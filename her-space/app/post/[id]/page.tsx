@@ -289,10 +289,6 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
 
   return (
     <PageShell className="max-w-3xl space-y-6 px-4 py-6 md:px-6 md:py-10">
-        <a className="inline-flex min-h-10 items-center rounded-full border border-white/70 bg-white/70 px-4 text-sm font-medium text-deep-plum shadow-sm transition hover:bg-white" href="/feed">
-          Back to feed
-        </a>
-
         {loading && <p className="text-gray-700">Loading post...</p>}
         {message && <Card className="text-red-700">{message}</Card>}
 

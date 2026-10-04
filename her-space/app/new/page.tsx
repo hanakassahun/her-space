@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import PageShell from "@/components/ui/PageShell";
@@ -22,6 +22,17 @@ export default function NewPostPage() {
   const [topics, setTopics] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      const query = new URLSearchParams(window.location.search);
+      const sharedTitle = query.get("title");
+      const sharedTopics = query.get("topics");
+      if (sharedTitle) setTitle(sharedTitle);
+      if (sharedTopics) setTopics(sharedTopics);
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -68,10 +79,7 @@ export default function NewPostPage() {
   return (
     <PageShell className="max-w-3xl space-y-6">
         <div>
-          <a className="inline-flex min-h-10 items-center rounded-full border border-white/70 bg-white/70 px-4 text-sm font-medium text-deep-plum shadow-sm transition hover:bg-white" href="/feed">
-            Back to feed
-          </a>
-          <h1 className="mt-3 text-3xl font-bold text-deep-plum">Write a post</h1>
+          <h1 className="text-3xl font-bold text-deep-plum">Write a post</h1>
         </div>
 
         <Card as="div" className="space-y-4">

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { navConfig } from "@/lib/nav";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
 import LikeButton from "@/components/LikeButton";
 import PageShell from "@/components/ui/PageShell";
@@ -145,33 +146,14 @@ export default function FeedPage() {
     <PageShell className="max-w-3xl space-y-8 px-4 py-6 md:px-6 md:py-10">
         <header className="flex items-center justify-between gap-4">
           <div>
-            <Badge variant="lilac" className="mb-2">Her Space</Badge>
             <h1 className="text-3xl font-bold text-deep-plum">Community feed</h1>
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-3">
-            {isSignedIn && (
-              <>
-                <Link className="shrink-0 inline-flex min-h-11 items-center rounded-full border border-white/60 bg-white/65 px-4 py-2 font-medium text-deep-plum" href="/explore">
-                  Explore
-                </Link>
-                <Link className="shrink-0 inline-flex min-h-11 items-center rounded-full border border-white/60 bg-white/65 px-4 py-2 font-medium text-deep-plum" href={`/u/${userId}`}>
-                  My profile
-                </Link>
-                <Link
-                  className="shrink-0 inline-flex min-h-11 items-center rounded-full border border-white/60 bg-white/65 px-4 py-2 font-medium text-deep-plum"
-                  href="/library"
-                >
-                  My Library
-                </Link>
-              </>
-            )}
-            <a
-              className="gradient-aurora shadow-glow inline-flex min-h-11 shrink-0 items-center rounded-full px-5 py-2 font-medium text-white"
-              href="/new"
-            >
-              Write a post
-            </a>
-          </div>
+          <Link
+            className="gradient-aurora shadow-glow inline-flex min-h-11 shrink-0 items-center rounded-full px-5 py-2 font-medium text-white"
+            href={navConfig.write.href}
+          >
+            Write a post
+          </Link>
         </header>
 
         <nav className="flex gap-2" aria-label="Feed posts">

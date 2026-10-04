@@ -3,100 +3,143 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { mobileNavOrder, moreNavOrder, isNavItemActive, navConfig, resolveNavHref } from "@/lib/nav";
 import { supabase } from "@/lib/supabase";
+import NavIcon from "@/components/NavIcon";
 
-type NavItem = {
-  label: string;
-  href: string;
-  icon: "home" | "explore" | "write" | "library" | "profile";
+type BottomNavProps = {
+  userId: string;
+  isAdmin: boolean;
 };
 
-const navItems: NavItem[] = [
-  { label: "Home", href: "/", icon: "home" },
-  { label: "Explore", href: "/explore", icon: "explore" },
-  { label: "Write", href: "/new", icon: "write" },
-  { label: "Library", href: "/library", icon: "library" },
-];
-
-function NavIcon({ icon }: { icon: NavItem["icon"] }) {
-  const common = {
-    fill: "none",
-    stroke: "currentColor",
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-    strokeWidth: 1.7,
-    viewBox: "0 0 24 24",
-    "aria-hidden": true as const,
-    className: "h-5 w-5",
-  };
-
-  if (icon === "home") {
-    return <svg {...common}><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-6v-7h-4v7H4a1 1 0 0 1-1-1z" /></svg>;
-  }
-  if (icon === "explore") {
-    return <svg {...common}><circle cx="12" cy="12" r="9" /><path d="m15.8 8.2-2.4 5.2-5.2 2.4 2.4-5.2z" /></svg>;
-  }
-  if (icon === "write") {
-    return <svg {...common}><path d="M12 20h9" /><path d="m16.5 3.5 4 4L8 20l-5 1 1-5z" /></svg>;
-  }
-  if (icon === "library") {
-    return <svg {...common}><path d="M5 4.5A2.5 2.5 0 0 1 7.5 2H20v18H7.5A2.5 2.5 0 0 0 5 22z" /><path d="M5 4.5v17M9 6h7M9 10h7" /></svg>;
-  }
-  return <svg {...common}><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>;
-}
-
-export default function BottomNav() {
+export default function BottomNav({ userId, isAdmin }: BottomNavProps) {
   const pathname = usePathname();
-  const [userId, setUserId] = useState<string | null>(null);
-  const excludedRoute = pathname === "/login" || pathname === "/signup";
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreActive = moreNavOrder.some(
+    (key) => (!navConfig[key].adminOnly || isAdmin) && isNavItemActive(key, pathname)
+  );
 
   useEffect(() => {
-    let mounted = true;
-    void supabase.auth.getUser().then(({ data }) => {
-      if (mounted) setUserId(data.user?.id ?? null);
-    });
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUserId(session?.user.id ?? null);
-    });
+    if (!moreOpen) return;
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setMoreOpen(false);
+    }
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [moreOpen]);
 
-    return () => {
-      mounted = false;
-      authListener.subscription.unsubscribe();
-    };
-  }, []);
-
-  if (!userId || excludedRoute) return null;
-
-  const items: NavItem[] = [
-    ...navItems,
-    { label: "Profile", href: `/u/${userId}`, icon: "profile" },
-  ];
+  async function handleLogout() {
+    setMoreOpen(false);
+    await supabase.auth.signOut();
+  }
 
   return (
-    <nav
-      className="glass fixed inset-x-3 bottom-0 z-50 rounded-b-none px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] md:hidden"
-      aria-label="Main navigation"
-    >
-      <ul className="mx-auto flex max-w-lg items-center justify-around gap-1">
-        {items.map(({ label, href, icon }) => {
-          const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
-          return (
-            <li className="min-w-0 flex-1" key={label}>
-              <Link
-                className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 text-[11px] font-medium ${
-                  active ? "text-deep-plum" : "text-gray-600"
-                }`}
-                href={href}
-                aria-current={active ? "page" : undefined}
-                aria-label={label}
+    <>
+      {moreOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end bg-deep-plum/20 md:hidden"
+          onClick={() => setMoreOpen(false)}
+        >
+          <section
+            className="glass nav-sheet-enter w-full rounded-b-none rounded-t-3xl p-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)]"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="more-heading"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h2 id="more-heading" className="text-lg font-semibold text-deep-plum">More</h2>
+              <button
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full text-deep-plum hover:bg-soft-lilac/50"
+                type="button"
+                aria-label="Close menu"
+                onClick={() => setMoreOpen(false)}
               >
-                <NavIcon icon={icon} />
-                <span className="truncate">{label}</span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                  <path strokeLinecap="round" d="m6 6 12 12M18 6 6 18" />
+                </svg>
+              </button>
+            </div>
+            <ul className="space-y-1">
+              {moreNavOrder.map((key) => {
+                const item = navConfig[key];
+                if (item.adminOnly && !isAdmin) return null;
+                const active = isNavItemActive(key, pathname);
+                return (
+                  <li key={key}>
+                    <Link
+                      className={`flex min-h-12 items-center gap-3 rounded-2xl px-3 text-sm font-medium ${
+                        active ? "bg-soft-lilac/70 text-deep-plum" : "text-gray-700 hover:bg-white/70"
+                      }`}
+                      href={resolveNavHref(key, userId)}
+                      aria-current={active ? "page" : undefined}
+                      onClick={() => setMoreOpen(false)}
+                    >
+                      <NavIcon icon={item.icon} />
+                      {item.label}
+                    </Link>
+                  </li>
+                );
+              })}
+              <li>
+                <button
+                  className="flex min-h-12 w-full items-center gap-3 rounded-2xl px-3 text-left text-sm font-medium text-rose-900 hover:bg-rose-100/70"
+                  type="button"
+                  onClick={handleLogout}
+                >
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 17l5-5-5-5M15 12H3m9-8h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7" />
+                  </svg>
+                  Log out
+                </button>
+              </li>
+            </ul>
+          </section>
+        </div>
+      )}
+
+      <nav
+        className="glass fixed inset-x-3 bottom-0 z-40 rounded-b-none px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] md:hidden"
+        aria-label="Primary navigation"
+      >
+        <ul className="mx-auto flex max-w-lg items-center justify-around gap-1">
+          {mobileNavOrder.map((key) => {
+            const item = navConfig[key];
+            const active = isNavItemActive(key, pathname);
+            const isWrite = key === "write";
+            return (
+              <li className="min-w-0 flex-1" key={key}>
+                <Link
+                  className={isWrite
+                    ? "mx-auto flex h-12 w-12 items-center justify-center rounded-full gradient-aurora text-white shadow-glow"
+                    : `flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 text-[11px] font-medium ${active ? "text-deep-plum" : "text-gray-600"}`}
+                  href={resolveNavHref(key, userId)}
+                  aria-label={isWrite ? "Write a post" : item.label}
+                  aria-current={active ? "page" : undefined}
+                  title={isWrite ? "Write a post" : item.label}
+                >
+                  <NavIcon icon={item.icon} className={isWrite ? "h-6 w-6" : "h-5 w-5"} />
+                  {!isWrite && <span className="truncate">{item.label}</span>}
+                </Link>
+              </li>
+            );
+          })}
+          <li className="min-w-0 flex-1">
+            <button
+              className={`flex min-h-12 w-full flex-col items-center justify-center gap-0.5 rounded-2xl px-1 text-[11px] font-medium ${moreActive || moreOpen ? "text-deep-plum" : "text-gray-600"}`}
+              type="button"
+              aria-label="More navigation options"
+              aria-expanded={moreOpen}
+              aria-haspopup="dialog"
+              aria-current={moreActive ? "page" : undefined}
+              onClick={() => setMoreOpen((open) => !open)}
+            >
+              <NavIcon icon="more" />
+              <span>More</span>
+            </button>
+          </li>
+        </ul>
+      </nav>
+    </>
   );
 }

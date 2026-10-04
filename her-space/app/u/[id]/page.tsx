@@ -172,9 +172,6 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
     <PageShell className="max-w-3xl space-y-8 px-4 py-6 md:px-6 md:py-10">
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <Link className="inline-flex min-h-10 items-center rounded-full border border-white/70 bg-white/70 px-4 text-sm font-medium text-deep-plum shadow-sm transition hover:bg-white" href="/feed">
-              Back to feed
-            </Link>
             {profile && (
               <>
                 <div className="mt-4 flex items-center gap-4">

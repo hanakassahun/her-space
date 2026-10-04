@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import PageShell from "@/components/ui/PageShell";
@@ -14,10 +15,12 @@ export default function SignupPage() {
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [agreedToPolicies, setAgreedToPolicies] = useState(false);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSignup() {
+    if (!agreedToPolicies) return;
     setLoading(true);
     setMessage("");
 
@@ -92,10 +95,26 @@ export default function SignupPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
+        <label className="flex items-start gap-3 text-sm leading-6 text-gray-700">
+          <input
+            className="mt-1 h-4 w-4 shrink-0 accent-fuchsia-700"
+            type="checkbox"
+            required
+            checked={agreedToPolicies}
+            onChange={(event) => setAgreedToPolicies(event.target.checked)}
+          />
+          <span>
+            I agree to the{" "}
+            <Link className="font-medium text-deep-plum underline" href="/rules" target="_blank" rel="noopener noreferrer">Community rules</Link>,{" "}
+            <Link className="font-medium text-deep-plum underline" href="/privacy" target="_blank" rel="noopener noreferrer">Privacy</Link>{" "}
+            and{" "}
+            <Link className="font-medium text-deep-plum underline" href="/terms" target="_blank" rel="noopener noreferrer">Terms</Link>.
+          </span>
+        </label>
         <Button
           className="w-full"
           onClick={handleSignup}
-          disabled={loading}
+          disabled={loading || !agreedToPolicies}
         >
           {loading ? "Creating..." : "Create account"}
         </Button>

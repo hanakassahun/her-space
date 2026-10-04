@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { DM_Sans, Noto_Sans_Ethiopic, Sora } from "next/font/google";
-import BottomNav from "@/components/BottomNav";
+import AppChrome from "@/components/AppChrome";
 import "./globals.css";
 
 const sora = Sora({
@@ -30,8 +30,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${sora.variable} ${dmSans.variable} ${notoSansEthiopic.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        {children}
-        <BottomNav />
+        <AppChrome>{children}</AppChrome>
       </body>
     </html>
   );

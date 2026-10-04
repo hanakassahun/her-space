@@ -1,0 +1,87 @@
+export type NavIconKey =
+  | "home"
+  | "feed"
+  | "explore"
+  | "write"
+  | "journal"
+  | "learn"
+  | "library"
+  | "resources"
+  | "profile"
+  | "admin"
+  | "settings"
+  | "rules"
+  | "more";
+
+export type NavKey =
+  | "home"
+  | "feed"
+  | "explore"
+  | "write"
+  | "journal"
+  | "learn"
+  | "library"
+  | "resources"
+  | "profile"
+  | "admin"
+  | "settings"
+  | "rules";
+
+export type NavItem = {
+  label: string;
+  href: string;
+  icon: NavIconKey;
+  adminOnly?: boolean;
+};
+
+export const navConfig: Record<NavKey, NavItem> = {
+  home: { label: "Home", href: "/", icon: "home" },
+  feed: { label: "Feed", href: "/feed", icon: "feed" },
+  explore: { label: "Explore", href: "/explore", icon: "explore" },
+  write: { label: "Write", href: "/new", icon: "write" },
+  journal: { label: "Journal", href: "/journal", icon: "journal" },
+  learn: { label: "Learn", href: "/learn", icon: "learn" },
+  library: { label: "Library", href: "/library", icon: "library" },
+  resources: { label: "Resources", href: "/resources", icon: "resources" },
+  profile: { label: "My profile", href: "/u/{userId}", icon: "profile" },
+  admin: { label: "Admin", href: "/admin", icon: "admin", adminOnly: true },
+  settings: { label: "Settings", href: "/settings", icon: "settings" },
+  rules: { label: "Rules", href: "/rules", icon: "rules" },
+};
+
+export const desktopNavOrder: NavKey[] = [
+  "home",
+  "feed",
+  "explore",
+  "write",
+  "journal",
+  "learn",
+  "library",
+  "resources",
+  "rules",
+  "settings",
+  "profile",
+  "admin",
+];
+
+export const mobileNavOrder: NavKey[] = ["home", "explore", "write", "journal"];
+export const moreNavOrder: NavKey[] = ["feed", "learn", "library", "resources", "rules", "settings", "profile", "admin"];
+
+export function resolveNavHref(key: NavKey, userId: string) {
+  return navConfig[key].href.replace("{userId}", userId);
+}
+
+export function isNavItemActive(key: NavKey, pathname: string) {
+  if (key === "home") return pathname === "/";
+  if (key === "feed") return pathname === "/feed" || pathname.startsWith("/post/");
+  if (key === "profile") return pathname.startsWith("/u/");
+  return pathname === navConfig[key].href || pathname.startsWith(`${navConfig[key].href}/`);
+}
+
+export function isTopLevelPath(pathname: string) {
+  return pathname === "/u/" || pathname.startsWith("/u/") ||
+    desktopNavOrder.some((key) => {
+      const href = navConfig[key].href;
+      return !href.includes("{") && pathname === href;
+    });
+}

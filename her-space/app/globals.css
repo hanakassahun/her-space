@@ -54,6 +54,21 @@
   .animate-fade-up {
     animation: fade-up 420ms ease-out both;
   }
+
+  .nav-sheet-enter {
+    animation: nav-sheet-enter 220ms ease-out both;
+  }
+}
+
+@keyframes nav-sheet-enter {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 body {
@@ -66,7 +81,6 @@ body {
   background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-dm-sans), var(--font-noto-ethiopic), sans-serif;
-  padding-bottom: calc(5.25rem + env(safe-area-inset-bottom));
 }
 
 h1,
@@ -78,8 +92,3 @@ h6 {
   font-family: var(--font-sora), var(--font-noto-ethiopic), sans-serif;
 }
 
-@media (min-width: 768px) {
-  body {
-    padding-bottom: 0;
-  }
-}

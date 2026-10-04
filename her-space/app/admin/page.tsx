@@ -130,10 +130,19 @@ export default function AdminPage() {
   return (
     <PageShell className="max-w-4xl space-y-8 px-4 py-6 md:px-6 md:py-10">
         <header>
-          <Link className="inline-flex min-h-10 items-center rounded-full border border-white/70 bg-white/70 px-4 text-sm font-medium text-deep-plum shadow-sm transition hover:bg-white" href="/">
-            Back home
-          </Link>
           <h1 className="mt-3 text-3xl font-bold text-deep-plum">Admin reports</h1>
+          <Link
+            className="mt-3 inline-flex min-h-10 items-center rounded-full border border-white/70 bg-white/70 px-4 text-sm font-medium text-deep-plum shadow-sm transition hover:bg-white"
+            href="/admin/articles"
+          >
+            Manage articles
+          </Link>
+          <Link
+            className="ml-2 mt-3 inline-flex min-h-10 items-center rounded-full border border-white/70 bg-white/70 px-4 text-sm font-medium text-deep-plum shadow-sm transition hover:bg-white"
+            href="/admin/resources"
+          >
+            Manage resources
+          </Link>
         </header>
 
         {loading && <p className="text-gray-700">Loading reports...</p>}
