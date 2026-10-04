@@ -50,6 +50,10 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
   const [userId, setUserId] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [commentBody, setCommentBody] = useState("");
+  const [activeReportTarget, setActiveReportTarget] = useState<string | null>(null);
+  const [reportReason, setReportReason] = useState("");
+  const [reportFeedback, setReportFeedback] = useState<Record<string, string>>({});
+  const [submittingReport, setSubmittingReport] = useState(false);
   const [loading, setLoading] = useState(true);
   const [bookmarking, setBookmarking] = useState(false);
   const [submittingComment, setSubmittingComment] = useState(false);
@@ -58,7 +62,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
   async function loadComments(postId: string) {
     const { data, error } = await supabase
       .from("comments")
-      .select("id, body, created_at, profiles(display_name)")
+      .select("id, body, created_at, profiles!comments_author_id_fkey(display_name)")
       .eq("post_id", postId)
       .order("created_at", { ascending: true });
 
@@ -83,7 +87,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       const [postResult, bookmarkResult] = await Promise.all([
         supabase
           .from("posts")
-          .select("id, type, title, body, topics, created_at, profiles(display_name)")
+          .select("id, type, title, body, topics, created_at, profiles!posts_author_id_fkey(display_name)")
           .eq("id", id)
           .single(),
         supabase
@@ -157,6 +161,84 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
     setSubmittingComment(false);
   }
 
+  async function handleReportSubmit(
+    event: FormEvent<HTMLFormElement>,
+    target: "post" | "comment",
+    targetId: string
+  ) {
+    event.preventDefault();
+    const reason = reportReason.trim();
+    if (!reason || submittingReport) return;
+
+    setSubmittingReport(true);
+    setMessage("");
+    const { error } = await supabase.from("reports").insert({
+      reason,
+      ...(target === "post" ? { post_id: targetId } : { comment_id: targetId }),
+    });
+
+    if (error) {
+      setMessage(error.message);
+    } else {
+      setReportFeedback((current) => ({ ...current, [targetId]: "Thanks, we'll review this." }));
+      setReportReason("");
+      setActiveReportTarget(null);
+    }
+    setSubmittingReport(false);
+  }
+
+  function renderReportControl(target: "post" | "comment", targetId: string) {
+    const reportKey = `${target}:${targetId}`;
+    return (
+      <div className="space-y-2">
+        {reportFeedback[targetId] ? (
+          <p className="text-sm text-rose-800">{reportFeedback[targetId]}</p>
+        ) : activeReportTarget === reportKey ? (
+          <form
+            className="space-y-2"
+            onSubmit={(event) => handleReportSubmit(event, target, targetId)}
+          >
+            <textarea
+              className="min-h-20 w-full rounded border border-rose-300 bg-white p-2 text-sm text-gray-900 placeholder:text-gray-400"
+              placeholder="Reason for reporting"
+              value={reportReason}
+              onChange={(event) => setReportReason(event.target.value)}
+              maxLength={500}
+              required
+            />
+            <div className="flex gap-3">
+              <button
+                className="rounded bg-rose-700 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+                type="submit"
+                disabled={submittingReport || !reportReason.trim()}
+              >
+                {submittingReport ? "Submitting..." : "Submit report"}
+              </button>
+              <button
+                className="text-sm text-gray-600 underline"
+                type="button"
+                onClick={() => setActiveReportTarget(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        ) : (
+          <button
+            className="text-sm text-rose-700 underline"
+            type="button"
+            onClick={() => {
+              setReportReason("");
+              setActiveReportTarget(reportKey);
+            }}
+          >
+            Report
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-rose-50 px-6 py-12">
       <div className="mx-auto w-full max-w-3xl space-y-6">
@@ -201,18 +283,21 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
 
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rose-100 pt-4">
                 <p className="text-sm text-gray-600">By {getAuthorName(post.profiles)}</p>
-                <button
-                  className={`rounded px-4 py-2 text-sm font-medium disabled:opacity-50 ${
-                    saved
-                      ? "border border-rose-700 text-rose-700"
-                      : "bg-rose-700 text-white"
-                  }`}
-                  type="button"
-                  onClick={toggleBookmark}
-                  disabled={bookmarking}
-                >
-                  {saved ? "Saved" : "Save"}
-                </button>
+                <div className="flex flex-wrap items-center gap-4">
+                  {renderReportControl("post", id)}
+                  <button
+                    className={`rounded px-4 py-2 text-sm font-medium disabled:opacity-50 ${
+                      saved
+                        ? "border border-rose-700 text-rose-700"
+                        : "bg-rose-700 text-white"
+                    }`}
+                    type="button"
+                    onClick={toggleBookmark}
+                    disabled={bookmarking}
+                  >
+                    {saved ? "Saved" : "Save"}
+                  </button>
+                </div>
               </div>
             </article>
 
@@ -236,6 +321,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                         </time>
                       </div>
                       <p className="whitespace-pre-wrap text-gray-800">{comment.body}</p>
+                      {renderReportControl("comment", comment.id)}
                     </article>
                   ))}
                 </div>

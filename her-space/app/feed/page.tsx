@@ -33,7 +33,7 @@ export default function FeedPage() {
     async function loadPosts() {
       const { data, error } = await supabase
         .from("posts")
-        .select("id, type, title, body, topics, created_at, profiles(display_name)")
+        .select("id, type, title, body, topics, created_at, profiles!posts_author_id_fkey(display_name)")
         .order("created_at", { ascending: false });
 
       if (error) {
