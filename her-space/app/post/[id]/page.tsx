@@ -6,6 +6,11 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
 import LikeButton from "@/components/LikeButton";
+import PageShell from "@/components/ui/PageShell";
+import Card from "@/components/ui/Card";
+import Badge from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import Textarea from "@/components/ui/Textarea";
 
 type PostType = "experience" | "question" | "knowledge";
 type Professional = { title: string } | { title: string }[] | null;
@@ -34,10 +39,10 @@ type Comment = {
   profiles: { display_name: string | null } | { display_name: string | null }[] | null;
 };
 
-const typeStyles: Record<PostType, string> = {
-  experience: "bg-rose-100 text-rose-800",
-  question: "bg-amber-100 text-amber-800",
-  knowledge: "bg-emerald-100 text-emerald-800",
+const typeVariants: Record<PostType, "rose" | "sky" | "mint"> = {
+  experience: "rose",
+  question: "sky",
+  knowledge: "mint",
 };
 
 function getAuthorName(profiles: Post["profiles"] | Comment["profiles"]) {
@@ -239,8 +244,8 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
             className="space-y-2"
             onSubmit={(event) => handleReportSubmit(event, target, targetId)}
           >
-            <textarea
-              className="min-h-20 w-full rounded border border-rose-300 bg-white p-2 text-sm text-gray-900 placeholder:text-gray-400"
+            <Textarea
+              className="min-h-20 text-sm"
               placeholder="Reason for reporting"
               value={reportReason}
               onChange={(event) => setReportReason(event.target.value)}
@@ -248,25 +253,27 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
               required
             />
             <div className="flex gap-3">
-              <button
-                className="rounded bg-rose-700 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+              <Button
+                className="text-sm"
                 type="submit"
                 disabled={submittingReport || !reportReason.trim()}
               >
                 {submittingReport ? "Submitting..." : "Submit report"}
-              </button>
-              <button
-                className="text-sm text-gray-600 underline"
+              </Button>
+              <Button
+                variant="ghost"
+                className="text-sm"
                 type="button"
                 onClick={() => setActiveReportTarget(null)}
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </form>
         ) : (
-          <button
-            className="text-sm text-rose-700 underline"
+          <Button
+            variant="ghost"
+            className="text-sm"
             type="button"
             onClick={() => {
               setReportReason("");
@@ -274,31 +281,28 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
             }}
           >
             Report
-          </button>
+          </Button>
         )}
       </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-rose-50 px-6 py-12">
-      <div className="mx-auto w-full max-w-3xl space-y-6">
-        <a className="text-sm text-rose-800 underline" href="/feed">
+    <PageShell className="max-w-3xl space-y-6 px-4 py-6 md:px-6 md:py-10">
+        <a className="inline-flex min-h-10 items-center rounded-full border border-white/70 bg-white/70 px-4 text-sm font-medium text-deep-plum shadow-sm transition hover:bg-white" href="/feed">
           Back to feed
         </a>
 
         {loading && <p className="text-gray-700">Loading post...</p>}
-        {message && <p className="rounded bg-white p-4 text-red-600">{message}</p>}
+        {message && <Card className="text-red-700">{message}</Card>}
 
         {post && (
           <>
-            <article className="space-y-5 rounded bg-white p-6 shadow-sm">
+            <Card as="article" className="space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <span
-                  className={`rounded px-2.5 py-1 text-xs font-semibold capitalize ${typeStyles[post.type]}`}
-                >
+                <Badge variant={typeVariants[post.type]} className="capitalize">
                   {post.type}
-                </span>
+                </Badge>
                 <time className="text-sm text-gray-500" dateTime={post.created_at}>
                   {formatDate(post.created_at)}
                 </time>
@@ -315,7 +319,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                 <ul className="flex flex-wrap gap-2" aria-label="Topics">
                   {post.topics.map((topic, index) => (
                     <li
-                      className="rounded bg-rose-50 px-2.5 py-1 text-xs text-rose-800"
+                      className="rounded-full bg-soft-lilac px-2.5 py-1 text-xs text-deep-plum"
                       key={`${topic}-${index}`}
                     >
                       {topic}
@@ -338,33 +342,41 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                 <div className="flex flex-wrap items-center gap-4">
                   {renderReportControl("post", id)}
                   <LikeButton count={likeCount} liked={liked} onToggle={toggleLike} />
-                  <button
-                    className={`rounded px-4 py-2 text-sm font-medium disabled:opacity-50 ${
-                      saved
-                        ? "border border-rose-700 text-rose-700"
-                        : "bg-rose-700 text-white"
-                    }`}
+                  <Button
+                    variant={saved ? "primary" : "secondary"}
+                    className="!h-11 !w-11 !min-w-11 !px-0 !py-0"
                     type="button"
                     onClick={toggleBookmark}
                     disabled={bookmarking}
+                    aria-label={saved ? "Remove saved post" : "Save post"}
+                    title={saved ? "Saved" : "Save"}
                   >
-                    {saved ? "Saved" : "Save"}
-                  </button>
+                    <svg
+                      className="h-5 w-5"
+                      viewBox="0 0 24 24"
+                      fill={saved ? "currentColor" : "none"}
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      aria-hidden="true"
+                    >
+                      <path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-4-6 4z" />
+                    </svg>
+                  </Button>
                 </div>
               </div>
-            </article>
+            </Card>
 
             <section className="space-y-4" aria-labelledby="comments-heading">
-              <h2 id="comments-heading" className="text-xl font-semibold text-rose-900">
+              <h2 id="comments-heading" className="text-xl font-semibold text-deep-plum">
                 Comments
               </h2>
 
               {comments.length === 0 ? (
-                <p className="rounded bg-white p-5 text-gray-700">No comments yet.</p>
+                <Card className="text-gray-700">No comments yet.</Card>
               ) : (
                 <div className="space-y-3">
                   {comments.map((comment) => (
-                    <article key={comment.id} className="space-y-2 rounded bg-white p-5 shadow-sm">
+                    <Card as="article" key={comment.id} className="space-y-2">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-sm font-medium text-gray-900">
                           {getAuthorName(comment.profiles)}
@@ -375,34 +387,34 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                       </div>
                       <p className="whitespace-pre-wrap text-gray-800">{comment.body}</p>
                       {renderReportControl("comment", comment.id)}
-                    </article>
+                    </Card>
                   ))}
                 </div>
               )}
 
-              <form className="space-y-3 rounded bg-white p-5 shadow-sm" onSubmit={handleCommentSubmit}>
+              <Card as="div" className="space-y-3">
+              <form className="space-y-3" onSubmit={handleCommentSubmit}>
                 <label className="block space-y-2 text-sm font-medium text-gray-900">
                   Add a comment
-                  <textarea
-                    className="min-h-28 w-full rounded border border-rose-300 bg-white p-3 text-gray-900 placeholder:text-gray-400"
+                  <Textarea
+                    className="min-h-28"
                     value={commentBody}
                     onChange={(event) => setCommentBody(event.target.value)}
                     maxLength={2000}
                     required
                   />
                 </label>
-                <button
-                  className="rounded bg-rose-700 px-4 py-2 font-medium text-white disabled:opacity-50"
+                <Button
                   type="submit"
                   disabled={submittingComment || !commentBody.trim()}
                 >
                   {submittingComment ? "Commenting..." : "Comment"}
-                </button>
+                </Button>
               </form>
+              </Card>
             </section>
           </>
         )}
-      </div>
-    </main>
+    </PageShell>
   );
 }

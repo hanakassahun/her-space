@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import PageShell from "@/components/ui/PageShell";
+import Card from "@/components/ui/Card";
+import Badge from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
 
 type Related<T> = T | T[] | null;
 
@@ -124,19 +128,18 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="min-h-screen bg-rose-50 px-6 py-12">
-      <div className="mx-auto w-full max-w-4xl space-y-8">
+    <PageShell className="max-w-4xl space-y-8 px-4 py-6 md:px-6 md:py-10">
         <header>
-          <Link className="text-sm text-rose-800 underline" href="/">
+          <Link className="inline-flex min-h-10 items-center rounded-full border border-white/70 bg-white/70 px-4 text-sm font-medium text-deep-plum shadow-sm transition hover:bg-white" href="/">
             Back home
           </Link>
-          <h1 className="mt-3 text-3xl font-bold text-rose-900">Admin reports</h1>
+          <h1 className="mt-3 text-3xl font-bold text-deep-plum">Admin reports</h1>
         </header>
 
         {loading && <p className="text-gray-700">Loading reports...</p>}
-        {message && <p className="rounded bg-white p-4 text-red-600">{message}</p>}
+        {message && <Card className="text-red-700">{message}</Card>}
         {!loading && !message && reports.length === 0 && (
-          <p className="rounded bg-white p-6 text-gray-700">No open reports.</p>
+          <Card className="text-gray-700">No open reports.</Card>
         )}
 
         <section className="space-y-4" aria-label="Open reports">
@@ -146,10 +149,10 @@ export default function AdminPage() {
             const reporter = first(report.profiles);
 
             return (
-              <article key={report.id} className="space-y-4 rounded bg-white p-6 shadow-sm">
+              <Card as="article" key={report.id} className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-sm text-gray-600">
-                    Reported by {reporter?.display_name || "Her Space member"}
+                    Reported by <Badge variant="lilac">{reporter?.display_name || "Her Space member"}</Badge>
                   </p>
                   <time className="text-sm text-gray-500" dateTime={report.created_at}>
                     {formatDate(report.created_at)}
@@ -157,47 +160,47 @@ export default function AdminPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <h2 className="text-sm font-semibold text-rose-900">Reason</h2>
+                  <h2 className="text-sm font-semibold text-deep-plum">Reason</h2>
                   <p className="whitespace-pre-wrap text-gray-900">{report.reason}</p>
                 </div>
 
                 {post && (
-                  <div className="space-y-1 rounded bg-rose-50 p-4">
+                  <div className="space-y-1 rounded-2xl bg-blush-rose/30 p-4">
                     <h3 className="font-semibold text-gray-900">Reported post: {post.title}</h3>
                     <p className="whitespace-pre-wrap text-gray-800">{post.body}</p>
                   </div>
                 )}
 
                 {comment && (
-                  <div className="space-y-1 rounded bg-rose-50 p-4">
+                  <div className="space-y-1 rounded-2xl bg-soft-lilac/60 p-4">
                     <h3 className="font-semibold text-gray-900">Reported comment</h3>
                     <p className="whitespace-pre-wrap text-gray-800">{comment.body}</p>
                   </div>
                 )}
 
                 <div className="flex flex-wrap gap-3 border-t border-rose-100 pt-4">
-                  <button
-                    className="rounded bg-rose-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  <Button
+                    className="text-sm"
                     type="button"
                     onClick={() => markResolved(report.id)}
                     disabled={busyReportId === report.id}
                   >
                     Mark resolved
-                  </button>
-                  <button
-                    className="rounded border border-rose-700 px-4 py-2 text-sm font-medium text-rose-700 disabled:opacity-50"
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    className="text-sm"
                     type="button"
                     onClick={() => deleteReportedContent(report)}
                     disabled={busyReportId === report.id}
                   >
                     Delete content
-                  </button>
+                  </Button>
                 </div>
-              </article>
+              </Card>
             );
           })}
         </section>
-      </div>
-    </main>
+    </PageShell>
   );
 }

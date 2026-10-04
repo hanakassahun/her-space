@@ -5,6 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
+import PageShell from "@/components/ui/PageShell";
+import Card from "@/components/ui/Card";
+import Badge from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -39,10 +44,10 @@ const topicGroups = {
   "Life stages": ["puberty", "pregnancy", "postpartum", "menopause"],
 };
 
-const typeStyles: Record<Post["type"], string> = {
-  experience: "bg-rose-100 text-rose-800",
-  question: "bg-amber-100 text-amber-800",
-  knowledge: "bg-emerald-100 text-emerald-800",
+const typeVariants: Record<Post["type"], "rose" | "sky" | "mint"> = {
+  experience: "rose",
+  question: "sky",
+  knowledge: "mint",
 };
 
 function first<T>(value: T | T[] | null) {
@@ -123,25 +128,24 @@ export default function ExplorePage() {
   }, [authChecked, debouncedSearch, selectedTopic, userId]);
 
   return (
-    <main className="min-h-screen bg-rose-50 px-6 py-12">
-      <div className="mx-auto w-full max-w-3xl space-y-8">
+    <PageShell className="max-w-3xl space-y-8 px-4 py-6 md:px-6 md:py-10">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <Link className="text-sm text-rose-800 underline" href="/feed">
+            <Link className="inline-flex min-h-10 items-center rounded-full border border-white/70 bg-white/70 px-4 text-sm font-medium text-deep-plum shadow-sm transition hover:bg-white" href="/feed">
               Back to feed
             </Link>
-            <h1 className="mt-2 text-3xl font-bold text-rose-900">Explore</h1>
+            <h1 className="mt-2 text-3xl font-bold text-deep-plum">Explore</h1>
           </div>
           <Link
-            className="rounded border border-rose-700 px-4 py-2 font-medium text-rose-700"
+            className="inline-flex min-h-11 items-center rounded-full border border-white/60 bg-white/65 px-4 py-2 font-medium text-deep-plum"
             href={`/u/${userId ?? ""}`}
           >
             My profile
           </Link>
         </header>
 
-        <input
-          className="w-full rounded border border-rose-300 bg-white p-3 text-gray-900 placeholder:text-gray-400"
+        <Input
+          className="min-h-12 rounded-full border-white/70 bg-white/80 shadow-sm"
           type="search"
           placeholder="Search posts by title or body"
           value={search}
@@ -152,14 +156,15 @@ export default function ExplorePage() {
         <div className="space-y-4">
           {Object.entries(topicGroups).map(([heading, topics]) => (
             <section className="space-y-2" key={heading} aria-label={heading}>
-              <h2 className="text-sm font-semibold text-rose-900">{heading}</h2>
+              <h2 className="text-sm font-semibold text-deep-plum">{heading}</h2>
               <div className="flex flex-wrap gap-2">
                 {topics.map((topic) => (
-                  <button
-                    className={`rounded-full border px-3 py-1.5 text-sm ${
+                  <Button
+                    variant={selectedTopic === topic ? "primary" : "secondary"}
+                    className={`text-sm ${
                       selectedTopic === topic
-                        ? "border-rose-700 bg-rose-700 text-white"
-                        : "border-rose-300 bg-white text-rose-800"
+                        ? "gradient-aurora shadow-glow text-white"
+                        : ""
                     }`}
                     key={topic}
                     type="button"
@@ -169,26 +174,27 @@ export default function ExplorePage() {
                     }
                   >
                     {topic}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </section>
           ))}
           {selectedTopic && (
-            <button
-              className="text-sm text-rose-700 underline"
+            <Button
+              variant="ghost"
+              className="text-sm"
               type="button"
               onClick={() => setSelectedTopic(null)}
             >
               Clear topic filter
-            </button>
+            </Button>
           )}
         </div>
 
         {loading && <p className="text-gray-700">Searching posts...</p>}
-        {message && <p className="rounded bg-white p-4 text-red-600">{message}</p>}
+        {message && <Card className="text-red-700">{message}</Card>}
         {!loading && !message && posts.length === 0 && (
-          <p className="rounded bg-white p-6 text-gray-700">No posts found.</p>
+          <Card className="text-gray-700">No posts found.</Card>
         )}
 
         <section className="space-y-4" aria-label="Explore results">
@@ -197,13 +203,11 @@ export default function ExplorePage() {
             const professionalTitle = getProfessionalTitle(profile);
 
             return (
-              <article key={post.id} className="space-y-4 rounded bg-white p-6 shadow-sm">
+              <Card as="article" key={post.id} className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <span
-                    className={`rounded px-2.5 py-1 text-xs font-semibold capitalize ${typeStyles[post.type]}`}
-                  >
+                  <Badge variant={typeVariants[post.type]} className="capitalize">
                     {post.type}
-                  </span>
+                  </Badge>
                   <time className="text-sm text-gray-500" dateTime={post.created_at}>
                     {new Date(post.created_at).toLocaleDateString(undefined, {
                       year: "numeric",
@@ -223,7 +227,7 @@ export default function ExplorePage() {
                   <ul className="flex flex-wrap gap-2" aria-label="Topics">
                     {post.topics.map((topic, index) => (
                       <li
-                        className="rounded bg-rose-50 px-2.5 py-1 text-xs text-rose-800"
+                        className="rounded-full bg-soft-lilac px-2.5 py-1 text-xs text-deep-plum"
                         key={`${topic}-${index}`}
                       >
                         {topic}
@@ -242,11 +246,10 @@ export default function ExplorePage() {
                     </span>
                   )}
                 </p>
-              </article>
+              </Card>
             );
           })}
         </section>
-      </div>
-    </main>
+    </PageShell>
   );
 }

@@ -5,6 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
+import PageShell from "@/components/ui/PageShell";
+import Card from "@/components/ui/Card";
+import Badge from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import Textarea from "@/components/ui/Textarea";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -29,10 +34,10 @@ type Post = {
   profiles: PostProfile | PostProfile[] | null;
 };
 
-const typeStyles: Record<Post["type"], string> = {
-  experience: "bg-rose-100 text-rose-800",
-  question: "bg-amber-100 text-amber-800",
-  knowledge: "bg-emerald-100 text-emerald-800",
+const typeVariants: Record<Post["type"], "rose" | "sky" | "mint"> = {
+  experience: "rose",
+  question: "sky",
+  knowledge: "mint",
 };
 
 function formatDate(date: string) {
@@ -164,49 +169,53 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
   }
 
   return (
-    <main className="min-h-screen bg-rose-50 px-6 py-12">
-      <div className="mx-auto w-full max-w-3xl space-y-8">
+    <PageShell className="max-w-3xl space-y-8 px-4 py-6 md:px-6 md:py-10">
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <Link className="text-sm text-rose-800 underline" href="/feed">
+            <Link className="inline-flex min-h-10 items-center rounded-full border border-white/70 bg-white/70 px-4 text-sm font-medium text-deep-plum shadow-sm transition hover:bg-white" href="/feed">
               Back to feed
             </Link>
             {profile && (
               <>
-                <h1 className="mt-3 text-3xl font-bold text-rose-900">
-                  {profile.display_name || "Her Space member"}
-                </h1>
-                <p className="mt-2 max-w-xl whitespace-pre-wrap text-gray-700">
-                  {profile.bio || ""}
-                </p>
-                <p className="mt-3 text-sm text-gray-600">
-                  {followerCount} followers · {followingCount} following
-                </p>
+                <div className="mt-4 flex items-center gap-4">
+                  <div className="gradient-aurora shadow-glow flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-2xl font-semibold text-white" aria-hidden="true">
+                    {(profile.display_name || "H").trim().charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h1 className="text-3xl font-bold text-deep-plum">
+                      {profile.display_name || "Her Space member"}
+                    </h1>
+                    <p className="mt-1 max-w-xl whitespace-pre-wrap text-gray-700">
+                      {profile.bio || ""}
+                    </p>
+                    <p className="mt-2 text-sm text-gray-600">
+                      {followerCount} followers · {followingCount} following
+                    </p>
+                  </div>
+                </div>
               </>
             )}
           </div>
           {userId && userId !== id && profile && (
-            <button
-              className={`mt-7 rounded px-4 py-2 font-medium disabled:opacity-50 ${
-                isFollowing
-                  ? "border border-rose-700 text-rose-700"
-                  : "bg-rose-700 text-white"
-              }`}
+            <Button
+              className="mt-7"
+              variant={isFollowing ? "secondary" : "primary"}
               type="button"
               onClick={toggleFollow}
               disabled={updatingFollow}
             >
               {isFollowing ? "Unfollow" : "Follow"}
-            </button>
+            </Button>
           )}
         </header>
 
         {userId === id && profile && (
-          <form className="space-y-3 rounded bg-white p-5 shadow-sm" onSubmit={saveBio}>
+          <Card as="div" className="space-y-3">
+          <form className="space-y-3" onSubmit={saveBio}>
             <label className="block space-y-2 text-sm font-medium text-gray-900">
               Edit bio
-              <textarea
-                className="min-h-24 w-full rounded border border-rose-300 bg-white p-3 text-gray-900 placeholder:text-gray-400"
+              <Textarea
+                className="min-h-24"
                 value={bioDraft}
                 onChange={(event) => setBioDraft(event.target.value)}
                 maxLength={160}
@@ -214,36 +223,34 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
             </label>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <span className="text-xs text-gray-500">{bioDraft.length}/160</span>
-              <button
-                className="rounded bg-rose-700 px-4 py-2 font-medium text-white disabled:opacity-50"
+              <Button
                 type="submit"
                 disabled={savingBio}
               >
                 {savingBio ? "Saving..." : "Save bio"}
-              </button>
+              </Button>
             </div>
           </form>
+          </Card>
         )}
 
         {loading && <p className="text-gray-700">Loading profile...</p>}
-        {message && <p className="rounded bg-white p-4 text-red-600">{message}</p>}
+        {message && <Card className="text-red-700">{message}</Card>}
         {!loading && !profile && !message && (
-          <p className="rounded bg-white p-6 text-gray-700">Profile not found.</p>
+          <Card className="text-gray-700">Profile not found.</Card>
         )}
 
         <section className="space-y-4" aria-label="Posts by this user">
-          <h2 className="text-xl font-semibold text-rose-900">Posts</h2>
+          <h2 className="text-xl font-semibold text-deep-plum">Posts</h2>
           {!loading && posts.length === 0 && profile && (
-            <p className="rounded bg-white p-6 text-gray-700">No posts yet.</p>
+            <Card className="text-gray-700">No posts yet.</Card>
           )}
           {posts.map((post) => (
-            <article key={post.id} className="space-y-4 rounded bg-white p-6 shadow-sm">
+            <Card as="article" key={post.id} className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <span
-                  className={`rounded px-2.5 py-1 text-xs font-semibold capitalize ${typeStyles[post.type]}`}
-                >
+                <Badge variant={typeVariants[post.type]} className="capitalize">
                   {post.type}
-                </span>
+                </Badge>
                 <time className="text-sm text-gray-500" dateTime={post.created_at}>
                   {formatDate(post.created_at)}
                 </time>
@@ -259,7 +266,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                 <ul className="flex flex-wrap gap-2" aria-label="Topics">
                   {post.topics.map((topic, index) => (
                     <li
-                      className="rounded bg-rose-50 px-2.5 py-1 text-xs text-rose-800"
+                      className="rounded-full bg-soft-lilac px-2.5 py-1 text-xs text-deep-plum"
                       key={`${topic}-${index}`}
                     >
                       {topic}
@@ -267,10 +274,9 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                   ))}
                 </ul>
               )}
-            </article>
+            </Card>
           ))}
         </section>
-      </div>
-    </main>
+    </PageShell>
   );
 }

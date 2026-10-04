@@ -1,26 +1,85 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #fbf7fd;
+  --foreground: #2a1b3d;
+  --aurora-rose: #f2c8dc;
+  --aurora-lilac: #d9c9f3;
+  --aurora-periwinkle: #b9c8f5;
+  --aurora-cyan: #a9dfe8;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-pearl-white: #fbf7fd;
+  --color-blush-rose: #f2c8dc;
+  --color-soft-lilac: #d9c9f3;
+  --color-periwinkle: #b9c8f5;
+  --color-aurora-cyan: #a9dfe8;
+  --color-deep-plum: #2a1b3d;
+  --font-sans: var(--font-dm-sans), var(--font-noto-ethiopic), sans-serif;
+  --font-heading: var(--font-sora), var(--font-noto-ethiopic), sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+.gradient-aurora {
+  background-image: linear-gradient(115deg, #d88faf 0%, #ac8bd4 52%, #829cda 100%);
+}
+
+.shadow-glow {
+  box-shadow: 0 8px 28px rgb(168 127 202 / 24%), 0 2px 8px rgb(77 48 103 / 12%);
+}
+
+.glass {
+  border: 1px solid rgb(255 255 255 / 60%);
+  border-radius: 1.5rem;
+  background: rgb(255 255 255 / 65%);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 12px 36px rgb(70 47 93 / 8%);
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .animate-fade-up {
+    animation: fade-up 420ms ease-out both;
   }
 }
 
 body {
-  background: var(--background);
+  min-height: 100%;
+  background-color: var(--background);
+  background-image:
+    radial-gradient(ellipse at 8% 8%, rgb(242 200 220 / 32%), transparent 38%),
+    radial-gradient(ellipse at 92% 18%, rgb(185 200 245 / 30%), transparent 40%),
+    radial-gradient(ellipse at 55% 96%, rgb(217 201 243 / 28%), transparent 42%);
+  background-attachment: fixed;
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-dm-sans), var(--font-noto-ethiopic), sans-serif;
+  padding-bottom: calc(5.25rem + env(safe-area-inset-bottom));
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-sora), var(--font-noto-ethiopic), sans-serif;
+}
+
+@media (min-width: 768px) {
+  body {
+    padding-bottom: 0;
+  }
 }

@@ -3,6 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import PageShell from "@/components/ui/PageShell";
+import Card from "@/components/ui/Card";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,38 +30,36 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-rose-50 px-6">
-      <div className="w-full max-w-sm space-y-4">
-        <h1 className="text-3xl font-bold text-rose-900">Welcome back</h1>
-        <input
-          className="w-full rounded border border-rose-300 bg-white p-3 text-gray-900 placeholder:text-gray-400"
+    <PageShell className="flex min-h-screen items-center justify-center">
+      <Card className="w-full max-w-sm space-y-4">
+        <h1 className="text-3xl font-bold text-deep-plum">Welcome back</h1>
+        <Input
           type="email"
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
-        <input
-          className="w-full rounded border border-rose-300 bg-white p-3 text-gray-900 placeholder:text-gray-400"
+        <Input
           type="password"
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <button
-          className="w-full rounded bg-rose-700 p-3 text-white disabled:opacity-50"
+        <Button
+          className="w-full"
           onClick={handleLogin}
           disabled={loading}
         >
           {loading ? "Signing in..." : "Log in"}
-        </button>
-        {message && <p className="text-red-600">{message}</p>}
-        <p className="text-rose-800">
+        </Button>
+        {message && <p className="text-red-700">{message}</p>}
+        <p className="text-deep-plum">
           New here?{" "}
           <a className="underline" href="/signup">
             Create an account
           </a>
         </p>
-      </div>
-    </main>
+      </Card>
+    </PageShell>
   );
 }

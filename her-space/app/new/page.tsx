@@ -3,6 +3,11 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import PageShell from "@/components/ui/PageShell";
+import Card from "@/components/ui/Card";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import Textarea from "@/components/ui/Textarea";
 
 type PostType = "experience" | "question" | "knowledge";
 type Provenance = "personal" | "community" | "evidence";
@@ -61,20 +66,20 @@ export default function NewPostPage() {
   }
 
   return (
-    <main className="min-h-screen bg-rose-50 px-6 py-12">
-      <div className="mx-auto w-full max-w-2xl space-y-6">
+    <PageShell className="max-w-3xl space-y-6">
         <div>
-          <a className="text-sm text-rose-800 underline" href="/feed">
+          <a className="inline-flex min-h-10 items-center rounded-full border border-white/70 bg-white/70 px-4 text-sm font-medium text-deep-plum shadow-sm transition hover:bg-white" href="/feed">
             Back to feed
           </a>
-          <h1 className="mt-3 text-3xl font-bold text-rose-900">Write a post</h1>
+          <h1 className="mt-3 text-3xl font-bold text-deep-plum">Write a post</h1>
         </div>
 
-        <form className="space-y-4 rounded bg-white p-6 shadow-sm" onSubmit={handleSubmit}>
+        <Card as="div" className="space-y-4">
+        <form className="space-y-4" onSubmit={handleSubmit}>
           <label className="block space-y-2 text-sm font-medium text-gray-900">
             Type
             <select
-              className="w-full rounded border border-rose-300 bg-white p-3 text-gray-900"
+              className="min-h-11 w-full rounded-2xl border border-white/70 bg-white/80 px-4 py-2.5 text-deep-plum focus:outline-none focus:ring-2 focus:ring-soft-lilac"
               value={type}
               onChange={(event) => {
                 const nextType = event.target.value as PostType;
@@ -92,7 +97,7 @@ export default function NewPostPage() {
           <label className="block space-y-2 text-sm font-medium text-gray-900">
             What is this post?
             <select
-              className="w-full rounded border border-rose-300 bg-white p-3 text-gray-900"
+              className="min-h-11 w-full rounded-2xl border border-white/70 bg-white/80 px-4 py-2.5 text-deep-plum focus:outline-none focus:ring-2 focus:ring-soft-lilac"
               value={provenance}
               onChange={(event) => {
                 const nextProvenance = event.target.value as Provenance;
@@ -109,8 +114,8 @@ export default function NewPostPage() {
           {provenance === "evidence" && (
             <label className="block space-y-2 text-sm font-medium text-gray-900">
               Source links (one per line)
-              <textarea
-                className="min-h-28 w-full rounded border border-rose-300 bg-white p-3 text-gray-900 placeholder:text-gray-400"
+              <Textarea
+                className="min-h-28"
                 placeholder="https://example.com/source"
                 value={sources}
                 onChange={(event) => setSources(event.target.value)}
@@ -121,8 +126,7 @@ export default function NewPostPage() {
 
           <label className="block space-y-2 text-sm font-medium text-gray-900">
             Title
-            <input
-              className="w-full rounded border border-rose-300 bg-white p-3 text-gray-900 placeholder:text-gray-400"
+            <Input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               required
@@ -131,8 +135,8 @@ export default function NewPostPage() {
 
           <label className="block space-y-2 text-sm font-medium text-gray-900">
             Body
-            <textarea
-              className="min-h-48 w-full rounded border border-rose-300 bg-white p-3 text-gray-900 placeholder:text-gray-400"
+            <Textarea
+              className="min-h-48"
               value={body}
               onChange={(event) => setBody(event.target.value)}
               required
@@ -141,8 +145,7 @@ export default function NewPostPage() {
 
           <label className="block space-y-2 text-sm font-medium text-gray-900">
             Topics
-            <input
-              className="w-full rounded border border-rose-300 bg-white p-3 text-gray-900 placeholder:text-gray-400"
+            <Input
               placeholder="e.g. wellbeing, relationships"
               value={topics}
               onChange={(event) => setTopics(event.target.value)}
@@ -150,15 +153,15 @@ export default function NewPostPage() {
           </label>
 
           {message && <p className="text-sm text-red-600">{message}</p>}
-          <button
-            className="w-full rounded bg-rose-700 p-3 font-medium text-white disabled:opacity-50"
+          <Button
+            className="w-full"
             type="submit"
             disabled={loading}
           >
             {loading ? "Publishing..." : "Publish post"}
-          </button>
+          </Button>
         </form>
-      </div>
-    </main>
+        </Card>
+    </PageShell>
   );
 }

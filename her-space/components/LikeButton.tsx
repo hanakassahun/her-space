@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Button from "@/components/ui/Button";
 
 type LikeButtonProps = {
   count: number;
@@ -19,19 +20,29 @@ export default function LikeButton({ count, liked, onToggle }: LikeButtonProps) 
   }
 
   return (
-    <button
-      className={`rounded px-3 py-1.5 text-sm disabled:opacity-50 ${
-        liked
-          ? "bg-rose-100 text-rose-800"
-          : "border border-rose-300 bg-white text-rose-700"
-      }`}
-      type="button"
-      onClick={handleClick}
-      disabled={loading}
-      aria-pressed={liked}
-      aria-label={`${liked ? "Unlike" : "Like"} post, ${count} likes`}
-    >
-      {liked ? "Liked" : "Like"} · {count}
-    </button>
+    <span className="inline-flex items-center gap-2 text-sm text-deep-plum">
+      <Button
+        className="!h-11 !w-11 !min-w-11 !px-0 !py-0"
+        variant={liked ? "primary" : "secondary"}
+        type="button"
+        onClick={handleClick}
+        disabled={loading}
+        aria-pressed={liked}
+        aria-label={liked ? "Unlike post" : "Like post"}
+        title={liked ? "Unlike post" : "Like post"}
+      >
+        <svg
+          className="h-5 w-5"
+          viewBox="0 0 24 24"
+          fill={liked ? "currentColor" : "none"}
+          stroke="currentColor"
+          strokeWidth="1.8"
+          aria-hidden="true"
+        >
+          <path d="M20.8 8.8c0 5.2-8.8 10-8.8 10s-8.8-4.8-8.8-10A4.8 4.8 0 0 1 12 6.1a4.8 4.8 0 0 1 8.8 2.7Z" />
+        </svg>
+      </Button>
+      <span aria-label={`${count} likes`}>{count}</span>
+    </span>
   );
 }

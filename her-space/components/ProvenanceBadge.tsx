@@ -1,3 +1,5 @@
+import Badge from "@/components/ui/Badge";
+
 type Provenance = "personal" | "community" | "evidence";
 
 type ProvenanceBadgeProps = {
@@ -5,10 +7,10 @@ type ProvenanceBadgeProps = {
   sources?: string[];
 };
 
-const badgeStyles: Record<Provenance, string> = {
-  personal: "bg-rose-100 text-rose-800",
-  community: "bg-amber-100 text-amber-800",
-  evidence: "bg-teal-100 text-teal-800",
+const badgeVariants: Record<Provenance, "rose" | "lilac" | "mint"> = {
+  personal: "rose",
+  community: "lilac",
+  evidence: "mint",
 };
 
 const labels: Record<Provenance, string> = {
@@ -20,12 +22,12 @@ const labels: Record<Provenance, string> = {
 export default function ProvenanceBadge({ provenance, sources = [] }: ProvenanceBadgeProps) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className={`rounded px-2.5 py-1 text-xs font-medium ${badgeStyles[provenance]}`}>
+      <Badge variant={badgeVariants[provenance]} className="border border-current/25 font-semibold">
         {labels[provenance]}
-      </span>
+      </Badge>
       {provenance === "evidence" && sources.map((source, index) => (
         <a
-          className="text-xs text-teal-800 underline"
+          className="text-xs font-medium text-emerald-900 underline"
           href={source}
           key={`${source}-${index}`}
           target="_blank"

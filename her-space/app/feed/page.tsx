@@ -6,6 +6,10 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
 import LikeButton from "@/components/LikeButton";
+import PageShell from "@/components/ui/PageShell";
+import Card from "@/components/ui/Card";
+import Badge from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -28,10 +32,10 @@ type Post = {
 
 type LikeState = { count: number; liked: boolean };
 
-const typeStyles: Record<Post["type"], string> = {
-  experience: "bg-rose-100 text-rose-800",
-  question: "bg-amber-100 text-amber-800",
-  knowledge: "bg-emerald-100 text-emerald-800",
+const typeVariants: Record<Post["type"], "rose" | "sky" | "mint"> = {
+  experience: "rose",
+  question: "sky",
+  knowledge: "mint",
 };
 
 function getAuthorProfile(profiles: Post["profiles"]) {
@@ -138,24 +142,23 @@ export default function FeedPage() {
     : posts;
 
   return (
-    <main className="min-h-screen bg-rose-50 px-6 py-12">
-      <div className="mx-auto w-full max-w-3xl space-y-8">
+    <PageShell className="max-w-3xl space-y-8 px-4 py-6 md:px-6 md:py-10">
         <header className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-sm font-medium text-rose-700">Her Space</p>
-            <h1 className="text-3xl font-bold text-rose-900">Community feed</h1>
+            <Badge variant="lilac" className="mb-2">Her Space</Badge>
+            <h1 className="text-3xl font-bold text-deep-plum">Community feed</h1>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-3">
             {isSignedIn && (
               <>
-                <Link className="shrink-0 rounded border border-rose-700 px-4 py-2 font-medium text-rose-700" href="/explore">
+                <Link className="shrink-0 inline-flex min-h-11 items-center rounded-full border border-white/60 bg-white/65 px-4 py-2 font-medium text-deep-plum" href="/explore">
                   Explore
                 </Link>
-                <Link className="shrink-0 rounded border border-rose-700 px-4 py-2 font-medium text-rose-700" href={`/u/${userId}`}>
+                <Link className="shrink-0 inline-flex min-h-11 items-center rounded-full border border-white/60 bg-white/65 px-4 py-2 font-medium text-deep-plum" href={`/u/${userId}`}>
                   My profile
                 </Link>
                 <Link
-                  className="shrink-0 rounded border border-rose-700 px-4 py-2 font-medium text-rose-700"
+                  className="shrink-0 inline-flex min-h-11 items-center rounded-full border border-white/60 bg-white/65 px-4 py-2 font-medium text-deep-plum"
                   href="/library"
                 >
                   My Library
@@ -163,7 +166,7 @@ export default function FeedPage() {
               </>
             )}
             <a
-              className="shrink-0 rounded bg-rose-700 px-4 py-2 font-medium text-white"
+              className="gradient-aurora shadow-glow inline-flex min-h-11 shrink-0 items-center rounded-full px-5 py-2 font-medium text-white"
               href="/new"
             >
               Write a post
@@ -172,16 +175,18 @@ export default function FeedPage() {
         </header>
 
         <nav className="flex gap-2" aria-label="Feed posts">
-          <button
-            className={`rounded px-4 py-2 text-sm font-medium ${activeTab === "all" ? "bg-rose-700 text-white" : "border border-rose-300 bg-white text-rose-800"}`}
+          <Button
+            variant={activeTab === "all" ? "primary" : "secondary"}
+            className="text-sm"
             type="button"
             aria-pressed={activeTab === "all"}
             onClick={() => setActiveTab("all")}
           >
             All
-          </button>
-          <button
-            className={`rounded px-4 py-2 text-sm font-medium ${activeTab === "following" ? "bg-rose-700 text-white" : "border border-rose-300 bg-white text-rose-800"}`}
+          </Button>
+          <Button
+            variant={activeTab === "following" ? "primary" : "secondary"}
+            className="text-sm"
             type="button"
             aria-pressed={activeTab === "following"}
             onClick={() => {
@@ -190,26 +195,24 @@ export default function FeedPage() {
             }}
           >
             Following
-          </button>
+          </Button>
         </nav>
 
         {loading && <p className="text-gray-700">Loading posts...</p>}
-        {message && <p className="rounded bg-white p-4 text-red-600">{message}</p>}
+        {message && <Card className="text-red-700">{message}</Card>}
         {!loading && !message && visiblePosts.length === 0 && (
-          <p className="rounded bg-white p-6 text-gray-700">
+          <Card className="text-gray-700">
             {activeTab === "following" ? "No posts from people you follow yet." : "No posts yet. Start the conversation."}
-          </p>
+          </Card>
         )}
 
         <section className="space-y-4" aria-label="Posts">
           {visiblePosts.map((post) => (
-            <article key={post.id} className="space-y-4 rounded bg-white p-6 shadow-sm">
+            <Card as="article" key={post.id} className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <span
-                  className={`rounded px-2.5 py-1 text-xs font-semibold capitalize ${typeStyles[post.type]}`}
-                >
+                <Badge variant={typeVariants[post.type]} className="capitalize">
                   {post.type}
-                </span>
+                </Badge>
                 <time className="text-sm text-gray-500" dateTime={post.created_at}>
                   {new Date(post.created_at).toLocaleDateString(undefined, {
                     year: "numeric",
@@ -232,7 +235,7 @@ export default function FeedPage() {
                 <ul className="flex flex-wrap gap-2" aria-label="Topics">
                   {post.topics.map((topic, index) => (
                     <li
-                      className="rounded bg-rose-50 px-2.5 py-1 text-xs text-rose-800"
+                      className="rounded-full bg-soft-lilac px-2.5 py-1 text-xs text-deep-plum"
                       key={`${topic}-${index}`}
                     >
                       {topic}
@@ -256,10 +259,9 @@ export default function FeedPage() {
                   onToggle={() => toggleLike(post.id)}
                 />
               </div>
-            </article>
+            </Card>
           ))}
         </section>
-      </div>
-    </main>
+    </PageShell>
   );
 }
