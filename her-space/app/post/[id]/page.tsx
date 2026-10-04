@@ -1,19 +1,30 @@
 "use client";
 
 import { FormEvent, use, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import ProvenanceBadge from "@/components/ProvenanceBadge";
+import LikeButton from "@/components/LikeButton";
 
 type PostType = "experience" | "question" | "knowledge";
+type Professional = { title: string } | { title: string }[] | null;
+type PostProfile = {
+  display_name: string | null;
+  verified_professionals: Professional;
+};
 
 type Post = {
   id: string;
+  author_id: string;
   type: PostType;
+  provenance: "personal" | "community" | "evidence";
+  sources: string[];
   title: string;
   body: string;
   topics: string[];
   created_at: string;
-  profiles: { display_name: string | null } | { display_name: string | null }[] | null;
+  profiles: PostProfile | PostProfile[] | null;
 };
 
 type Comment = {
@@ -34,6 +45,12 @@ function getAuthorName(profiles: Post["profiles"] | Comment["profiles"]) {
   return profile?.display_name || "Her Space member";
 }
 
+function getProfessionalTitle(profiles: Post["profiles"]) {
+  const profile = Array.isArray(profiles) ? profiles[0] : profiles;
+  const professional = profile?.verified_professionals;
+  return (Array.isArray(professional) ? professional[0] : professional)?.title;
+}
+
 function formatDate(date: string) {
   return new Date(date).toLocaleDateString(undefined, {
     year: "numeric",
@@ -49,6 +66,8 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
   const [comments, setComments] = useState<Comment[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [liked, setLiked] = useState(false);
   const [commentBody, setCommentBody] = useState("");
   const [activeReportTarget, setActiveReportTarget] = useState<string | null>(null);
   const [reportReason, setReportReason] = useState("");
@@ -84,10 +103,10 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
 
       setUserId(authData.user.id);
 
-      const [postResult, bookmarkResult] = await Promise.all([
+      const [postResult, bookmarkResult, likesResult] = await Promise.all([
         supabase
           .from("posts")
-          .select("id, type, title, body, topics, created_at, profiles!posts_author_id_fkey(display_name)")
+          .select("id, author_id, type, provenance, sources, title, body, topics, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
           .eq("id", id)
           .single(),
         supabase
@@ -96,6 +115,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
           .eq("user_id", authData.user.id)
           .eq("post_id", id)
           .maybeSingle(),
+        supabase.from("likes").select("user_id").eq("post_id", id),
       ]);
 
       if (postResult.error) {
@@ -108,6 +128,13 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
         setMessage(bookmarkResult.error.message);
       } else {
         setSaved(Boolean(bookmarkResult.data));
+      }
+
+      if (likesResult.error) {
+        setMessage(likesResult.error.message);
+      } else {
+        setLikeCount(likesResult.data.length);
+        setLiked(likesResult.data.some((like) => like.user_id === authData.user.id));
       }
 
       if (!postResult.error) {
@@ -139,6 +166,20 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       setSaved(!saved);
     }
     setBookmarking(false);
+  }
+
+  async function toggleLike() {
+    if (!userId) return;
+    const result = liked
+      ? await supabase.from("likes").delete().eq("user_id", userId).eq("post_id", id)
+      : await supabase.from("likes").insert({ post_id: id });
+
+    if (result.error) {
+      setMessage(result.error.message);
+    } else {
+      setLiked(!liked);
+      setLikeCount((count) => count + (liked ? -1 : 1));
+    }
   }
 
   async function handleCommentSubmit(event: FormEvent<HTMLFormElement>) {
@@ -268,6 +309,8 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                 <p className="whitespace-pre-wrap text-gray-800">{post.body}</p>
               </div>
 
+              <ProvenanceBadge provenance={post.provenance} sources={post.sources} />
+
               {post.topics?.length > 0 && (
                 <ul className="flex flex-wrap gap-2" aria-label="Topics">
                   {post.topics.map((topic, index) => (
@@ -282,9 +325,19 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
               )}
 
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rose-100 pt-4">
-                <p className="text-sm text-gray-600">By {getAuthorName(post.profiles)}</p>
+                <p className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                  By <Link className="underline" href={`/u/${post.author_id}`}>
+                    {getAuthorName(post.profiles)}
+                  </Link>
+                  {getProfessionalTitle(post.profiles) && (
+                    <span className="rounded bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-800">
+                      Verified professional: {getProfessionalTitle(post.profiles)}
+                    </span>
+                  )}
+                </p>
                 <div className="flex flex-wrap items-center gap-4">
                   {renderReportControl("post", id)}
+                  <LikeButton count={likeCount} liked={liked} onToggle={toggleLike} />
                   <button
                     className={`rounded px-4 py-2 text-sm font-medium disabled:opacity-50 ${
                       saved

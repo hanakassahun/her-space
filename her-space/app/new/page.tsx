@@ -5,10 +5,13 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 type PostType = "experience" | "question" | "knowledge";
+type Provenance = "personal" | "community" | "evidence";
 
 export default function NewPostPage() {
   const router = useRouter();
   const [type, setType] = useState<PostType>("experience");
+  const [provenance, setProvenance] = useState<Provenance>("personal");
+  const [sources, setSources] = useState("");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [topics, setTopics] = useState("");
@@ -26,8 +29,20 @@ export default function NewPostPage() {
       return;
     }
 
+    const sourceList = sources
+      .split("\n")
+      .map((source) => source.trim())
+      .filter(Boolean);
+    if (provenance === "evidence" && sourceList.length === 0) {
+      setMessage("Add at least one source link for evidence-backed posts.");
+      setLoading(false);
+      return;
+    }
+
     const { error } = await supabase.from("posts").insert({
       type,
+      provenance,
+      sources: provenance === "evidence" ? sourceList : [],
       title: title.trim(),
       body: body.trim(),
       topics: topics
@@ -61,13 +76,48 @@ export default function NewPostPage() {
             <select
               className="w-full rounded border border-rose-300 bg-white p-3 text-gray-900"
               value={type}
-              onChange={(event) => setType(event.target.value as PostType)}
+              onChange={(event) => {
+                const nextType = event.target.value as PostType;
+                setType(nextType);
+                setProvenance(nextType === "experience" ? "personal" : "community");
+                setSources("");
+              }}
             >
               <option value="experience">Experience</option>
               <option value="question">Question</option>
               <option value="knowledge">Knowledge</option>
             </select>
           </label>
+
+          <label className="block space-y-2 text-sm font-medium text-gray-900">
+            What is this post?
+            <select
+              className="w-full rounded border border-rose-300 bg-white p-3 text-gray-900"
+              value={provenance}
+              onChange={(event) => {
+                const nextProvenance = event.target.value as Provenance;
+                setProvenance(nextProvenance);
+                if (nextProvenance !== "evidence") setSources("");
+              }}
+            >
+              <option value="personal">My personal experience</option>
+              <option value="community">Shared knowledge, not medically verified</option>
+              <option value="evidence">Backed by sources</option>
+            </select>
+          </label>
+
+          {provenance === "evidence" && (
+            <label className="block space-y-2 text-sm font-medium text-gray-900">
+              Source links (one per line)
+              <textarea
+                className="min-h-28 w-full rounded border border-rose-300 bg-white p-3 text-gray-900 placeholder:text-gray-400"
+                placeholder="https://example.com/source"
+                value={sources}
+                onChange={(event) => setSources(event.target.value)}
+                required
+              />
+            </label>
+          )}
 
           <label className="block space-y-2 text-sm font-medium text-gray-900">
             Title

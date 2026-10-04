@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 
 export default function Home() {
   const [name, setName] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -13,6 +14,7 @@ export default function Home() {
     async function load() {
       const { data } = await supabase.auth.getUser();
       if (data.user) {
+        setUserId(data.user.id);
         const { data: profile } = await supabase
           .from("profiles")
           .select("display_name")
@@ -34,6 +36,7 @@ export default function Home() {
   async function handleLogout() {
     await supabase.auth.signOut();
     setName(null);
+    setUserId(null);
     setIsAdmin(false);
   }
 
@@ -56,6 +59,17 @@ export default function Home() {
             <a className="rounded bg-rose-700 px-4 py-2 text-white" href="/feed">
               Go to feed
             </a>
+            <Link className="rounded border border-rose-700 px-4 py-2 text-rose-700" href="/explore">
+              Explore
+            </Link>
+            {userId && (
+              <Link className="rounded border border-rose-700 px-4 py-2 text-rose-700" href={`/u/${userId}`}>
+                My profile
+              </Link>
+            )}
+            <Link className="rounded border border-rose-700 px-4 py-2 text-rose-700" href="/library">
+              My Library
+            </Link>
             <a className="rounded border border-rose-700 px-4 py-2 text-rose-700" href="/new">
               Write a post
             </a>
