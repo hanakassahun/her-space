@@ -267,6 +267,7 @@ const en = {
   "common.backHome": "Back home",
   "common.backToFeed": "Back to feed",
   "common.backToLogin": "Back to log in",
+  "common.loadMore": "Load more",
   "common.cancel": "Cancel",
   "common.edit": "Edit",
   "common.delete": "Delete",

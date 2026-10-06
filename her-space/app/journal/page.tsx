@@ -11,6 +11,7 @@ import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import Badge from "@/components/ui/Badge";
 import { useLanguage } from "@/components/LanguageProvider";
+import type { TranslationKey } from "@/lib/i18n/en";
 
 type PeriodStatus = "none" | "spotting" | "light" | "medium" | "heavy";
 
@@ -51,7 +52,7 @@ const symptomOptions = [
 
 const periodOptions: PeriodStatus[] = ["none", "spotting", "light", "medium", "heavy"];
 
-const symptomTranslationKeys: Record<string, string> = {
+const symptomTranslationKeys: Record<string, TranslationKey> = {
   cramps: "symptom.cramps",
   headache: "symptom.headache",
   bloating: "symptom.bloating",
@@ -64,7 +65,7 @@ const symptomTranslationKeys: Record<string, string> = {
   "discharge changes": "symptom.dischargeChanges",
 };
 
-const periodTranslationKeys: Record<PeriodStatus, string> = {
+const periodTranslationKeys: Record<PeriodStatus, TranslationKey> = {
   none: "common.periodNone",
   spotting: "common.periodSpotting",
   light: "common.periodLight",
@@ -165,11 +166,20 @@ export default function JournalPage() {
   }
 
   function addCustomSymptom() {
-    const symptom = customSymptom.trim();
-    if (!symptom || draft.symptoms.some((item) => item.toLowerCase() === symptom.toLowerCase())) {
-      return;
-    }
-    setDraft((current) => ({ ...current, symptoms: [...current.symptoms, symptom] }));
+    const symptoms = customSymptom
+      .split(/[,،፣]/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (symptoms.length === 0) return;
+
+    setDraft((current) => ({
+      ...current,
+      symptoms: [
+        ...current.symptoms,
+        ...symptoms.filter((symptom) => !current.symptoms.some((item) => item.toLowerCase() === symptom.toLowerCase())),
+      ],
+    }));
     setCustomSymptom("");
   }
 
@@ -364,7 +374,7 @@ export default function JournalPage() {
                     aria-pressed={selected}
                     onClick={() => toggleSymptom(symptom)}
                   >
-                    {t(symptomTranslationKeys[symptom] as keyof typeof import("@/lib/i18n/en").default)}
+                    {t(symptomTranslationKeys[symptom])}
                   </Button>
                 );
               })}
@@ -462,7 +472,7 @@ export default function JournalPage() {
                   {entry.symptoms.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {entry.symptoms.map((symptom) => (
-                        <Badge variant="lilac" key={symptom}>{symptomTranslationKeys[symptom] ? t(symptomTranslationKeys[symptom] as keyof typeof import("@/lib/i18n/en").default) : symptom}</Badge>
+                        <Badge variant="lilac" key={symptom}>{symptomTranslationKeys[symptom] ? t(symptomTranslationKeys[symptom]) : symptom}</Badge>
                       ))}
                     </div>
                   )}

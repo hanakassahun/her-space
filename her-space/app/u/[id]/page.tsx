@@ -208,7 +208,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
       .update({
         title: postTitleDraft.trim(),
         body: postBodyDraft.trim(),
-        topics: postTopicsDraft.split(",").map((topic) => topic.trim()).filter(Boolean),
+        topics: postTopicsDraft.split(/[,،፣]/).map((topic) => topic.trim()).filter(Boolean),
         ...(post.provenance === "evidence" ? { sources } : {}),
       })
       .eq("id", post.id)

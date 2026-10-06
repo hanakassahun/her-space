@@ -57,6 +57,14 @@ const typeTranslationKeys = {
   knowledge: "postType.knowledge",
 } as const;
 
+const PAGE_SIZE = 20;
+
+function mergeUniquePosts(current: Post[], incoming: Post[]) {
+  const merged = new Map(current.map((post) => [post.id, post]));
+  incoming.forEach((post) => merged.set(post.id, post));
+  return [...merged.values()];
+}
+
 const topicGroupTranslationKeys = {
   Health: "explore.health",
   "Body & Beauty": "explore.bodyBeauty",
@@ -80,8 +88,11 @@ export default function ExplorePage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -102,45 +113,59 @@ export default function ExplorePage() {
     return () => window.clearTimeout(timeout);
   }, [search]);
 
-  useEffect(() => {
+  async function loadPostsPage(nextPage: number, reset: boolean) {
     if (!userId || !authChecked) return;
-    let cancelled = false;
 
-    async function searchPosts() {
-      setLoading(true);
-      setMessage("");
-      let query = supabase
-        .from("posts")
-        .select(
-          "id, author_id, type, provenance, sources, title, body, topics, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))"
-        )
-        .order("created_at", { ascending: false });
+    if (reset) setLoading(true);
+    else setLoadingMore(true);
+    setMessage("");
 
-      if (debouncedSearch) {
-        const safeTerm = debouncedSearch.replace(/[%,()]/g, " ").replace(/\s+/g, " ");
-        if (safeTerm.trim()) {
-          query = query.or(
-            `title.ilike.%${safeTerm.trim()}%,body.ilike.%${safeTerm.trim()}%`
-          );
-        }
+    let query = supabase
+      .from("posts")
+      .select(
+        "id, author_id, type, provenance, sources, title, body, topics, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))"
+      )
+      .order("created_at", { ascending: false })
+      .range(nextPage * PAGE_SIZE, nextPage * PAGE_SIZE + PAGE_SIZE - 1);
+
+    if (debouncedSearch) {
+      const safeTerm = debouncedSearch.replace(/[%,()]/g, " ").replace(/\s+/g, " ");
+      if (safeTerm.trim()) {
+        query = query.or(
+          `title.ilike.%${safeTerm.trim()}%,body.ilike.%${safeTerm.trim()}%`
+        );
       }
-      if (selectedTopic) query = query.contains("topics", [selectedTopic]);
+    }
+    if (selectedTopic) query = query.contains("topics", [selectedTopic]);
 
-      const { data, error } = await query;
-      if (cancelled) return;
-      if (error) {
-        setMessage(error.message);
-      } else {
-        setPosts((data ?? []) as Post[]);
-      }
+    const { data, error } = await query;
+    if (error) {
+      setMessage(error.message);
       setLoading(false);
+      setLoadingMore(false);
+      return;
     }
 
-    void searchPosts();
-    return () => {
-      cancelled = true;
-    };
+    const incomingPosts = (data ?? []) as Post[];
+    setPosts((current) => (reset ? incomingPosts : mergeUniquePosts(current, incomingPosts)));
+    setHasMore(incomingPosts.length === PAGE_SIZE);
+    setPage(nextPage);
+    setLoading(false);
+    setLoadingMore(false);
+  }
+
+  useEffect(() => {
+    if (!userId || !authChecked) return;
+    setPosts([]);
+    setPage(0);
+    setHasMore(true);
+    void loadPostsPage(0, true);
   }, [authChecked, debouncedSearch, selectedTopic, userId]);
+
+  async function handleLoadMore() {
+    if (loadingMore || !hasMore) return;
+    await loadPostsPage(page + 1, false);
+  }
 
   return (
     <PageShell className="max-w-3xl space-y-8 px-4 py-6 md:px-6 md:py-10">
@@ -256,6 +281,18 @@ export default function ExplorePage() {
             );
           })}
         </section>
+
+        {!loading && !message && hasMore && posts.length > 0 && (
+          <Button
+            variant="secondary"
+            className="w-full"
+            type="button"
+            onClick={() => void handleLoadMore()}
+            disabled={loadingMore}
+          >
+            {loadingMore ? "Loading..." : t("common.loadMore")}
+          </Button>
+        )}
     </PageShell>
   );
 }

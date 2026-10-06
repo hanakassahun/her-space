@@ -46,6 +46,14 @@ const typeTranslationKeys = {
   knowledge: "postType.knowledge",
 } as const;
 
+const PAGE_SIZE = 20;
+
+function mergeUniquePosts(current: Post[], incoming: Post[]) {
+  const merged = new Map(current.map((post) => [post.id, post]));
+  incoming.forEach((post) => merged.set(post.id, post));
+  return [...merged.values()];
+}
+
 function getAuthorProfile(profiles: Post["profiles"]) {
   return Array.isArray(profiles) ? profiles[0] : profiles;
 }
@@ -69,59 +77,83 @@ export default function FeedPage() {
   const [followingIds, setFollowingIds] = useState<string[]>([]);
   const [likeStates, setLikeStates] = useState<Record<string, LikeState>>({});
   const [activeTab, setActiveTab] = useState<"all" | "following">("all");
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [message, setMessage] = useState("");
 
-  useEffect(() => {
-    async function loadPosts() {
-      const [authResult, postsResult] = await Promise.all([
-        supabase.auth.getUser(),
-        supabase
-          .from("posts")
-          .select("id, author_id, type, provenance, sources, title, body, topics, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
-          .order("created_at", { ascending: false }),
-      ]);
-      const currentUserId = authResult.data.user?.id ?? null;
-      setUserId(currentUserId);
-      setIsSignedIn(Boolean(currentUserId));
+  async function loadPostsPage(nextPage: number, reset: boolean) {
+    const from = nextPage * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
 
-      if (postsResult.error) {
-        setMessage(postsResult.error.message);
-      } else {
-        const loadedPosts = (postsResult.data ?? []) as Post[];
-        setPosts(loadedPosts);
+    if (reset) setLoading(true);
+    else setLoadingMore(true);
+    setMessage("");
 
-        if (currentUserId && loadedPosts.length > 0) {
-          const postIds = loadedPosts.map((post) => post.id);
-          const [likesResult, followsResult] = await Promise.all([
-            supabase.from("likes").select("post_id, user_id").in("post_id", postIds),
-            supabase.from("follows").select("followee_id").eq("follower_id", currentUserId),
-          ]);
+    const [authResult, postsResult] = await Promise.all([
+      supabase.auth.getUser(),
+      supabase
+        .from("posts")
+        .select("id, author_id, type, provenance, sources, title, body, topics, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+        .order("created_at", { ascending: false })
+        .range(from, to),
+    ]);
 
-          if (likesResult.error) setMessage(likesResult.error.message);
-          else {
-            const nextLikes: Record<string, LikeState> = {};
-            for (const post of loadedPosts) nextLikes[post.id] = { count: 0, liked: false };
-            for (const like of likesResult.data ?? []) {
-              const state = nextLikes[like.post_id] ?? { count: 0, liked: false };
-              state.count += 1;
-              if (like.user_id === currentUserId) state.liked = true;
-              nextLikes[like.post_id] = state;
-            }
-            setLikeStates(nextLikes);
-          }
-          if (followsResult.error) setMessage(followsResult.error.message);
-          else setFollowingIds((followsResult.data ?? []).map((follow) => follow.followee_id));
-        } else {
-          setLikeStates({});
-          setFollowingIds([]);
-        }
-      }
+    const currentUserId = authResult.data.user?.id ?? null;
+    setUserId(currentUserId);
+    setIsSignedIn(Boolean(currentUserId));
+
+    if (postsResult.error) {
+      setMessage(postsResult.error.message);
       setLoading(false);
+      setLoadingMore(false);
+      return;
     }
 
-    void loadPosts();
-  }, []);
+    const incomingPosts = (postsResult.data ?? []) as Post[];
+    const nextPosts = reset ? incomingPosts : mergeUniquePosts(posts, incomingPosts);
+    setPosts(nextPosts);
+    setHasMore(incomingPosts.length === PAGE_SIZE);
+    setPage(nextPage);
+
+    if (currentUserId && incomingPosts.length > 0) {
+      const postIds = incomingPosts.map((post) => post.id);
+      const [likesResult, followsResult] = await Promise.all([
+        supabase.from("likes").select("post_id, user_id").in("post_id", postIds),
+        supabase.from("follows").select("followee_id").eq("follower_id", currentUserId),
+      ]);
+
+      if (likesResult.error) setMessage(likesResult.error.message);
+      else {
+        setLikeStates((current) => {
+          const nextLikes = { ...current };
+          for (const post of incomingPosts) {
+            nextLikes[post.id] = { count: 0, liked: false };
+          }
+          for (const like of likesResult.data ?? []) {
+            const state = nextLikes[like.post_id] ?? { count: 0, liked: false };
+            state.count += 1;
+            if (like.user_id === currentUserId) state.liked = true;
+            nextLikes[like.post_id] = state;
+          }
+          return nextLikes;
+        });
+      }
+      if (followsResult.error) setMessage(followsResult.error.message);
+      else setFollowingIds((followsResult.data ?? []).map((follow) => follow.followee_id));
+    } else {
+      setLikeStates((current) => (reset ? {} : current));
+      setFollowingIds([]);
+    }
+
+    setLoading(false);
+    setLoadingMore(false);
+  }
+
+  useEffect(() => {
+    void loadPostsPage(0, true);
+  }, [activeTab]);
 
   async function toggleLike(postId: string) {
     if (!userId) {
@@ -149,6 +181,11 @@ export default function FeedPage() {
   const visiblePosts = activeTab === "following"
     ? posts.filter((post) => followingIds.includes(post.author_id))
     : posts;
+
+  async function handleLoadMore() {
+    if (loadingMore || !hasMore) return;
+    await loadPostsPage(page + 1, false);
+  }
 
   return (
     <PageShell className="max-w-3xl space-y-8 px-4 py-6 md:px-6 md:py-10">
@@ -252,6 +289,18 @@ export default function FeedPage() {
             </Card>
           ))}
         </section>
+
+        {!loading && !message && hasMore && visiblePosts.length > 0 && (
+          <Button
+            variant="secondary"
+            className="w-full"
+            type="button"
+            onClick={() => void handleLoadMore()}
+            disabled={loadingMore}
+          >
+            {loadingMore ? "Loading..." : t("common.loadMore")}
+          </Button>
+        )}
     </PageShell>
   );
 }

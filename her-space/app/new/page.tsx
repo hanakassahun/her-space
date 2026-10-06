@@ -64,7 +64,7 @@ export default function NewPostPage() {
       title: title.trim(),
       body: body.trim(),
       topics: topics
-        .split(",")
+        .split(/[,،፣]/)
         .map((topic) => topic.trim())
         .filter(Boolean),
     });

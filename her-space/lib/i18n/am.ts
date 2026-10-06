@@ -273,6 +273,7 @@ const am: Record<TranslationKey, string> = {
   "common.backHome": "ወደ መነሻ ተመለሺ",
   "common.backToFeed": "ወደ ጽሑፎች ተመለሺ",
   "common.backToLogin": "ወደ መግቢያ ተመለሺ",
+  "common.loadMore": "ተጨማሪ ጫኚ",
   "common.cancel": "ተዪ",
   "common.edit": "አርትዕ",
   "common.delete": "ሰርዢ",

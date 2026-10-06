@@ -252,7 +252,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       .update({
         title: editTitle.trim(),
         body: editBody.trim(),
-        topics: editTopics.split(",").map((topic) => topic.trim()).filter(Boolean),
+        topics: editTopics.split(/[,،፣]/).map((topic) => topic.trim()).filter(Boolean),
         ...(post.provenance === "evidence" ? { sources } : {}),
       })
       .eq("id", post.id)

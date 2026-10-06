@@ -56,15 +56,15 @@ type ResourceForm = {
   published: boolean;
 };
 
-const kindLabels: Record<ResourceKind, string> = {
-  clinic: "Clinic",
-  hospital: "Hospital",
-  gynecologist: "Gynecologist",
-  pharmacy: "Pharmacy",
-  counseling: "Counseling",
-  hotline: "Hotline",
-  other: "Other",
-};
+const kindValues: ResourceKind[] = [
+  "clinic",
+  "hospital",
+  "gynecologist",
+  "pharmacy",
+  "counseling",
+  "hotline",
+  "other",
+];
 
 const emptyForm: ResourceForm = {
   name: "",
@@ -272,8 +272,16 @@ export default function AdminResourcesPage() {
                 value={form.kind}
                 onChange={(event) => setForm({ ...form, kind: event.target.value as ResourceKind })}
               >
-                {Object.entries(kindLabels).map(([kind, label]) => (
-                  <option key={kind} value={kind}>{label}</option>
+                {kindValues.map((kind) => (
+                  <option key={kind} value={kind}>
+                    {kind === "clinic" && "Clinic"}
+                    {kind === "hospital" && "Hospital"}
+                    {kind === "gynecologist" && "Gynecologist"}
+                    {kind === "pharmacy" && "Pharmacy"}
+                    {kind === "counseling" && "Counseling"}
+                    {kind === "hotline" && "Hotline"}
+                    {kind === "other" && "Other"}
+                  </option>
                 ))}
               </select>
             </label>
@@ -340,7 +348,17 @@ export default function AdminResourcesPage() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h3 className="text-lg font-semibold text-deep-plum">{resource.name}</h3>
-                <p className="text-sm text-gray-600">{kindLabels[resource.kind]} · {[resource.area, resource.city].filter(Boolean).join(", ")}</p>
+                <p className="text-sm text-gray-600">
+                  {resource.kind === "clinic" && "Clinic"}
+                  {resource.kind === "hospital" && "Hospital"}
+                  {resource.kind === "gynecologist" && "Gynecologist"}
+                  {resource.kind === "pharmacy" && "Pharmacy"}
+                  {resource.kind === "counseling" && "Counseling"}
+                  {resource.kind === "hotline" && "Hotline"}
+                  {resource.kind === "other" && "Other"}
+                  {" · "}
+                  {[resource.area, resource.city].filter(Boolean).join(", ")}
+                </p>
               </div>
               <Badge variant={resource.published ? "mint" : "sky"}>{resource.published ? "Published" : "Unpublished"}</Badge>
             </div>

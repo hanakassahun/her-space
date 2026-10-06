@@ -17,6 +17,7 @@ const dmSans = DM_Sans({
 const notoSansEthiopic = Noto_Sans_Ethiopic({
   variable: "--font-noto-ethiopic",
   subsets: ["ethiopic", "latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {

@@ -92,10 +92,37 @@ h6 {
   font-family: var(--font-sora), var(--font-noto-ethiopic), sans-serif;
 }
 
-html[lang="am"] body {
-  font-family: var(--font-noto-ethiopic), var(--font-dm-sans), sans-serif;
+p,
+textarea,
+input,
+select,
+.whitespace-pre-wrap,
+body .prose,
+body .post-body,
+body .comment-body,
+body .journal-note,
+body .bio {
   line-height: 1.7;
-  overflow-wrap: anywhere;
+}
+
+html[lang="am"] body,
+html[lang="am"] h1,
+html[lang="am"] h2,
+html[lang="am"] h3,
+html[lang="am"] h4,
+html[lang="am"] h5,
+html[lang="am"] h6,
+html[lang="am"] p,
+html[lang="am"] textarea,
+html[lang="am"] input,
+html[lang="am"] select,
+html[lang="am"] .whitespace-pre-wrap,
+html[lang="am"] body .prose,
+html[lang="am"] body .post-body,
+html[lang="am"] body .comment-body,
+html[lang="am"] body .journal-note,
+html[lang="am"] body .bio {
+  font-family: var(--font-noto-ethiopic), var(--font-dm-sans), sans-serif;
 }
 
 html[lang="am"] button,
