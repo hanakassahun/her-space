@@ -11,6 +11,7 @@ import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
+import { useLanguage } from "@/components/LanguageProvider";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -39,6 +40,12 @@ const typeVariants: Record<Post["type"], "rose" | "sky" | "mint"> = {
   knowledge: "mint",
 };
 
+const typeTranslationKeys = {
+  experience: "postType.experience",
+  question: "postType.question",
+  knowledge: "postType.knowledge",
+} as const;
+
 function getAuthorProfile(profiles: Post["profiles"]) {
   return Array.isArray(profiles) ? profiles[0] : profiles;
 }
@@ -54,6 +61,7 @@ function getAuthorName(profiles: Post["profiles"]) {
 }
 
 export default function FeedPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
   const [isSignedIn, setIsSignedIn] = useState(false);
@@ -146,17 +154,17 @@ export default function FeedPage() {
     <PageShell className="max-w-3xl space-y-8 px-4 py-6 md:px-6 md:py-10">
         <header className="flex items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-deep-plum">Community feed</h1>
+            <h1 className="text-3xl font-bold text-deep-plum">{t("feed.title")}</h1>
           </div>
           <Link
             className="gradient-aurora shadow-glow inline-flex min-h-11 shrink-0 items-center rounded-full px-5 py-2 font-medium text-white"
             href={navConfig.write.href}
           >
-            Write a post
+            {t("nav.writePost")}
           </Link>
         </header>
 
-        <nav className="flex gap-2" aria-label="Feed posts">
+        <nav className="flex gap-2" aria-label={t("feed.posts")}>
           <Button
             variant={activeTab === "all" ? "primary" : "secondary"}
             className="text-sm"
@@ -164,7 +172,7 @@ export default function FeedPage() {
             aria-pressed={activeTab === "all"}
             onClick={() => setActiveTab("all")}
           >
-            All
+            {t("feed.all")}
           </Button>
           <Button
             variant={activeTab === "following" ? "primary" : "secondary"}
@@ -176,15 +184,15 @@ export default function FeedPage() {
               else setActiveTab("following");
             }}
           >
-            Following
+            {t("feed.following")}
           </Button>
         </nav>
 
-        {loading && <p className="text-gray-700">Loading posts...</p>}
+        {loading && <p className="text-gray-700">{t("feed.loading")}</p>}
         {message && <Card className="text-red-700">{message}</Card>}
         {!loading && !message && visiblePosts.length === 0 && (
           <Card className="text-gray-700">
-            {activeTab === "following" ? "No posts from people you follow yet." : "No posts yet. Start the conversation."}
+            {activeTab === "following" ? t("feed.noFollowing") : t("feed.noPosts")}
           </Card>
         )}
 
@@ -192,8 +200,8 @@ export default function FeedPage() {
           {visiblePosts.map((post) => (
             <Card as="article" key={post.id} className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <Badge variant={typeVariants[post.type]} className="capitalize">
-                  {post.type}
+                <Badge variant={typeVariants[post.type]}>
+                  {t(typeTranslationKeys[post.type])}
                 </Badge>
                 <time className="text-sm text-gray-500" dateTime={post.created_at}>
                   {new Date(post.created_at).toLocaleDateString(undefined, {
@@ -214,7 +222,7 @@ export default function FeedPage() {
               <ProvenanceBadge provenance={post.provenance} sources={post.sources} />
 
               {post.topics?.length > 0 && (
-                <ul className="flex flex-wrap gap-2" aria-label="Topics">
+                <ul className="flex flex-wrap gap-2" aria-label={t("common.topics")}>
                   {post.topics.map((topic, index) => (
                     <li
                       className="rounded-full bg-soft-lilac px-2.5 py-1 text-xs text-deep-plum"
@@ -228,10 +236,10 @@ export default function FeedPage() {
 
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rose-100 pt-3">
                 <p className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-                  By <Link className="underline" href={`/u/${post.author_id}`}>{getAuthorName(post.profiles)}</Link>
+                  {t("common.by")} <Link className="underline" href={`/u/${post.author_id}`}>{getAuthorName(post.profiles)}</Link>
                   {getProfessionalTitle(getAuthorProfile(post.profiles)) && (
                     <span className="rounded bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-800">
-                      Verified professional: {getProfessionalTitle(getAuthorProfile(post.profiles))}
+                      {t("common.verifiedProfessional")} {getProfessionalTitle(getAuthorProfile(post.profiles))}
                     </span>
                   )}
                 </p>

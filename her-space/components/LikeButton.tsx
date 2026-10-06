@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Button from "@/components/ui/Button";
+import { useLanguage } from "@/components/LanguageProvider";
 
 type LikeButtonProps = {
   count: number;
@@ -10,6 +11,7 @@ type LikeButtonProps = {
 };
 
 export default function LikeButton({ count, liked, onToggle }: LikeButtonProps) {
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
 
   async function handleClick() {
@@ -28,8 +30,8 @@ export default function LikeButton({ count, liked, onToggle }: LikeButtonProps) 
         onClick={handleClick}
         disabled={loading}
         aria-pressed={liked}
-        aria-label={liked ? "Unlike post" : "Like post"}
-        title={liked ? "Unlike post" : "Like post"}
+        aria-label={`${t(liked ? "like.unlike" : "like.like")} ${count} ${t("like.likes")}`}
+        title={t(liked ? "like.unlike" : "like.like")}
       >
         <svg
           className="h-5 w-5"
@@ -42,7 +44,7 @@ export default function LikeButton({ count, liked, onToggle }: LikeButtonProps) 
           <path d="M20.8 8.8c0 5.2-8.8 10-8.8 10s-8.8-4.8-8.8-10A4.8 4.8 0 0 1 12 6.1a4.8 4.8 0 0 1 8.8 2.7Z" />
         </svg>
       </Button>
-      <span aria-label={`${count} likes`}>{count}</span>
+      <span aria-label={`${count} ${t("like.likes")}`}>{count}</span>
     </span>
   );
 }

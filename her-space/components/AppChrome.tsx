@@ -12,7 +12,11 @@ export default function AppChrome({ children }: { children: ReactNode }) {
   const [userId, setUserId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [sessionChecked, setSessionChecked] = useState(false);
-  const hideOnAuthRoute = pathname === "/login" || pathname === "/signup";
+  const hideOnAuthRoute =
+    pathname === "/login" ||
+    pathname === "/signup" ||
+    pathname === "/forgot-password" ||
+    pathname === "/reset-password";
 
   useEffect(() => {
     let active = true;

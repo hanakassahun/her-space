@@ -10,6 +10,7 @@ import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import { useLanguage } from "@/components/LanguageProvider";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -50,6 +51,19 @@ const typeVariants: Record<Post["type"], "rose" | "sky" | "mint"> = {
   knowledge: "mint",
 };
 
+const typeTranslationKeys = {
+  experience: "postType.experience",
+  question: "postType.question",
+  knowledge: "postType.knowledge",
+} as const;
+
+const topicGroupTranslationKeys = {
+  Health: "explore.health",
+  "Body & Beauty": "explore.bodyBeauty",
+  "Mind & Life": "explore.mindLife",
+  "Life stages": "explore.lifeStages",
+} as const;
+
 function first<T>(value: T | T[] | null) {
   return Array.isArray(value) ? value[0] : value;
 }
@@ -59,6 +73,7 @@ function getProfessionalTitle(profile: Profile | null | undefined) {
 }
 
 export default function ExplorePage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -131,23 +146,23 @@ export default function ExplorePage() {
     <PageShell className="max-w-3xl space-y-8 px-4 py-6 md:px-6 md:py-10">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-deep-plum">Explore</h1>
+            <h1 className="text-3xl font-bold text-deep-plum">{t("explore.title")}</h1>
           </div>
         </header>
 
         <Input
           className="min-h-12 rounded-full border-white/70 bg-white/80 shadow-sm"
           type="search"
-          placeholder="Search posts by title or body"
+          placeholder={t("explore.searchPlaceholder")}
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          aria-label="Search posts"
+          aria-label={t("explore.searchLabel")}
         />
 
         <div className="space-y-4">
           {Object.entries(topicGroups).map(([heading, topics]) => (
             <section className="space-y-2" key={heading} aria-label={heading}>
-              <h2 className="text-sm font-semibold text-deep-plum">{heading}</h2>
+              <h2 className="text-sm font-semibold text-deep-plum">{t(topicGroupTranslationKeys[heading as keyof typeof topicGroupTranslationKeys])}</h2>
               <div className="flex flex-wrap gap-2">
                 {topics.map((topic) => (
                   <Button
@@ -177,15 +192,15 @@ export default function ExplorePage() {
               type="button"
               onClick={() => setSelectedTopic(null)}
             >
-              Clear topic filter
+              {t("explore.clearFilter")}
             </Button>
           )}
         </div>
 
-        {loading && <p className="text-gray-700">Searching posts...</p>}
+        {loading && <p className="text-gray-700">{t("explore.searching")}</p>}
         {message && <Card className="text-red-700">{message}</Card>}
         {!loading && !message && posts.length === 0 && (
-          <Card className="text-gray-700">No posts found.</Card>
+          <Card className="text-gray-700">{t("explore.noResults")}</Card>
         )}
 
         <section className="space-y-4" aria-label="Explore results">
@@ -196,8 +211,8 @@ export default function ExplorePage() {
             return (
               <Card as="article" key={post.id} className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <Badge variant={typeVariants[post.type]} className="capitalize">
-                    {post.type}
+                  <Badge variant={typeVariants[post.type]}>
+                    {t(typeTranslationKeys[post.type])}
                   </Badge>
                   <time className="text-sm text-gray-500" dateTime={post.created_at}>
                     {new Date(post.created_at).toLocaleDateString(undefined, {
@@ -215,7 +230,7 @@ export default function ExplorePage() {
                 </div>
                 <ProvenanceBadge provenance={post.provenance} sources={post.sources} />
                 {post.topics?.length > 0 && (
-                  <ul className="flex flex-wrap gap-2" aria-label="Topics">
+                  <ul className="flex flex-wrap gap-2" aria-label={t("common.topics")}>
                     {post.topics.map((topic, index) => (
                       <li
                         className="rounded-full bg-soft-lilac px-2.5 py-1 text-xs text-deep-plum"
@@ -227,13 +242,13 @@ export default function ExplorePage() {
                   </ul>
                 )}
                 <p className="flex flex-wrap items-center gap-2 border-t border-rose-100 pt-3 text-sm text-gray-600">
-                  By{" "}
+                  {t("common.by")}{" "}
                   <Link className="underline" href={`/u/${post.author_id}`}>
                     {profile?.display_name || "Her Space member"}
                   </Link>
                   {professionalTitle && (
                     <span className="rounded bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-800">
-                      Verified professional: {professionalTitle}
+                      {t("common.verifiedProfessional")} {professionalTitle}
                     </span>
                   )}
                 </p>

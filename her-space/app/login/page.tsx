@@ -1,14 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import { useLanguage } from "@/components/LanguageProvider";
 
 export default function LoginPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -32,16 +35,16 @@ export default function LoginPage() {
   return (
     <PageShell className="flex min-h-screen items-center justify-center">
       <Card className="w-full max-w-sm space-y-4">
-        <h1 className="text-3xl font-bold text-deep-plum">Welcome back</h1>
+        <h1 className="text-3xl font-bold text-deep-plum">{t("login.title")}</h1>
         <Input
           type="email"
-          placeholder="Email"
+          placeholder={t("login.email")}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
         <Input
           type="password"
-          placeholder="Password"
+          placeholder={t("login.password")}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
@@ -50,13 +53,19 @@ export default function LoginPage() {
           onClick={handleLogin}
           disabled={loading}
         >
-          {loading ? "Signing in..." : "Log in"}
+          {loading ? t("login.signingIn") : t("home.login")}
         </Button>
+        <Link
+          className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-soft-lilac bg-white/70 px-4 text-sm font-semibold text-deep-plum underline underline-offset-4 hover:bg-soft-lilac/40"
+          href="/forgot-password"
+        >
+          {t("login.forgot")}
+        </Link>
         {message && <p className="text-red-700">{message}</p>}
         <p className="text-deep-plum">
-          New here?{" "}
+          {t("login.newHere")} {" "}
           <a className="underline" href="/signup">
-            Create an account
+            {t("login.createAccount")}
           </a>
         </p>
       </Card>

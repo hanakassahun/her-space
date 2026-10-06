@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import { mobileNavOrder, moreNavOrder, isNavItemActive, navConfig, resolveNavHref } from "@/lib/nav";
 import { supabase } from "@/lib/supabase";
 import NavIcon from "@/components/NavIcon";
+import { useLanguage } from "@/components/LanguageProvider";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 type BottomNavProps = {
   userId: string;
@@ -14,6 +16,7 @@ type BottomNavProps = {
 
 export default function BottomNav({ userId, isAdmin }: BottomNavProps) {
   const pathname = usePathname();
+  const { t } = useLanguage();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreActive = moreNavOrder.some(
     (key) => (!navConfig[key].adminOnly || isAdmin) && isNavItemActive(key, pathname)
@@ -48,7 +51,7 @@ export default function BottomNav({ userId, isAdmin }: BottomNavProps) {
             onClick={(event) => event.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h2 id="more-heading" className="text-lg font-semibold text-deep-plum">More</h2>
+              <h2 id="more-heading" className="text-lg font-semibold text-deep-plum">{t("nav.more")}</h2>
               <button
                 className="inline-flex h-11 w-11 items-center justify-center rounded-full text-deep-plum hover:bg-soft-lilac/50"
                 type="button"
@@ -76,7 +79,7 @@ export default function BottomNav({ userId, isAdmin }: BottomNavProps) {
                       onClick={() => setMoreOpen(false)}
                     >
                       <NavIcon icon={item.icon} />
-                      {item.label}
+                      {t(item.label)}
                     </Link>
                   </li>
                 );
@@ -90,10 +93,11 @@ export default function BottomNav({ userId, isAdmin }: BottomNavProps) {
                   <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M10 17l5-5-5-5M15 12H3m9-8h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7" />
                   </svg>
-                  Log out
+                  {t("nav.logout")}
                 </button>
               </li>
             </ul>
+            <LanguageSwitcher className="mt-4" />
           </section>
         </div>
       )}
@@ -114,12 +118,12 @@ export default function BottomNav({ userId, isAdmin }: BottomNavProps) {
                     ? "mx-auto flex h-12 w-12 items-center justify-center rounded-full gradient-aurora text-white shadow-glow"
                     : `flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 text-[11px] font-medium ${active ? "text-deep-plum" : "text-gray-600"}`}
                   href={resolveNavHref(key, userId)}
-                  aria-label={isWrite ? "Write a post" : item.label}
+                  aria-label={isWrite ? t("nav.writePost") : t(item.label)}
                   aria-current={active ? "page" : undefined}
-                  title={isWrite ? "Write a post" : item.label}
+                  title={isWrite ? t("nav.writePost") : t(item.label)}
                 >
                   <NavIcon icon={item.icon} className={isWrite ? "h-6 w-6" : "h-5 w-5"} />
-                  {!isWrite && <span className="truncate">{item.label}</span>}
+                  {!isWrite && <span className="truncate">{t(item.label)}</span>}
                 </Link>
               </li>
             );
@@ -128,14 +132,14 @@ export default function BottomNav({ userId, isAdmin }: BottomNavProps) {
             <button
               className={`flex min-h-12 w-full flex-col items-center justify-center gap-0.5 rounded-2xl px-1 text-[11px] font-medium ${moreActive || moreOpen ? "text-deep-plum" : "text-gray-600"}`}
               type="button"
-              aria-label="More navigation options"
+              aria-label={t("nav.more")}
               aria-expanded={moreOpen}
               aria-haspopup="dialog"
               aria-current={moreActive ? "page" : undefined}
               onClick={() => setMoreOpen((open) => !open)}
             >
               <NavIcon icon="more" />
-              <span>More</span>
+              <span>{t("nav.more")}</span>
             </button>
           </li>
         </ul>

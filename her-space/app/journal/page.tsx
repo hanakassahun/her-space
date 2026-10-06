@@ -10,6 +10,7 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import Badge from "@/components/ui/Badge";
+import { useLanguage } from "@/components/LanguageProvider";
 
 type PeriodStatus = "none" | "spotting" | "light" | "medium" | "heavy";
 
@@ -49,6 +50,27 @@ const symptomOptions = [
 ];
 
 const periodOptions: PeriodStatus[] = ["none", "spotting", "light", "medium", "heavy"];
+
+const symptomTranslationKeys: Record<string, string> = {
+  cramps: "symptom.cramps",
+  headache: "symptom.headache",
+  bloating: "symptom.bloating",
+  acne: "symptom.acne",
+  fatigue: "symptom.fatigue",
+  nausea: "symptom.nausea",
+  "mood swings": "symptom.moodSwings",
+  "back pain": "symptom.backPain",
+  "tender breasts": "symptom.tenderBreasts",
+  "discharge changes": "symptom.dischargeChanges",
+};
+
+const periodTranslationKeys: Record<PeriodStatus, string> = {
+  none: "common.periodNone",
+  spotting: "common.periodSpotting",
+  light: "common.periodLight",
+  medium: "common.periodMedium",
+  heavy: "common.periodHeavy",
+};
 
 const emptyDraft: EntryDraft = {
   mood: null,
@@ -97,6 +119,7 @@ async function fetchJournalEntries(userId: string) {
 }
 
 export default function JournalPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
@@ -219,7 +242,7 @@ export default function JournalPage() {
     <PageShell className="max-w-3xl space-y-6 px-4 py-6 md:px-6 md:py-10">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-deep-plum">Body journal</h1>
+          <h1 className="text-3xl font-bold text-deep-plum">{t("journal.title")}</h1>
         </div>
         <p className="inline-flex items-center gap-2 text-sm font-medium text-deep-plum">
           <svg
@@ -233,7 +256,7 @@ export default function JournalPage() {
             <rect x="5" y="10" width="14" height="11" rx="2" />
             <path d="M8 10V7a4 4 0 0 1 8 0v3" />
           </svg>
-          Only you can see this.
+          {t("journal.private")}
         </p>
       </header>
 
@@ -241,7 +264,7 @@ export default function JournalPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-sm font-medium text-deep-plum">
-              {editingPastDate ? `Editing ${formatDate(editingPastDate)}` : "Today"}
+              {editingPastDate ? `${t("journal.editingDate")} ${formatDate(editingPastDate)}` : t("journal.today")}
             </p>
             <h2 className="text-xl font-semibold text-deep-plum">
               {formatDate(editingPastDate ?? today)}
@@ -249,14 +272,14 @@ export default function JournalPage() {
           </div>
           {editingPastDate && (
             <Button variant="ghost" className="text-sm" type="button" onClick={cancelPastEdit}>
-              Cancel edit
+              {t("journal.cancelEdit")}
             </Button>
           )}
         </div>
 
         <form className="space-y-5" onSubmit={saveEntry}>
           <fieldset className="space-y-2">
-            <legend className="text-sm font-medium text-deep-plum">Mood</legend>
+            <legend className="text-sm font-medium text-deep-plum">{t("journal.mood")}</legend>
             <div className="flex flex-wrap gap-2">
               {[1, 2, 3, 4, 5].map((value) => (
                 <Button
@@ -274,7 +297,7 @@ export default function JournalPage() {
           </fieldset>
 
           <fieldset className="space-y-2">
-            <legend className="text-sm font-medium text-deep-plum">Energy</legend>
+            <legend className="text-sm font-medium text-deep-plum">{t("journal.energy")}</legend>
             <div className="flex flex-wrap gap-2">
               {[1, 2, 3, 4, 5].map((value) => (
                 <Button
@@ -292,7 +315,7 @@ export default function JournalPage() {
           </fieldset>
 
           <label className="block space-y-2 text-sm font-medium text-deep-plum">
-            Sleep hours
+            {t("journal.sleepHours")}
             <Input
               type="number"
               min="0"
@@ -303,16 +326,16 @@ export default function JournalPage() {
               onChange={(event) =>
                 setDraft((current) => ({ ...current, sleepHours: event.target.value }))
               }
-              placeholder="e.g. 7.5"
+              placeholder={t("journal.sleepPlaceholder")}
             />
           </label>
 
           <fieldset className="space-y-2">
-            <legend className="text-sm font-medium text-deep-plum">Period status</legend>
+            <legend className="text-sm font-medium text-deep-plum">{t("journal.periodStatus")}</legend>
             <div className="flex flex-wrap gap-2">
               {periodOptions.map((status) => (
                 <Button
-                  className="text-sm capitalize"
+                  className="text-sm"
                   variant={draft.periodStatus === status ? "primary" : "secondary"}
                   key={status}
                   type="button"
@@ -321,27 +344,27 @@ export default function JournalPage() {
                     setDraft((current) => ({ ...current, periodStatus: status }))
                   }
                 >
-                  {status}
+                  {t(periodTranslationKeys[status])}
                 </Button>
               ))}
             </div>
           </fieldset>
 
           <fieldset className="space-y-2">
-            <legend className="text-sm font-medium text-deep-plum">Symptoms</legend>
+            <legend className="text-sm font-medium text-deep-plum">{t("journal.symptoms")}</legend>
             <div className="flex flex-wrap gap-2">
               {symptomOptions.map((symptom) => {
                 const selected = draft.symptoms.includes(symptom);
                 return (
                   <Button
-                    className="text-sm capitalize"
+                    className="text-sm"
                     variant={selected ? "primary" : "secondary"}
                     key={symptom}
                     type="button"
                     aria-pressed={selected}
                     onClick={() => toggleSymptom(symptom)}
                   >
-                    {symptom}
+                    {t(symptomTranslationKeys[symptom] as keyof typeof import("@/lib/i18n/en").default)}
                   </Button>
                 );
               })}
@@ -349,7 +372,7 @@ export default function JournalPage() {
                 .filter((symptom) => !symptomOptions.includes(symptom))
                 .map((symptom) => (
                   <Button
-                    className="text-sm capitalize"
+                    className="text-sm"
                     key={symptom}
                     type="button"
                     aria-pressed="true"
@@ -363,29 +386,29 @@ export default function JournalPage() {
               <Input
                 value={customSymptom}
                 onChange={(event) => setCustomSymptom(event.target.value)}
-                placeholder="Add another symptom"
-                aria-label="Custom symptom"
+                placeholder={t("journal.customSymptom")}
+                aria-label={t("journal.customSymptomLabel")}
               />
               <Button variant="secondary" type="button" onClick={addCustomSymptom}>
-                Add
+                {t("journal.add")}
               </Button>
             </div>
           </fieldset>
 
           <label className="block space-y-2 text-sm font-medium text-deep-plum">
-            Notes
+            {t("journal.notes")}
             <Textarea
               className="min-h-32"
               maxLength={3000}
               value={draft.notes}
               onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))}
-              placeholder="Anything you want to remember about today..."
+              placeholder={t("journal.notesPlaceholder")}
             />
           </label>
 
           {message && <p className="text-sm text-deep-plum" role="status">{message}</p>}
           <Button className="w-full" type="submit" disabled={saving || loading}>
-            {saving ? "Saving..." : editingPastDate ? "Save changes" : "Save today’s entry"}
+            {saving ? t("journal.saving") : editingPastDate ? t("journal.saveChanges") : t("journal.saveToday")}
           </Button>
         </form>
         {todayEntry && !editingPastDate && (
@@ -393,7 +416,7 @@ export default function JournalPage() {
             className="gradient-aurora shadow-glow inline-flex min-h-11 w-full items-center justify-center rounded-full px-5 py-2 text-sm font-semibold text-white"
             href={getShareHref(todayEntry)}
           >
-            Share as a post
+            {t("journal.sharePost")}
           </Link>
         )}
       </Card>
@@ -401,14 +424,14 @@ export default function JournalPage() {
       <section className="space-y-4" aria-labelledby="past-entries-heading">
         <div className="flex items-center justify-between gap-3">
           <h2 id="past-entries-heading" className="text-xl font-semibold text-deep-plum">
-            Past entries
+            {t("journal.pastEntries")}
           </h2>
           <Badge variant="lilac">{pastEntries.length}</Badge>
         </div>
 
-        {loading && <p className="text-gray-700">Loading entries...</p>}
+        {loading && <p className="text-gray-700">{t("journal.loading")}</p>}
         {!loading && pastEntries.length === 0 && (
-          <Card className="text-gray-700">Your earlier entries will appear here.</Card>
+          <Card className="text-gray-700">{t("journal.earlierEmpty")}</Card>
         )}
 
         {pastEntries.map((entry) => {
@@ -424,35 +447,35 @@ export default function JournalPage() {
               >
                 <span className="font-semibold">{formatDate(entry.entry_date)}</span>
                 <span className="text-sm text-gray-600">
-                  {entry.symptoms.length ? `${entry.symptoms.length} symptoms` : "No symptoms noted"}
+                  {entry.symptoms.length ? `${entry.symptoms.length} ${t("journal.symptomCount")}` : t("journal.noSymptoms")}
                 </span>
               </Button>
 
               {expanded && (
                 <div className="space-y-4 border-t border-white/70 pt-4">
                   <dl className="grid grid-cols-2 gap-3 text-sm text-deep-plum sm:grid-cols-4">
-                    <div><dt className="text-gray-600">Mood</dt><dd>{entry.mood ?? "—"}/5</dd></div>
-                    <div><dt className="text-gray-600">Energy</dt><dd>{entry.energy ?? "—"}/5</dd></div>
-                    <div><dt className="text-gray-600">Sleep</dt><dd>{entry.sleep_hours === null ? "—" : `${entry.sleep_hours}h`}</dd></div>
-                    <div><dt className="text-gray-600">Period</dt><dd className="capitalize">{entry.period_status ?? "—"}</dd></div>
+                    <div><dt className="text-gray-600">{t("journal.moodLabel")}</dt><dd>{entry.mood ?? "—"}/5</dd></div>
+                    <div><dt className="text-gray-600">{t("journal.energyLabel")}</dt><dd>{entry.energy ?? "—"}/5</dd></div>
+                    <div><dt className="text-gray-600">{t("journal.sleepLabel")}</dt><dd>{entry.sleep_hours === null ? "—" : `${entry.sleep_hours}h`}</dd></div>
+                    <div><dt className="text-gray-600">{t("journal.periodLabel")}</dt><dd>{entry.period_status ? t(periodTranslationKeys[entry.period_status]) : "—"}</dd></div>
                   </dl>
                   {entry.symptoms.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {entry.symptoms.map((symptom) => (
-                        <Badge variant="lilac" className="capitalize" key={symptom}>{symptom}</Badge>
+                        <Badge variant="lilac" key={symptom}>{symptomTranslationKeys[symptom] ? t(symptomTranslationKeys[symptom] as keyof typeof import("@/lib/i18n/en").default) : symptom}</Badge>
                       ))}
                     </div>
                   )}
                   {entry.notes && <p className="whitespace-pre-wrap text-sm text-gray-700">{entry.notes}</p>}
                   <div className="flex flex-wrap gap-2">
                     <Button variant="secondary" type="button" onClick={() => editEntry(entry)}>
-                      Edit entry
+                      {t("journal.editEntry")}
                     </Button>
                     <Link
                       className="gradient-aurora shadow-glow inline-flex min-h-11 items-center justify-center rounded-full px-5 py-2 text-sm font-semibold text-white"
                       href={getShareHref(entry)}
                     >
-                      Share as a post
+                      {t("journal.sharePost")}
                     </Link>
                   </div>
                 </div>

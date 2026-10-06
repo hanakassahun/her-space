@@ -9,6 +9,7 @@ import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
+import { useLanguage } from "@/components/LanguageProvider";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -44,6 +45,12 @@ const typeVariants: Record<Post["type"], "rose" | "sky" | "mint"> = {
   knowledge: "mint",
 };
 
+const typeTranslationKeys = {
+  experience: "postType.experience",
+  question: "postType.question",
+  knowledge: "postType.knowledge",
+} as const;
+
 function first<T>(value: T | T[] | null) {
   return Array.isArray(value) ? value[0] : value;
 }
@@ -61,6 +68,7 @@ function formatDate(date: string) {
 }
 
 export default function LibraryPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
   const [savedPosts, setSavedPosts] = useState<SavedPost[]>([]);
@@ -133,12 +141,12 @@ export default function LibraryPage() {
     <PageShell className="max-w-3xl space-y-8 px-4 py-6 md:px-6 md:py-10">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-deep-plum">My Library</h1>
+            <h1 className="text-3xl font-bold text-deep-plum">{t("library.title")}</h1>
           </div>
         </header>
 
         {topics.length > 0 && (
-          <nav className="flex flex-wrap gap-2" aria-label="Filter saved posts by topic">
+          <nav className="flex flex-wrap gap-2" aria-label={t("library.filterLabel")}>
             <Button
               variant={selectedTopic === null ? "primary" : "secondary"}
               className="text-sm"
@@ -146,7 +154,7 @@ export default function LibraryPage() {
               onClick={() => setSelectedTopic(null)}
               aria-pressed={selectedTopic === null}
             >
-              All topics
+              {t("library.allTopics")}
             </Button>
             {topics.map((topic) => (
               <Button
@@ -163,16 +171,16 @@ export default function LibraryPage() {
           </nav>
         )}
 
-        {loading && <p className="text-gray-700">Loading your library...</p>}
+        {loading && <p className="text-gray-700">{t("library.loading")}</p>}
         {message && <Card className="text-red-700">{message}</Card>}
         {!loading && !message && savedPosts.length === 0 && (
           <Card className="text-gray-700">
-            You haven&apos;t saved any posts yet.
+            {t("library.empty")}
           </Card>
         )}
         {!loading && !message && savedPosts.length > 0 && visiblePosts.length === 0 && (
           <Card className="text-gray-700">
-            No saved posts match this topic.
+            {t("library.noMatch")}
           </Card>
         )}
 
@@ -184,11 +192,11 @@ export default function LibraryPage() {
             return (
               <Card as="article" key={post.id} className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <Badge variant={typeVariants[post.type]} className="capitalize">
-                    {post.type}
+                  <Badge variant={typeVariants[post.type]}>
+                    {t(typeTranslationKeys[post.type])}
                   </Badge>
                   <time className="text-sm text-gray-500" dateTime={savedAt}>
-                    Saved {formatDate(savedAt)}
+                    {t("library.saved")} {formatDate(savedAt)}
                   </time>
                 </div>
 
@@ -202,7 +210,7 @@ export default function LibraryPage() {
                 <ProvenanceBadge provenance={post.provenance} sources={post.sources} />
 
                 {post.topics?.length > 0 && (
-                  <ul className="flex flex-wrap gap-2" aria-label="Topics">
+                  <ul className="flex flex-wrap gap-2" aria-label={t("common.topics")}>
                     {post.topics.map((topic, index) => (
                       <li
                         className="rounded-full bg-soft-lilac px-2.5 py-1 text-xs text-deep-plum"
@@ -216,10 +224,10 @@ export default function LibraryPage() {
 
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rose-100 pt-3">
                   <p className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-                    By {profile?.display_name || "Her Space member"}
+                    {t("common.by")} {profile?.display_name || "Her Space member"}
                     {professionalTitle && (
                       <span className="rounded bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-800">
-                        Verified professional: {professionalTitle}
+                        {t("common.verifiedProfessional")} {professionalTitle}
                       </span>
                     )}
                   </p>
@@ -229,8 +237,8 @@ export default function LibraryPage() {
                     type="button"
                     onClick={() => unsavePost(post.id)}
                     disabled={busyPostId === post.id}
-                    aria-label="Unsave post"
-                    title={busyPostId === post.id ? "Unsaving..." : "Unsave"}
+                    aria-label={t("library.unsave")}
+                    title={busyPostId === post.id ? t("library.unsaving") : t("library.unsave")}
                   >
                     <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
                       <path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-4-6 4z" />

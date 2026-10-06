@@ -8,8 +8,10 @@ import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import { useLanguage } from "@/components/LanguageProvider";
 
 export default function SignupPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [inviteCode, setInviteCode] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -35,7 +37,7 @@ export default function SignupPage() {
       return;
     }
     if (!inviteIsValid) {
-      setMessage("That invite code isn't valid or has been used up.");
+      setMessage(t("signup.invalidInvite"));
       setLoading(false);
       return;
     }
@@ -45,7 +47,7 @@ export default function SignupPage() {
       const signupMessage = error?.message ?? "Something went wrong.";
       setMessage(
         signupMessage.toLowerCase().includes("you can only request this after")
-          ? "Please wait a moment and try again."
+          ? t("signup.rateLimit")
           : signupMessage
       );
       setLoading(false);
@@ -69,29 +71,29 @@ export default function SignupPage() {
   return (
     <PageShell className="flex min-h-screen items-center justify-center">
       <Card className="w-full max-w-sm space-y-4">
-        <h1 className="text-3xl font-bold text-deep-plum">Join Her Space</h1>
+        <h1 className="text-3xl font-bold text-deep-plum">{t("signup.title")}</h1>
         <p className="text-deep-plum">
-          Pick a display name. It doesn&apos;t have to be your real name.
+          {t("signup.intro")}
         </p>
         <Input
-          placeholder="Invite code"
+          placeholder={t("signup.inviteCode")}
           value={inviteCode}
           onChange={(e) => setInviteCode(e.target.value)}
         />
         <Input
-          placeholder="Display name"
+          placeholder={t("signup.displayName")}
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
         />
         <Input
           type="email"
-          placeholder="Email"
+          placeholder={t("login.email")}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
         <Input
           type="password"
-          placeholder="Password (at least 6 characters)"
+          placeholder={t("signup.passwordHint")}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
@@ -104,11 +106,11 @@ export default function SignupPage() {
             onChange={(event) => setAgreedToPolicies(event.target.checked)}
           />
           <span>
-            I agree to the{" "}
-            <Link className="font-medium text-deep-plum underline" href="/rules" target="_blank" rel="noopener noreferrer">Community rules</Link>,{" "}
-            <Link className="font-medium text-deep-plum underline" href="/privacy" target="_blank" rel="noopener noreferrer">Privacy</Link>{" "}
-            and{" "}
-            <Link className="font-medium text-deep-plum underline" href="/terms" target="_blank" rel="noopener noreferrer">Terms</Link>.
+            {t("signup.agree")} {" "}
+            <Link className="font-medium text-deep-plum underline" href="/rules" target="_blank" rel="noopener noreferrer">{t("legal.rules")}</Link>,{" "}
+            <Link className="font-medium text-deep-plum underline" href="/privacy" target="_blank" rel="noopener noreferrer">{t("legal.privacy")}</Link>{" "}
+            {t("signup.and")} {" "}
+            <Link className="font-medium text-deep-plum underline" href="/terms" target="_blank" rel="noopener noreferrer">{t("legal.terms")}</Link>.
           </span>
         </label>
         <Button
@@ -116,7 +118,7 @@ export default function SignupPage() {
           onClick={handleSignup}
           disabled={loading || !agreedToPolicies}
         >
-          {loading ? "Creating..." : "Create account"}
+          {loading ? t("signup.creating") : t("signup.create")}
         </Button>
         {message && <p className="text-red-700">{message}</p>}
       </Card>

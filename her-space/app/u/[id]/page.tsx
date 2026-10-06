@@ -10,6 +10,8 @@ import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Textarea from "@/components/ui/Textarea";
+import Input from "@/components/ui/Input";
+import { useLanguage } from "@/components/LanguageProvider";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -40,6 +42,12 @@ const typeVariants: Record<Post["type"], "rose" | "sky" | "mint"> = {
   knowledge: "mint",
 };
 
+const typeTranslationKeys = {
+  experience: "postType.experience",
+  question: "postType.question",
+  knowledge: "postType.knowledge",
+} as const;
+
 function formatDate(date: string) {
   return new Date(date).toLocaleDateString(undefined, {
     year: "numeric",
@@ -50,11 +58,19 @@ function formatDate(date: string) {
 
 export default function UserProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const { t } = useLanguage();
   const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [bioDraft, setBioDraft] = useState("");
   const [posts, setPosts] = useState<Post[]>([]);
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [postTitleDraft, setPostTitleDraft] = useState("");
+  const [postBodyDraft, setPostBodyDraft] = useState("");
+  const [postTopicsDraft, setPostTopicsDraft] = useState("");
+  const [postSourcesDraft, setPostSourcesDraft] = useState("");
+  const [savingPost, setSavingPost] = useState(false);
+  const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [isFollowing, setIsFollowing] = useState(false);
@@ -115,7 +131,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
           followersResult.error?.message ??
             followingResult.error?.message ??
             followResult.error?.message ??
-            "Unable to load follow details."
+            t("profile.followError")
         );
       }
       setFollowerCount(followersResult.count ?? 0);
@@ -168,6 +184,57 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
     setUpdatingFollow(false);
   }
 
+  function beginPostEdit(post: Post) {
+    setEditingPostId(post.id);
+    setPostTitleDraft(post.title);
+    setPostBodyDraft(post.body);
+    setPostTopicsDraft(post.topics.join(", "));
+    setPostSourcesDraft(post.sources.join("\n"));
+  }
+
+  async function savePostEdit(event: FormEvent<HTMLFormElement>, post: Post) {
+    event.preventDefault();
+    if (userId !== id || savingPost) return;
+    const sources = postSourcesDraft.split("\n").map((source) => source.trim()).filter(Boolean);
+    if (post.provenance === "evidence" && sources.length === 0) {
+      setMessage(t("post.evidenceNeedsSource"));
+      return;
+    }
+
+    setSavingPost(true);
+    setMessage("");
+    const { data, error } = await supabase
+      .from("posts")
+      .update({
+        title: postTitleDraft.trim(),
+        body: postBodyDraft.trim(),
+        topics: postTopicsDraft.split(",").map((topic) => topic.trim()).filter(Boolean),
+        ...(post.provenance === "evidence" ? { sources } : {}),
+      })
+      .eq("id", post.id)
+      .select("id, author_id, type, provenance, sources, title, body, topics, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+      .single();
+
+    if (error) setMessage(error.message);
+    else {
+      setPosts((current) => current.map((item) => item.id === post.id ? data as Post : item));
+      setEditingPostId(null);
+    }
+    setSavingPost(false);
+  }
+
+  async function deletePost(post: Post) {
+    if (userId !== id || deletingPostId) return;
+    if (!window.confirm(t("post.deleteConfirm"))) return;
+
+    setDeletingPostId(post.id);
+    setMessage("");
+    const { error } = await supabase.from("posts").delete().eq("id", post.id);
+    if (error) setMessage(error.message);
+    else setPosts((current) => current.filter((item) => item.id !== post.id));
+    setDeletingPostId(null);
+  }
+
   return (
     <PageShell className="max-w-3xl space-y-8 px-4 py-6 md:px-6 md:py-10">
         <header className="flex flex-wrap items-start justify-between gap-4">
@@ -186,7 +253,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                       {profile.bio || ""}
                     </p>
                     <p className="mt-2 text-sm text-gray-600">
-                      {followerCount} followers · {followingCount} following
+                      {followerCount} {t("profile.followers")} · {followingCount} {t("profile.following")}
                     </p>
                   </div>
                 </div>
@@ -201,7 +268,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
               onClick={toggleFollow}
               disabled={updatingFollow}
             >
-              {isFollowing ? "Unfollow" : "Follow"}
+              {isFollowing ? t("profile.unfollow") : t("profile.follow")}
             </Button>
           )}
         </header>
@@ -210,7 +277,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
           <Card as="div" className="space-y-3">
           <form className="space-y-3" onSubmit={saveBio}>
             <label className="block space-y-2 text-sm font-medium text-gray-900">
-              Edit bio
+              {t("profile.editBio")}
               <Textarea
                 className="min-h-24"
                 value={bioDraft}
@@ -224,43 +291,78 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                 type="submit"
                 disabled={savingBio}
               >
-                {savingBio ? "Saving..." : "Save bio"}
+                {savingBio ? t("profile.savingBio") : t("profile.saveBio")}
               </Button>
             </div>
           </form>
           </Card>
         )}
 
-        {loading && <p className="text-gray-700">Loading profile...</p>}
+        {loading && <p className="text-gray-700">{t("status.loadingProfile")}</p>}
         {message && <Card className="text-red-700">{message}</Card>}
         {!loading && !profile && !message && (
-          <Card className="text-gray-700">Profile not found.</Card>
+          <Card className="text-gray-700">{t("status.profileNotFound")}</Card>
         )}
 
         <section className="space-y-4" aria-label="Posts by this user">
-          <h2 className="text-xl font-semibold text-deep-plum">Posts</h2>
+          <h2 className="text-xl font-semibold text-deep-plum">{t("profile.posts")}</h2>
           {!loading && posts.length === 0 && profile && (
-            <Card className="text-gray-700">No posts yet.</Card>
+            <Card className="text-gray-700">{t("status.noPosts")}</Card>
           )}
           {posts.map((post) => (
             <Card as="article" key={post.id} className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <Badge variant={typeVariants[post.type]} className="capitalize">
-                  {post.type}
+                <Badge variant={typeVariants[post.type]}>
+                  {t(typeTranslationKeys[post.type])}
                 </Badge>
                 <time className="text-sm text-gray-500" dateTime={post.created_at}>
                   {formatDate(post.created_at)}
                 </time>
               </div>
-              <div className="space-y-2">
-                <h3 className="text-xl font-semibold text-gray-900">
-                  <Link href={`/post/${post.id}`}>{post.title}</Link>
-                </h3>
-                <p className="whitespace-pre-wrap text-gray-800">{post.body}</p>
-              </div>
+              {editingPostId === post.id ? (
+                <form className="space-y-3" onSubmit={(event) => savePostEdit(event, post)}>
+                  <label className="block space-y-2 text-sm font-medium text-deep-plum">
+                    Title
+                    <Input value={postTitleDraft} onChange={(event) => setPostTitleDraft(event.target.value)} required />
+                  </label>
+                  <label className="block space-y-2 text-sm font-medium text-deep-plum">
+                    Body
+                    <Textarea className="min-h-36" value={postBodyDraft} onChange={(event) => setPostBodyDraft(event.target.value)} required />
+                  </label>
+                  <label className="block space-y-2 text-sm font-medium text-deep-plum">
+                    Topics (comma-separated)
+                    <Input value={postTopicsDraft} onChange={(event) => setPostTopicsDraft(event.target.value)} />
+                  </label>
+                  {post.provenance === "evidence" && (
+                    <label className="block space-y-2 text-sm font-medium text-deep-plum">
+                      Sources (one URL per line)
+                      <Textarea className="min-h-24" value={postSourcesDraft} onChange={(event) => setPostSourcesDraft(event.target.value)} required />
+                    </label>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="submit" disabled={savingPost}>{savingPost ? "Saving..." : "Save changes"}</Button>
+                    <Button variant="secondary" type="button" onClick={() => setEditingPostId(null)}>Cancel</Button>
+                  </div>
+                </form>
+              ) : (
+                <div className="space-y-2">
+                  <h3 className="text-xl font-semibold text-gray-900">
+                    <Link href={`/post/${post.id}`}>{post.title}</Link>
+                  </h3>
+                  <p className="whitespace-pre-wrap text-gray-800">{post.body}</p>
+                  {userId === id && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <Button variant="secondary" className="text-sm" type="button" onClick={() => beginPostEdit(post)}>Edit</Button>
+                      <Button variant="ghost" className="text-sm text-red-800" type="button" disabled={deletingPostId === post.id} onClick={() => deletePost(post)}>
+                        {deletingPostId === post.id ? "Deleting..." : "Delete"}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
               <ProvenanceBadge provenance={post.provenance} sources={post.sources} />
               {post.topics?.length > 0 && (
-                <ul className="flex flex-wrap gap-2" aria-label="Topics">
+                  <ul className="flex flex-wrap gap-2" aria-label={t("common.topics")}>
                   {post.topics.map((topic, index) => (
                     <li
                       className="rounded-full bg-soft-lilac px-2.5 py-1 text-xs text-deep-plum"

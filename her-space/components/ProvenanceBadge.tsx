@@ -1,4 +1,5 @@
 import Badge from "@/components/ui/Badge";
+import { useLanguage } from "@/components/LanguageProvider";
 
 type Provenance = "personal" | "community" | "evidence";
 
@@ -13,17 +14,18 @@ const badgeVariants: Record<Provenance, "rose" | "lilac" | "mint"> = {
   evidence: "mint",
 };
 
-const labels: Record<Provenance, string> = {
-  personal: "Personal experience",
-  community: "Community knowledge, not medically verified",
-  evidence: "Evidence-backed",
-};
+const labelKeys = {
+  personal: "provenance.personal",
+  community: "provenance.community",
+  evidence: "provenance.evidence",
+} as const;
 
 export default function ProvenanceBadge({ provenance, sources = [] }: ProvenanceBadgeProps) {
+  const { t } = useLanguage();
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Badge variant={badgeVariants[provenance]} className="border border-current/25 font-semibold">
-        {labels[provenance]}
+        {t(labelKeys[provenance])}
       </Badge>
       {provenance === "evidence" && sources.map((source, index) => (
         <a

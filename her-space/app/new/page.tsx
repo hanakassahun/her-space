@@ -8,11 +8,13 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
+import { useLanguage } from "@/components/LanguageProvider";
 
 type PostType = "experience" | "question" | "knowledge";
 type Provenance = "personal" | "community" | "evidence";
 
 export default function NewPostPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [type, setType] = useState<PostType>("experience");
   const [provenance, setProvenance] = useState<Provenance>("personal");
@@ -50,7 +52,7 @@ export default function NewPostPage() {
       .map((source) => source.trim())
       .filter(Boolean);
     if (provenance === "evidence" && sourceList.length === 0) {
-      setMessage("Add at least one source link for evidence-backed posts.");
+      setMessage(t("new.evidenceNeedsSource"));
       setLoading(false);
       return;
     }
@@ -79,13 +81,13 @@ export default function NewPostPage() {
   return (
     <PageShell className="max-w-3xl space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-deep-plum">Write a post</h1>
+          <h1 className="text-3xl font-bold text-deep-plum">{t("new.title")}</h1>
         </div>
 
         <Card as="div" className="space-y-4">
         <form className="space-y-4" onSubmit={handleSubmit}>
           <label className="block space-y-2 text-sm font-medium text-gray-900">
-            Type
+            {t("new.type")}
             <select
               className="min-h-11 w-full rounded-2xl border border-white/70 bg-white/80 px-4 py-2.5 text-deep-plum focus:outline-none focus:ring-2 focus:ring-soft-lilac"
               value={type}
@@ -96,14 +98,14 @@ export default function NewPostPage() {
                 setSources("");
               }}
             >
-              <option value="experience">Experience</option>
-              <option value="question">Question</option>
-              <option value="knowledge">Knowledge</option>
+              <option value="experience">{t("new.experience")}</option>
+              <option value="question">{t("new.question")}</option>
+              <option value="knowledge">{t("new.knowledge")}</option>
             </select>
           </label>
 
           <label className="block space-y-2 text-sm font-medium text-gray-900">
-            What is this post?
+            {t("new.provenance")}
             <select
               className="min-h-11 w-full rounded-2xl border border-white/70 bg-white/80 px-4 py-2.5 text-deep-plum focus:outline-none focus:ring-2 focus:ring-soft-lilac"
               value={provenance}
@@ -113,18 +115,18 @@ export default function NewPostPage() {
                 if (nextProvenance !== "evidence") setSources("");
               }}
             >
-              <option value="personal">My personal experience</option>
-              <option value="community">Shared knowledge, not medically verified</option>
-              <option value="evidence">Backed by sources</option>
+              <option value="personal">{t("new.personal")}</option>
+              <option value="community">{t("new.community")}</option>
+              <option value="evidence">{t("new.evidence")}</option>
             </select>
           </label>
 
           {provenance === "evidence" && (
             <label className="block space-y-2 text-sm font-medium text-gray-900">
-              Source links (one per line)
+              {t("new.sourceLinks")}
               <Textarea
                 className="min-h-28"
-                placeholder="https://example.com/source"
+                placeholder={t("new.sourcePlaceholder")}
                 value={sources}
                 onChange={(event) => setSources(event.target.value)}
                 required
@@ -133,7 +135,7 @@ export default function NewPostPage() {
           )}
 
           <label className="block space-y-2 text-sm font-medium text-gray-900">
-            Title
+            {t("common.title")}
             <Input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
@@ -142,7 +144,7 @@ export default function NewPostPage() {
           </label>
 
           <label className="block space-y-2 text-sm font-medium text-gray-900">
-            Body
+            {t("common.body")}
             <Textarea
               className="min-h-48"
               value={body}
@@ -152,9 +154,9 @@ export default function NewPostPage() {
           </label>
 
           <label className="block space-y-2 text-sm font-medium text-gray-900">
-            Topics
+            {t("common.topics")}
             <Input
-              placeholder="e.g. wellbeing, relationships"
+              placeholder={t("new.topicsPlaceholder")}
               value={topics}
               onChange={(event) => setTopics(event.target.value)}
             />
@@ -166,7 +168,7 @@ export default function NewPostPage() {
             type="submit"
             disabled={loading}
           >
-            {loading ? "Publishing..." : "Publish post"}
+            {loading ? t("new.publishing") : t("new.publish")}
           </Button>
         </form>
         </Card>
