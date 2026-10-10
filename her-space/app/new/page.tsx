@@ -73,6 +73,7 @@ export default function NewPostPage() {
   const [body, setBody] = useState("");
   const [topics, setTopics] = useState<string[]>([]);
   const [extraTopics, setExtraTopics] = useState("");
+  const [topicsExpanded, setTopicsExpanded] = useState(false);
   const [sensitive, setSensitive] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [draftReady, setDraftReady] = useState(false);
@@ -180,9 +181,14 @@ export default function NewPostPage() {
   function toggleTopic(topic: string) {
     setTopics((current) => {
       if (current.includes(topic)) return current.filter((item) => item !== topic);
-      if (new Set([...current, ...parseTopicText(extraTopics)]).size >= 5) return current;
+      if (new Set([...current, topic, ...parseTopicText(extraTopics)]).size > 5) return current;
       return [...current, topic];
     });
+  }
+
+  function removeTopic(topic: string) {
+    setTopics((current) => current.filter((item) => item !== topic));
+    setExtraTopics((current) => parseTopicText(current).filter((item) => item !== topic).join(", "));
   }
 
   function addStarter(starter: string) {
@@ -282,12 +288,12 @@ export default function NewPostPage() {
             <>
               <fieldset className="space-y-2">
                 <legend className="text-sm font-medium text-deep-plum">{t("write.chooseType")}</legend>
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid grid-cols-3 gap-2">
                   {(["experience", "question", "knowledge"] as const).map((postType) => (
                     <Button
                       key={postType}
                       variant={type === postType ? "primary" : "secondary"}
-                      className={`h-auto min-h-[104px] w-full flex-col items-start gap-2 rounded-2xl p-4 text-left ${type === postType ? "shadow-glow" : ""}`}
+                      className={`h-auto min-h-[84px] w-full min-w-0 flex-col justify-center gap-1 rounded-2xl px-2 py-2 text-center ${type === postType ? "shadow-glow" : ""}`}
                       type="button"
                       aria-pressed={type === postType}
                       onClick={() => {
@@ -296,7 +302,7 @@ export default function NewPostPage() {
                         setSources("");
                       }}
                     >
-                      <span className="flex items-center gap-2">
+                      <span className="flex w-full min-w-0 flex-col items-center gap-1">
                         {postType === "experience" ? (
                           <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M12 21s-8-4.5-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 6.5-8 11-8 11Z" /></svg>
                         ) : postType === "question" ? (
@@ -304,58 +310,40 @@ export default function NewPostPage() {
                         ) : (
                           <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M12 3 4 7v5c0 5 3.4 8 8 9 4.6-1 8-4 8-9V7l-8-4Z" /><path d="m8.5 12 2.2 2.2 4.8-4.8" /></svg>
                         )}
-                        <span className="break-words font-semibold">{t(`new.${postType}` as const)}</span>
+                        <span className="w-full break-words text-sm font-semibold leading-tight [overflow-wrap:anywhere]">{t(`new.${postType}` as const)}</span>
                       </span>
-                      <span className="break-words text-xs font-normal leading-5 opacity-90">{t(typeDescriptionKeys[postType])}</span>
                     </Button>
                   ))}
                 </div>
+                <p className="break-words text-sm leading-snug text-gray-600">
+                  {t(typeDescriptionKeys[type])}
+                </p>
               </fieldset>
 
               <label className="block space-y-2 text-sm font-medium text-deep-plum">
                 {t("common.title")}
-                <Input maxLength={150} value={title} onChange={(event) => setTitle(event.target.value)} required />
+                <Input
+                  className="write-title-input !rounded-none !border-x-0 !border-t-0 !border-b-2 !border-b-[#CDBDEB] !bg-transparent !px-1 !text-[22px] !font-medium focus:!border-b-[#8F72BE] focus:!ring-0"
+                  maxLength={150}
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  required
+                />
                 {title.length > 120 && <span className="block text-right text-xs font-normal text-gray-600">{title.length}/150</span>}
               </label>
 
-              <fieldset className="space-y-2">
-                <legend className="text-sm font-medium text-deep-plum">{t("write.pickTopics")}</legend>
-                <div className="flex flex-wrap gap-2">
-                  {topicOptions.map((topic) => {
-                    const selected = topics.includes(topic);
-                    return (
-                      <Button
-                        key={topic}
-                        variant={selected ? "primary" : "secondary"}
-                        className="min-h-11 max-w-full break-words px-3 text-sm"
-                        type="button"
-                        aria-pressed={selected}
-                        onClick={() => toggleTopic(topic)}
-                      >
-                        {topic}
+              {!body.trim() && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-deep-plum">{t("write.starters")}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {starterKeys[type].map((key) => (
+                      <Button key={key} variant="secondary" type="button" className="max-w-full whitespace-normal break-words px-3 text-xs" onClick={() => addStarter(t(key))}>
+                        {t(key)}
                       </Button>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
-                <Input
-                  value={extraTopics}
-                  onChange={(event) => setExtraTopics(event.target.value)}
-                  placeholder={t("write.otherTopics")}
-                  aria-label={t("write.otherTopics")}
-                />
-                <p className="text-right text-xs text-gray-600">{mergedTopics.length}/5</p>
-              </fieldset>
-
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-deep-plum">{t("write.starters")}</p>
-                <div className="flex flex-wrap gap-2">
-                  {starterKeys[type].map((key) => (
-                    <Button key={key} variant="secondary" type="button" className="max-w-full whitespace-normal break-words px-3 text-xs" onClick={() => addStarter(t(key))}>
-                      {t(key)}
-                    </Button>
-                  ))}
-                </div>
-              </div>
+              )}
 
               <label className="block space-y-2 text-sm font-medium text-deep-plum">
                 {t("common.body")}
@@ -370,15 +358,65 @@ export default function NewPostPage() {
                 {body.length > 4000 && <span className="block text-right text-xs font-normal text-gray-600">{body.length}/5000</span>}
               </label>
 
-              <div className="space-y-2 text-xs leading-5 text-gray-600">
-                <p>{t("write.privacyTip")}</p>
-                <p className="flex items-start gap-2">
-                  <svg className="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-                    <rect x="5" y="10" width="14" height="11" rx="2" />
-                    <path d="M8 10V7a4 4 0 0 1 8 0v3" />
-                  </svg>
-                  {t("new.visibility")}
-                </p>
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    className="justify-start px-1 text-sm font-medium"
+                    aria-expanded={topicsExpanded}
+                    onClick={() => setTopicsExpanded((current) => !current)}
+                  >
+                    {t("write.addTopics")}
+                    <svg className={`ml-1 h-4 w-4 transition-transform ${topicsExpanded ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </Button>
+                  <span className="text-xs text-gray-600">{mergedTopics.length}/5</span>
+                </div>
+                {mergedTopics.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {mergedTopics.map((topic) => (
+                      <Button
+                        key={topic}
+                        variant="secondary"
+                        type="button"
+                        className="max-w-full whitespace-normal break-words px-3 text-sm"
+                        aria-label={`${topic} ×`}
+                        onClick={() => removeTopic(topic)}
+                      >
+                        <span className="break-words">{topic}</span><span aria-hidden="true" className="ml-1">×</span>
+                      </Button>
+                    ))}
+                  </div>
+                )}
+                {topicsExpanded && (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap gap-2">
+                      {topicOptions.map((topic) => {
+                        const selected = topics.includes(topic);
+                        return (
+                          <Button
+                            key={topic}
+                            variant={selected ? "primary" : "secondary"}
+                            className="min-h-11 max-w-full break-words px-3 text-sm"
+                            type="button"
+                            aria-pressed={selected}
+                            onClick={() => toggleTopic(topic)}
+                          >
+                            {topic}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    <Input
+                      value={extraTopics}
+                      onChange={(event) => setExtraTopics(event.target.value)}
+                      placeholder={t("write.otherTopics")}
+                      aria-label={t("write.otherTopics")}
+                    />
+                  </div>
+                )}
               </div>
 
               <label className="block space-y-2 text-sm font-medium text-deep-plum">
@@ -411,15 +449,26 @@ export default function NewPostPage() {
                   <span className="mt-1 block break-words text-xs leading-5 text-gray-600">{t("write.sensitiveHint")}</span>
                 </span>
                 <button
-                  className={`relative mt-0.5 inline-flex h-7 w-12 shrink-0 items-center rounded-full border p-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle ${sensitive ? "gradient-aurora border-transparent" : "border-[#CDBDEB] bg-white"}`}
+                  className={`relative inline-flex h-11 w-16 shrink-0 items-center rounded-full border px-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle ${sensitive ? "gradient-aurora border-transparent" : "border-[#CDBDEB] bg-soft-lilac/40"}`}
                   type="button"
                   role="switch"
                   aria-checked={sensitive}
                   aria-label={t("write.sensitive")}
                   onClick={() => setSensitive((current) => !current)}
                 >
-                  <span className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${sensitive ? "translate-x-5" : "translate-x-0"}`} />
+                  <span className={`h-7 w-7 rounded-full bg-white shadow-sm transition-transform ${sensitive ? "translate-x-7" : "translate-x-0"}`} />
                 </button>
+              </div>
+
+              <div className="space-y-2 text-sm leading-snug text-gray-600">
+                <p>{t("write.privacyTip")}</p>
+                <p className="flex items-start gap-2">
+                  <svg className="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                    <rect x="5" y="10" width="14" height="11" rx="2" />
+                    <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+                  </svg>
+                  {t("new.visibility")}
+                </p>
               </div>
             </>
           )}
@@ -436,10 +485,13 @@ export default function NewPostPage() {
                 {t("write.preview")}
               </Button>
             )}
-            <Button className="flex-1" type="submit" disabled={loading || (preview && (!title.trim() || !body.trim()))}>
+            <Button className="publish-submit flex-1" type="submit" disabled={loading || !title.trim() || !body.trim()}>
               {loading ? t("new.publishing") : t("new.publish")}
             </Button>
           </div>
+          {(!title.trim() || !body.trim()) && (
+            <p className="text-center text-xs text-gray-600">{t("write.publishHint")}</p>
+          )}
         </form>
       </Card>
     </PageShell>

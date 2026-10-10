@@ -89,6 +89,18 @@ html[data-lowend="true"] .glass {
   line-height: 1.8;
 }
 
+.publish-submit:disabled {
+  background-color: #d8d2df;
+  background-image: none;
+  color: #716a7b;
+  box-shadow: none;
+  opacity: 1;
+}
+
+.write-title-input {
+  font-size: 22px !important;
+}
+
 .more-sheet {
   overscroll-behavior: contain;
 }

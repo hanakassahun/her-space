@@ -447,7 +447,7 @@ export default function ExplorePage() {
                     <Badge variant={typeVariants[post.type]}>
                       {t(typeTranslationKeys[post.type])}
                     </Badge>
-                    <ProvenanceBadge provenance={post.provenance} sources={post.sources} />
+                    <ProvenanceBadge provenance={post.provenance} sources={post.sources} short />
                   </div>
                   <time className="text-sm text-gray-500" dateTime={post.created_at}>
                     {new Date(post.created_at).toLocaleDateString(undefined, {

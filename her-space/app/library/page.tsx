@@ -242,7 +242,7 @@ export default function LibraryPage() {
                   )}
                 </div>
 
-                <ProvenanceBadge provenance={post.provenance} sources={post.sources} />
+                <ProvenanceBadge provenance={post.provenance} sources={post.sources} short />
 
                 {(!post.sensitive || revealedPostIds[post.id]) && post.topics?.length > 0 && (
                   <ul className="flex flex-wrap gap-2" aria-label={t("common.topics")}>
