@@ -305,6 +305,10 @@ export default function JournalPage() {
                 </Button>
               ))}
             </div>
+            <div className="flex justify-between text-xs text-gray-600">
+              <span>{t("journal.low")}</span>
+              <span>{t("journal.high")}</span>
+            </div>
           </fieldset>
 
           <fieldset className="space-y-2">
@@ -322,6 +326,10 @@ export default function JournalPage() {
                   {value}
                 </Button>
               ))}
+            </div>
+            <div className="flex justify-between text-xs text-gray-600">
+              <span>{t("journal.low")}</span>
+              <span>{t("journal.high")}</span>
             </div>
           </fieldset>
 

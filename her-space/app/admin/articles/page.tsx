@@ -236,7 +236,7 @@ export default function AdminArticlesPage() {
             <label className="block space-y-2 text-sm font-medium text-deep-plum">
               Category
               <select
-                className="min-h-11 w-full rounded-2xl border border-white/70 bg-white/80 px-4 py-2.5 text-deep-plum focus:outline-none focus:ring-2 focus:ring-soft-lilac"
+                className="min-h-11 w-full rounded-2xl border border-[#CDBDEB] bg-white px-4 py-2.5 text-deep-plum focus:border-[#8F72BE] focus:outline-none focus:ring-2 focus:ring-[#B49AD8]"
                 value={form.category}
                 onChange={(event) => setForm({ ...form, category: event.target.value as ArticleCategory })}
               >

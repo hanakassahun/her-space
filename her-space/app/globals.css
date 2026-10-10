@@ -39,6 +39,17 @@
   box-shadow: 0 12px 36px rgb(70 47 93 / 8%);
 }
 
+select {
+  border: 1px solid #cdbdeb;
+  background-color: #fff;
+}
+
+select:focus-visible {
+  border-color: #8f72be;
+  outline: 2px solid #b49ad8;
+  outline-offset: 1px;
+}
+
 @keyframes fade-up {
   from {
     opacity: 0;

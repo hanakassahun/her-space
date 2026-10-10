@@ -90,7 +90,7 @@ export default function NewPostPage() {
           <label className="block space-y-2 text-sm font-medium text-gray-900">
             {t("new.type")}
             <select
-              className="min-h-11 w-full rounded-2xl border border-white/70 bg-white/80 px-4 py-2.5 text-deep-plum focus:outline-none focus:ring-2 focus:ring-soft-lilac"
+              className="min-h-11 w-full rounded-2xl border border-[#CDBDEB] bg-white px-4 py-2.5 text-deep-plum focus:border-[#8F72BE] focus:outline-none focus:ring-2 focus:ring-[#B49AD8]"
               value={type}
               onChange={(event) => {
                 const nextType = event.target.value as PostType;
@@ -108,7 +108,7 @@ export default function NewPostPage() {
           <label className="block space-y-2 text-sm font-medium text-gray-900">
             {t("new.provenance")}
             <select
-              className="min-h-11 w-full rounded-2xl border border-white/70 bg-white/80 px-4 py-2.5 text-deep-plum focus:outline-none focus:ring-2 focus:ring-soft-lilac"
+              className="min-h-11 w-full rounded-2xl border border-[#CDBDEB] bg-white px-4 py-2.5 text-deep-plum focus:border-[#8F72BE] focus:outline-none focus:ring-2 focus:ring-[#B49AD8]"
               value={provenance}
               onChange={(event) => {
                 const nextProvenance = event.target.value as Provenance;
@@ -147,7 +147,8 @@ export default function NewPostPage() {
           <label className="block space-y-2 text-sm font-medium text-gray-900">
             {t("common.body")}
             <Textarea
-              className="min-h-48"
+              className="min-h-40 resize-y"
+              rows={6}
               value={body}
               onChange={(event) => setBody(event.target.value)}
               required

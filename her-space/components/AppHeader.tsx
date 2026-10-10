@@ -62,7 +62,7 @@ export default function AppHeader({ userId, isAdmin }: AppHeaderProps) {
             </svg>
           </button>
         )}
-        <Link className="shrink-0 bg-clip-text text-lg font-bold text-transparent gradient-aurora md:text-xl" href={navConfig.home.href}>
+        <Link className="shrink-0 text-lg font-bold text-deep-plum md:text-xl" href={navConfig.home.href}>
           Her Space
         </Link>
 
@@ -95,7 +95,7 @@ export default function AppHeader({ userId, isAdmin }: AppHeaderProps) {
           <NavIcon icon={navConfig.write.icon} className="h-4 w-4" />
           {t(navConfig.write.label)}
         </Link>
-        <LanguageSwitcher className="hidden md:inline-flex" />
+        <LanguageSwitcher className="inline-flex" />
         <div className="relative hidden shrink-0 md:block" ref={accountMenuRef}>
           <button
             className={`inline-flex h-10 w-10 items-center justify-center rounded-full border text-sm font-semibold transition-colors ${accountOpen ? "border-soft-lilac bg-soft-lilac text-deep-plum" : "border-white/70 bg-white/75 text-deep-plum hover:bg-white"}`}

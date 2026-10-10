@@ -7,7 +7,6 @@ import { mobileNavOrder, moreNavOrder, isNavItemActive, navConfig, resolveNavHre
 import { supabase } from "@/lib/supabase";
 import NavIcon from "@/components/NavIcon";
 import { useLanguage } from "@/components/LanguageProvider";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 type BottomNavProps = {
   userId: string;
@@ -97,7 +96,6 @@ export default function BottomNav({ userId, isAdmin }: BottomNavProps) {
                 </button>
               </li>
             </ul>
-            <LanguageSwitcher className="mt-4" />
           </section>
         </div>
       )}

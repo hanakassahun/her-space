@@ -3,10 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { navConfig, resolveNavHref, type NavKey } from "@/lib/nav";
+import { navConfig, resolveNavHref } from "@/lib/nav";
 import NavIcon from "@/components/NavIcon";
 import { useLanguage } from "@/components/LanguageProvider";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import InstallBanner from "@/components/InstallBanner";
@@ -54,25 +53,29 @@ export default function Home() {
           <p className="text-center text-deep-plum">{t("home.welcome")} {name} 🌸</p>
           {userId && <WelcomeCards />}
           <InstallBanner />
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {(["feed", "explore", "learn", "journal", "library", "resources"] as NavKey[]).map((key) => {
+          <div className="grid grid-cols-2 gap-3">
+            {(["feed", "explore", "learn", "journal", "library", "resources"] as const).map((key) => {
               const item = navConfig[key];
+              const descriptionKeys = {
+                feed: "home.feedDesc",
+                explore: "home.exploreDesc",
+                learn: "home.learnDesc",
+                journal: "home.journalDesc",
+                library: "home.libraryDesc",
+                resources: "home.resourcesDesc",
+              } as const;
               return (
                 <Link href={resolveNavHref(key, userId ?? "")} key={key}>
-                  <Card as="article" className="flex min-h-32 h-full flex-col justify-between text-deep-plum transition hover:-translate-y-0.5 hover:bg-white/80">
-                    <NavIcon icon={item.icon} className="h-6 w-6 text-periwinkle" />
-                    <span className="text-lg font-semibold">{t(item.label)}</span>
-                  </Card>
-                </Link>
-              );
-            })}
-            {userId && (["profile", ...(isAdmin ? ["admin"] : [])] as NavKey[]).map((key) => {
-              const item = navConfig[key];
-              return (
-                <Link href={resolveNavHref(key, userId)} key={key}>
-                  <Card as="article" className="flex min-h-32 h-full flex-col justify-between text-deep-plum transition hover:-translate-y-0.5 hover:bg-white/80">
-                    <NavIcon icon={item.icon} className="h-6 w-6 text-periwinkle" />
-                    <span className="text-lg font-semibold">{t(item.label)}</span>
+                  <Card as="article" className="flex min-h-[120px] h-full min-w-0 flex-col justify-between gap-2 p-4 text-deep-plum transition hover:-translate-y-0.5 hover:bg-white/80">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-soft-lilac/70 text-deep-plum">
+                      <NavIcon icon={item.icon} className="h-5 w-5" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block break-words text-base font-semibold leading-snug">{t(item.label)}</span>
+                      <span className="mt-0.5 block line-clamp-2 break-words text-xs leading-4 text-gray-600">
+                        {t(descriptionKeys[key])}
+                      </span>
+                    </span>
                   </Card>
                 </Link>
               );
@@ -95,7 +98,6 @@ export default function Home() {
             <Link className="underline underline-offset-4" href="/rules">{t("legal.rules")}</Link>
             <Link className="underline underline-offset-4" href="/privacy">{t("legal.privacy")}</Link>
             <Link className="underline underline-offset-4" href="/terms">{t("legal.terms")}</Link>
-            <LanguageSwitcher />
           </footer>
         </>
       )}

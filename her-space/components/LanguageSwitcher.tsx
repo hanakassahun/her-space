@@ -19,7 +19,6 @@ export default function LanguageSwitcher({ className = "" }: { className?: strin
       >
         {t("language.english")}
       </button>
-      <span className="text-gray-400" aria-hidden="true">|</span>
       <button
         className={`min-h-8 rounded-full px-3 transition-colors ${lang === "am" ? "bg-soft-lilac text-deep-plum" : "text-gray-700 hover:bg-white"}`}
         type="button"

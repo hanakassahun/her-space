@@ -24,8 +24,8 @@ export default function LikeButton({ count, liked, onToggle }: LikeButtonProps) 
   return (
     <span className="inline-flex items-center gap-2 text-sm text-deep-plum">
       <Button
-        className="!h-11 !w-11 !min-w-11 !px-0 !py-0"
-        variant={liked ? "primary" : "secondary"}
+        className="!h-11 !w-11 !min-w-11 !px-0 !py-0 text-rose-700 hover:bg-rose-50"
+        variant="ghost"
         type="button"
         onClick={handleClick}
         disabled={loading}

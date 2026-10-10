@@ -146,7 +146,7 @@ export default function ResourcesPage() {
           onChange={(event) => setSearch(event.target.value)}
         />
         <select
-          className="min-h-11 rounded-2xl border border-white/70 bg-white/80 px-4 py-2.5 text-deep-plum focus:outline-none focus:ring-2 focus:ring-soft-lilac"
+          className="min-h-11 rounded-2xl border border-[#CDBDEB] bg-white px-4 py-2.5 text-deep-plum focus:border-[#8F72BE] focus:outline-none focus:ring-2 focus:ring-[#B49AD8]"
           aria-label={t("resources.kindFilter")}
           value={selectedKind}
           onChange={(event) => setSelectedKind(event.target.value as ResourceKind | "all")}
@@ -157,7 +157,7 @@ export default function ResourcesPage() {
           ))}
         </select>
         <select
-          className="min-h-11 rounded-2xl border border-white/70 bg-white/80 px-4 py-2.5 text-deep-plum focus:outline-none focus:ring-2 focus:ring-soft-lilac"
+          className="min-h-11 rounded-2xl border border-[#CDBDEB] bg-white px-4 py-2.5 text-deep-plum focus:border-[#8F72BE] focus:outline-none focus:ring-2 focus:ring-[#B49AD8]"
           aria-label={t("resources.areaFilter")}
           value={selectedArea}
           onChange={(event) => setSelectedArea(event.target.value)}
