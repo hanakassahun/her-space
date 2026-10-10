@@ -309,7 +309,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
             <Card className="text-gray-700">{t("status.noPosts")}</Card>
           )}
           {posts.map((post) => (
-            <Card as="article" key={post.id} className="space-y-4">
+            <Card as="article" key={post.id} className="post-card space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <Badge variant={typeVariants[post.type]}>
                   {t(typeTranslationKeys[post.type])}

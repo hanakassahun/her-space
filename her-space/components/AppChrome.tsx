@@ -19,6 +19,19 @@ export default function AppChrome({ children }: { children: ReactNode }) {
     pathname === "/reset-password";
 
   useEffect(() => {
+    const device = window.navigator as Navigator & { deviceMemory?: number };
+    if (typeof device.deviceMemory === "number" && device.deviceMemory <= 2) {
+      document.documentElement.dataset.lowend = "true";
+    } else {
+      delete document.documentElement.dataset.lowend;
+    }
+
+    return () => {
+      delete document.documentElement.dataset.lowend;
+    };
+  }, []);
+
+  useEffect(() => {
     let active = true;
 
     async function setAdminForUser(currentUserId: string | null) {

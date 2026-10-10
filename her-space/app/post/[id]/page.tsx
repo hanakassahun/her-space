@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, use, useEffect, useState } from "react";
+import { FormEvent, use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -13,6 +13,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Textarea from "@/components/ui/Textarea";
 import Input from "@/components/ui/Input";
+import BookmarkButton from "@/components/ui/BookmarkButton";
 import { useLanguage } from "@/components/LanguageProvider";
 
 type PostType = "experience" | "question" | "knowledge";
@@ -101,6 +102,8 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
   const [bookmarking, setBookmarking] = useState(false);
   const [submittingComment, setSubmittingComment] = useState(false);
   const [message, setMessage] = useState("");
+  const likeRequest = useRef(false);
+  const bookmarkRequest = useRef(false);
 
   async function loadComments(postId: string) {
     const { data, error } = await supabase
@@ -172,37 +175,53 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
   }, [id, router]);
 
   async function toggleBookmark() {
-    if (!userId || bookmarking) return;
+    if (!userId || bookmarkRequest.current) return;
 
+    bookmarkRequest.current = true;
     setBookmarking(true);
     setMessage("");
-    const result = saved
-      ? await supabase
-          .from("bookmarks")
-          .delete()
-          .eq("user_id", userId)
-          .eq("post_id", id)
-      : await supabase.from("bookmarks").insert({ post_id: id });
-
-    if (result.error) {
-      setMessage(friendlyError(result.error, t));
-    } else {
-      setSaved(!saved);
+    const previousSaved = saved;
+    setSaved(!previousSaved);
+    try {
+      const result = previousSaved
+        ? await supabase
+            .from("bookmarks")
+            .delete()
+            .eq("user_id", userId)
+            .eq("post_id", id)
+        : await supabase.from("bookmarks").insert({ post_id: id });
+      if (result.error) throw result.error;
+    } catch (error) {
+      setSaved(previousSaved);
+      const friendlyMessage = friendlyError(error, t);
+      setMessage(friendlyMessage);
+      window.setTimeout(() => setMessage((currentMessage) => currentMessage === friendlyMessage ? "" : currentMessage), 3000);
+    } finally {
+      bookmarkRequest.current = false;
+      setBookmarking(false);
     }
-    setBookmarking(false);
   }
 
   async function toggleLike() {
-    if (!userId) return;
-    const result = liked
-      ? await supabase.from("likes").delete().eq("user_id", userId).eq("post_id", id)
-      : await supabase.from("likes").insert({ post_id: id });
-
-    if (result.error) {
-      setMessage(friendlyError(result.error, t));
-    } else {
-      setLiked(!liked);
-      setLikeCount((count) => count + (liked ? -1 : 1));
+    if (!userId || likeRequest.current) return;
+    likeRequest.current = true;
+    const previousLiked = liked;
+    const previousCount = likeCount;
+    setLiked(!previousLiked);
+    setLikeCount(previousCount + (previousLiked ? -1 : 1));
+    try {
+      const result = previousLiked
+        ? await supabase.from("likes").delete().eq("user_id", userId).eq("post_id", id)
+        : await supabase.from("likes").insert({ post_id: id });
+      if (result.error) throw result.error;
+    } catch (error) {
+      setLiked(previousLiked);
+      setLikeCount(previousCount);
+      const friendlyMessage = friendlyError(error, t);
+      setMessage(friendlyMessage);
+      window.setTimeout(() => setMessage((currentMessage) => currentMessage === friendlyMessage ? "" : currentMessage), 3000);
+    } finally {
+      likeRequest.current = false;
     }
   }
 
@@ -385,7 +404,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
 
         {post && (
           <>
-            <Card as="article" className="space-y-5">
+            <Card as="article" className="post-card space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <Badge variant={typeVariants[post.type]}>
                   {t(typeTranslationKeys[post.type])}
@@ -464,26 +483,14 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                 <div className="flex flex-wrap items-center gap-4">
                   {renderReportControl("post", id)}
                   <LikeButton count={likeCount} liked={liked} onToggle={toggleLike} />
-                  <Button
-                    variant={saved ? "primary" : "secondary"}
-                    className="!h-11 !w-11 !min-w-11 !px-0 !py-0"
-                    type="button"
-                    onClick={toggleBookmark}
+                  <BookmarkButton
+                    saved={saved}
                     disabled={bookmarking}
-                    aria-label={t(saved ? "post.removeSaved" : "post.savePost")}
-                    title={t(saved ? "post.saved" : "post.save")}
-                  >
-                    <svg
-                      className="h-5 w-5"
-                      viewBox="0 0 24 24"
-                      fill={saved ? "currentColor" : "none"}
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      aria-hidden="true"
-                    >
-                      <path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-4-6 4z" />
-                    </svg>
-                  </Button>
+                    saveLabel={t("post.savePost")}
+                    savedLabel={t("post.removeSaved")}
+                    onToggle={() => void toggleBookmark()}
+                    variant={saved ? "primary" : "secondary"}
+                  />
                 </div>
               </div>
             </Card>

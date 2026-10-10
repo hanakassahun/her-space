@@ -9,6 +9,28 @@
   --aurora-cyan: #a9dfe8;
 }
 
+html {
+  scroll-padding-top: 4rem;
+  scroll-padding-bottom: calc(5.25rem + env(safe-area-inset-bottom));
+  -webkit-tap-highlight-color: transparent;
+}
+
+a,
+button,
+[role="button"],
+input,
+select,
+textarea,
+label {
+  touch-action: manipulation;
+}
+
+input,
+select,
+textarea {
+  font-size: 16px !important;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -39,6 +61,43 @@
   box-shadow: 0 12px 36px rgb(70 47 93 / 8%);
 }
 
+@media (prefers-reduced-transparency: reduce), (prefers-reduced-motion: reduce) {
+  .glass {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background-color: rgb(255 255 255 / 94%);
+  }
+}
+
+html[data-lowend="true"] .glass {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background-color: rgb(255 255 255 / 94%);
+}
+
+.post-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 280px;
+}
+
+.more-sheet {
+  overscroll-behavior: contain;
+}
+
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background: #eee8f3;
+}
+
+.skeleton-shimmer::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, #f8f5fa, transparent);
+  content: "";
+  transform: translateX(-100%);
+}
+
 select {
   border: 1px solid #cdbdeb;
   background-color: #fff;
@@ -50,35 +109,112 @@ select:focus-visible {
   outline-offset: 1px;
 }
 
-@keyframes fade-up {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 @media (prefers-reduced-motion: no-preference) {
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes skeleton-shimmer {
+    to {
+      transform: translateX(100%);
+    }
+  }
+
+  @keyframes heart-pop {
+    0%, 100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.25);
+    }
+  }
+
+  @keyframes bookmark-bounce {
+    0%, 100% {
+      transform: scale(1);
+    }
+    45% {
+      transform: scale(1.14);
+    }
+  }
+
+  @keyframes success-check {
+    from {
+      opacity: 0;
+      transform: scaleX(0);
+    }
+    to {
+      opacity: 1;
+      transform: scaleX(1);
+    }
+  }
+
+  @keyframes nav-sheet-enter {
+    from {
+      opacity: 0;
+      transform: translateY(100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
   .animate-fade-up {
     animation: fade-up 420ms ease-out both;
   }
 
-  .nav-sheet-enter {
-    animation: nav-sheet-enter 220ms ease-out both;
+  .more-sheet {
+    transition: transform 250ms ease-out;
   }
-}
 
-@keyframes nav-sheet-enter {
-  from {
-    opacity: 0;
-    transform: translateY(100%);
+  .more-overlay {
+    transition: opacity 250ms ease-out;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+
+  .more-sheet-dragging {
+    transition: none;
+  }
+
+  .skeleton-shimmer {
+    animation: skeleton-shimmer 1.6s ease-in-out infinite;
+  }
+
+  .heart-pop {
+    animation: heart-pop 250ms ease-out;
+  }
+
+  .bookmark-bounce {
+    animation: bookmark-bounce 250ms ease-out;
+  }
+
+  .success-check {
+    animation: success-check 400ms ease-out both;
+  }
+
+  .success-check path {
+    transform-box: fill-box;
+    transform-origin: left center;
+  }
+
+  .post-entry {
+    opacity: 0;
+    animation: fade-up 420ms ease-out both;
+  }
+
+  :where(a, button, [role="button"]) {
+    transition: transform 120ms ease-out !important;
+  }
+
+  :where(a, button, [role="button"]):active {
+    transform: scale(0.97);
   }
 }
 

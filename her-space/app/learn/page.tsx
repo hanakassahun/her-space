@@ -10,6 +10,7 @@ import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
+import PostSkeleton from "@/components/ui/PostSkeleton";
 import { useLanguage } from "@/components/LanguageProvider";
 
 type ArticleCategory = "health" | "body_beauty" | "mind_life" | "life_stages";
@@ -127,7 +128,7 @@ export default function LearnPage() {
         ))}
       </nav>
 
-      {loading && <p className="text-gray-700">{t("learn.loading")}</p>}
+      {loading && <div className="space-y-4">{[0, 1, 2].map((index) => <PostSkeleton key={index} />)}</div>}
       {message && <Card className="text-red-700">{message}</Card>}
       {!loading && !message && filteredArticles.length === 0 && (
         <Card className="text-gray-700">{t("learn.noResults")}</Card>

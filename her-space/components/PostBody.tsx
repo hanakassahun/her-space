@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useLanguage } from "@/components/LanguageProvider";
 
-export default function PostBody({ body, href }: { body: string; href: string }) {
+export default function PostBody({ body, href, onNavigate }: { body: string; href: string; onNavigate?: () => void }) {
   const { t } = useLanguage();
   const bodyRef = useRef<HTMLParagraphElement>(null);
   const [isTruncated, setIsTruncated] = useState(false);
@@ -31,7 +31,7 @@ export default function PostBody({ body, href }: { body: string; href: string })
         {body}
       </p>
       {isTruncated && (
-        <Link className="inline-flex min-h-11 items-center text-sm font-semibold text-deep-plum underline underline-offset-4" href={href}>
+        <Link className="inline-flex min-h-11 items-center text-sm font-semibold text-deep-plum underline underline-offset-4" href={href} onClick={onNavigate}>
           {t("common.readMore")}
         </Link>
       )}

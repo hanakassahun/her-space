@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Button from "@/components/ui/Button";
 import { useLanguage } from "@/components/LanguageProvider";
 
@@ -13,12 +13,35 @@ type LikeButtonProps = {
 export default function LikeButton({ count, liked, onToggle }: LikeButtonProps) {
   const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
+  const heartRef = useRef<SVGSVGElement>(null);
+  const previousLiked = useRef(liked);
+  const didMount = useRef(false);
+
+  useEffect(() => {
+    if (!didMount.current) {
+      didMount.current = true;
+      previousLiked.current = liked;
+      return;
+    }
+    const heart = heartRef.current;
+    if (heart && liked && !previousLiked.current) {
+      heart.classList.remove("heart-pop");
+      window.requestAnimationFrame(() => heart.classList.add("heart-pop"));
+      const timeout = window.setTimeout(() => heart.classList.remove("heart-pop"), 250);
+      previousLiked.current = liked;
+      return () => window.clearTimeout(timeout);
+    }
+    previousLiked.current = liked;
+  }, [liked]);
 
   async function handleClick() {
     if (loading) return;
     setLoading(true);
-    await onToggle();
-    setLoading(false);
+    try {
+      await onToggle();
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -34,6 +57,7 @@ export default function LikeButton({ count, liked, onToggle }: LikeButtonProps) 
         title={t(liked ? "like.unlike" : "like.like")}
       >
         <svg
+          ref={heartRef}
           className="h-5 w-5"
           viewBox="0 0 24 24"
           fill={liked ? "currentColor" : "none"}

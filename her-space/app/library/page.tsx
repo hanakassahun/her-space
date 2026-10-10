@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -10,6 +10,8 @@ import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
+import PostSkeleton from "@/components/ui/PostSkeleton";
+import BookmarkButton from "@/components/ui/BookmarkButton";
 import { useLanguage } from "@/components/LanguageProvider";
 
 type Professional = { title: string } | { title: string }[] | null;
@@ -75,8 +77,9 @@ export default function LibraryPage() {
   const [savedPosts, setSavedPosts] = useState<SavedPost[]>([]);
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busyPostId, setBusyPostId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [busyPostIds, setBusyPostIds] = useState<Record<string, boolean>>({});
+  const bookmarkRequests = useRef(new Set<string>());
 
   useEffect(() => {
     async function loadLibrary() {
@@ -120,22 +123,37 @@ export default function LibraryPage() {
     : savedPosts;
 
   async function unsavePost(postId: string) {
-    if (!userId || busyPostId) return;
+    if (!userId || bookmarkRequests.current.has(postId)) return;
 
-    setBusyPostId(postId);
+    const originalIndex = savedPosts.findIndex(({ post }) => post.id === postId);
+    const original = savedPosts[originalIndex];
+    if (!original) return;
+
+    bookmarkRequests.current.add(postId);
+    setBusyPostIds((current) => ({ ...current, [postId]: true }));
     setMessage("");
-    const { error } = await supabase
-      .from("bookmarks")
-      .delete()
-      .eq("user_id", userId)
-      .eq("post_id", postId);
-
-    if (error) {
-      setMessage(friendlyError(error, t));
-    } else {
-      setSavedPosts((current) => current.filter(({ post }) => post.id !== postId));
+    setSavedPosts((current) => current.filter(({ post }) => post.id !== postId));
+    try {
+      const { error } = await supabase
+        .from("bookmarks")
+        .delete()
+        .eq("user_id", userId)
+        .eq("post_id", postId);
+      if (error) throw error;
+    } catch (error) {
+      setSavedPosts((current) => {
+        if (current.some(({ post }) => post.id === postId)) return current;
+        const restored = [...current];
+        restored.splice(Math.min(originalIndex, restored.length), 0, original);
+        return restored;
+      });
+      const friendlyMessage = friendlyError(error, t);
+      setMessage(friendlyMessage);
+      window.setTimeout(() => setMessage((currentMessage) => currentMessage === friendlyMessage ? "" : currentMessage), 3000);
+    } finally {
+      bookmarkRequests.current.delete(postId);
+      setBusyPostIds((current) => ({ ...current, [postId]: false }));
     }
-    setBusyPostId(null);
   }
 
   return (
@@ -172,7 +190,7 @@ export default function LibraryPage() {
           </nav>
         )}
 
-        {loading && <p className="text-gray-700">{t("library.loading")}</p>}
+        {loading && <div className="space-y-4">{[0, 1, 2].map((index) => <PostSkeleton key={index} />)}</div>}
         {message && <Card className="text-red-700">{message}</Card>}
         {!loading && !message && savedPosts.length === 0 && (
           <Card className="space-y-3 text-gray-700">
@@ -195,7 +213,7 @@ export default function LibraryPage() {
             const professionalTitle = getProfessionalTitle(profile);
 
             return (
-              <Card as="article" key={post.id} className="space-y-4">
+              <Card as="article" key={post.id} className="post-card space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <Badge variant={typeVariants[post.type]}>
                     {t(typeTranslationKeys[post.type])}
@@ -236,19 +254,14 @@ export default function LibraryPage() {
                       </span>
                     )}
                   </p>
-                  <Button
+                  <BookmarkButton
+                    saved
+                    disabled={busyPostIds[post.id] === true}
+                    saveLabel={t("post.savePost")}
+                    savedLabel={t("library.unsave")}
+                    onToggle={() => void unsavePost(post.id)}
                     variant="primary"
-                    className="!h-11 !w-11 !min-w-11 !px-0 !py-0"
-                    type="button"
-                    onClick={() => unsavePost(post.id)}
-                    disabled={busyPostId === post.id}
-                    aria-label={t("library.unsave")}
-                    title={busyPostId === post.id ? t("library.unsaving") : t("library.unsave")}
-                  >
-                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-                      <path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-4-6 4z" />
-                    </svg>
-                  </Button>
+                  />
                 </div>
               </Card>
             );

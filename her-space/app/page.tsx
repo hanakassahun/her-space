@@ -17,6 +17,15 @@ export default function Home() {
   const [userId, setUserId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [greetingKey, setGreetingKey] = useState<"home.greetingMorning" | "home.greetingAfternoon" | "home.greetingEvening" | null>(null);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      const hour = new Date().getHours();
+      setGreetingKey(hour < 12 ? "home.greetingMorning" : hour < 18 ? "home.greetingAfternoon" : "home.greetingEvening");
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -50,7 +59,7 @@ export default function Home() {
 
       {!loading && name && (
         <section className="mt-8 w-full max-w-3xl space-y-4 text-left">
-          <p className="text-center text-deep-plum">{t("home.welcome")} {name} 🌸</p>
+          <p className="text-center text-deep-plum">{greetingKey ? t(greetingKey) : ""} {name} 🌸</p>
           {userId && <WelcomeCards />}
           <InstallBanner />
           <div className="grid grid-cols-2 gap-3">

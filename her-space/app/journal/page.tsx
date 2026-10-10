@@ -11,6 +11,7 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import Badge from "@/components/ui/Badge";
+import SuccessCheck from "@/components/ui/SuccessCheck";
 import { useLanguage } from "@/components/LanguageProvider";
 import type { TranslationKey } from "@/lib/i18n/en";
 
@@ -132,6 +133,7 @@ export default function JournalPage() {
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveSucceeded, setSaveSucceeded] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -205,6 +207,7 @@ export default function JournalPage() {
 
     setSaving(true);
     setMessage("");
+    setSaveSucceeded(false);
     const { error } = await supabase.from("journal_entries").upsert(
       {
         user_id: userId,
@@ -222,11 +225,13 @@ export default function JournalPage() {
     if (error) {
       setMessage(friendlyError(error, t));
     } else {
-      setMessage("Entry saved.");
+      setMessage(t("journal.saved"));
+      setSaveSucceeded(true);
       setEditingPastDate(null);
       setEntryDate(getLocalDate());
       const { data, error: refreshError } = await fetchJournalEntries(userId);
       if (refreshError) {
+        setSaveSucceeded(false);
         setMessage(friendlyError(refreshError, t));
       } else {
         setEntries(data);
@@ -246,6 +251,8 @@ export default function JournalPage() {
   }
 
   const today = getLocalDate();
+  const thisMonth = today.slice(0, 7);
+  const thisMonthEntryCount = entries.filter((entry) => entry.entry_date.startsWith(thisMonth)).length;
   const todayEntry = entries.find((entry) => entry.entry_date === today);
   const pastEntries = entries.filter((entry) => entry.entry_date < today);
 
@@ -254,6 +261,11 @@ export default function JournalPage() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold text-deep-plum">{t("journal.title")}</h1>
+            {thisMonthEntryCount > 0 && (
+              <p className="mt-1 text-sm text-gray-600">
+                {thisMonthEntryCount} {t("journal.monthCount")}
+              </p>
+            )}
         </div>
         <p className="inline-flex items-center gap-2 text-sm font-medium text-deep-plum">
           <svg
@@ -425,7 +437,12 @@ export default function JournalPage() {
             />
           </label>
 
-          {message && <p className="text-sm text-deep-plum" role="status">{message}</p>}
+          {message && (
+            <p className="inline-flex items-center gap-2 text-sm text-deep-plum" role="status">
+              {saveSucceeded && <SuccessCheck />}
+              {message}
+            </p>
+          )}
           <Button className="w-full" type="submit" disabled={saving || loading}>
             {saving ? t("journal.saving") : editingPastDate ? t("journal.saveChanges") : t("journal.saveToday")}
           </Button>

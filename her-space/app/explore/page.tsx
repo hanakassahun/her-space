@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -13,6 +13,8 @@ import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import PostSkeleton from "@/components/ui/PostSkeleton";
+import BookmarkButton from "@/components/ui/BookmarkButton";
 import { useLanguage } from "@/components/LanguageProvider";
 
 type Professional = { title: string } | { title: string }[] | null;
@@ -34,6 +36,12 @@ type Post = {
 };
 
 type LikeState = { count: number; liked: boolean };
+type ExploreRestoreState = {
+  scrollY: number;
+  pages: number;
+  selectedTopic: string | null;
+  search: string;
+};
 
 const topicGroups = {
   Health: [
@@ -92,17 +100,60 @@ export default function ExplorePage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
+  const [restoreReady, setRestoreReady] = useState(false);
   const [posts, setPosts] = useState<Post[]>([]);
   const [likeStates, setLikeStates] = useState<Record<string, LikeState>>({});
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [savedPostIds, setSavedPostIds] = useState<Record<string, boolean>>({});
-  const [savingPostId, setSavingPostId] = useState<string | null>(null);
+  const [savingPostIds, setSavingPostIds] = useState<Record<string, boolean>>({});
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [message, setMessage] = useState("");
+  const restoreState = useRef<ExploreRestoreState | null>(null);
+  const loadMoreLock = useRef(false);
+  const loadMoreSentinel = useRef<HTMLDivElement>(null);
+  const likeRequests = useRef(new Set<string>());
+  const bookmarkRequests = useRef(new Set<string>());
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      try {
+        const restoreKey = window.sessionStorage.getItem("explore:return-key");
+        const serialized = restoreKey ? window.sessionStorage.getItem(restoreKey) : null;
+        if (serialized) {
+          const saved = JSON.parse(serialized) as ExploreRestoreState;
+          if (Number.isFinite(saved.scrollY) && Number.isInteger(saved.pages) && saved.pages > 0) {
+            restoreState.current = saved;
+            setSelectedTopic(saved.selectedTopic);
+            setSearch(saved.search);
+            setDebouncedSearch(saved.search);
+          }
+        }
+      } catch {
+        restoreState.current = null;
+      }
+      setRestoreReady(true);
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, []);
+
+  function saveScrollForPost() {
+    const key = `explore:${selectedTopic ?? "all"}:${encodeURIComponent(debouncedSearch)}`;
+    try {
+      window.sessionStorage.setItem(key, JSON.stringify({
+        scrollY: window.scrollY,
+        pages: page + 1,
+        selectedTopic,
+        search: debouncedSearch,
+      }));
+      window.sessionStorage.setItem("explore:return-key", key);
+    } catch {
+      // Ignore session storage errors.
+    }
+  }
 
   useEffect(() => {
     async function checkAuth() {
@@ -122,7 +173,7 @@ export default function ExplorePage() {
     return () => window.clearTimeout(timeout);
   }, [search]);
 
-  async function loadPostsPage(nextPage: number, reset: boolean) {
+  const loadPostsPage = useCallback(async (nextPage: number, reset: boolean) => {
     if (!userId || !authChecked) return;
 
     if (reset) setLoading(true);
@@ -207,36 +258,90 @@ export default function ExplorePage() {
     setPage(nextPage);
     setLoading(false);
     setLoadingMore(false);
-  }
+  }, [authChecked, debouncedSearch, selectedTopic, t, userId]);
+
+  const loadPostsPageRef = useRef(loadPostsPage);
+  useEffect(() => {
+    loadPostsPageRef.current = loadPostsPage;
+  }, [loadPostsPage]);
 
   useEffect(() => {
-    if (!userId || !authChecked) return;
-    setPosts([]);
-    setPage(0);
-    setHasMore(true);
-    void loadPostsPage(0, true);
-  }, [authChecked, debouncedSearch, selectedTopic, userId]);
+    if (!userId || !authChecked || !restoreReady) return;
+    const timeout = window.setTimeout(() => {
+      setPosts([]);
+      setPage(0);
+      setHasMore(true);
+      void loadPostsPageRef.current(0, true);
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [authChecked, debouncedSearch, restoreReady, selectedTopic, userId]);
 
-  async function handleLoadMore() {
-    if (loadingMore || !hasMore) return;
-    await loadPostsPage(page + 1, false);
-  }
+  const handleLoadMore = useCallback(async () => {
+    if (loadMoreLock.current || loading || loadingMore || !hasMore) return;
+    loadMoreLock.current = true;
+    try {
+      await loadPostsPage(page + 1, false);
+    } finally {
+      loadMoreLock.current = false;
+    }
+  }, [hasMore, loading, loadingMore, page, loadPostsPage]);
+
+  const handleLoadMoreRef = useRef(handleLoadMore);
+  useEffect(() => {
+    handleLoadMoreRef.current = handleLoadMore;
+  }, [handleLoadMore]);
+
+  useEffect(() => {
+    const saved = restoreState.current;
+    if (!saved || loading || loadingMore || message) return;
+    if (page + 1 < saved.pages && hasMore) {
+      void handleLoadMoreRef.current();
+      return;
+    }
+
+    restoreState.current = null;
+    const key = `explore:${saved.selectedTopic ?? "all"}:${encodeURIComponent(saved.search)}`;
+    try {
+      window.sessionStorage.removeItem(key);
+      window.sessionStorage.removeItem("explore:return-key");
+    } catch {
+      // Ignore session storage errors.
+    }
+    window.requestAnimationFrame(() => window.scrollTo(0, saved.scrollY));
+  }, [hasMore, loading, loadingMore, message, page]);
+
+  useEffect(() => {
+    const sentinel = loadMoreSentinel.current;
+    if (!sentinel || !hasMore || loading || loadingMore) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) void handleLoadMoreRef.current();
+    }, { rootMargin: "400px" });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, loading, loadingMore]);
 
   async function toggleLike(postId: string) {
     if (!userId) {
       router.push("/login");
       return;
     }
+    if (likeRequests.current.has(postId)) return;
+    likeRequests.current.add(postId);
     const current = likeStates[postId] ?? { count: 0, liked: false };
-    const result = current.liked
-      ? await supabase.from("likes").delete().eq("user_id", userId).eq("post_id", postId)
-      : await supabase.from("likes").insert({ post_id: postId });
-    if (result.error) setMessage(friendlyError(result.error, t));
-    else {
-      setLikeStates((states) => ({
-        ...states,
-        [postId]: { count: current.count + (current.liked ? -1 : 1), liked: !current.liked },
-      }));
+    const optimistic = { count: current.count + (current.liked ? -1 : 1), liked: !current.liked };
+    setLikeStates((states) => ({ ...states, [postId]: optimistic }));
+    try {
+      const result = current.liked
+        ? await supabase.from("likes").delete().eq("user_id", userId).eq("post_id", postId)
+        : await supabase.from("likes").insert({ post_id: postId });
+      if (result.error) throw result.error;
+    } catch (error) {
+      setLikeStates((states) => ({ ...states, [postId]: current }));
+      const friendlyMessage = friendlyError(error, t);
+      setMessage(friendlyMessage);
+      window.setTimeout(() => setMessage((currentMessage) => currentMessage === friendlyMessage ? "" : currentMessage), 3000);
+    } finally {
+      likeRequests.current.delete(postId);
     }
   }
 
@@ -245,15 +350,25 @@ export default function ExplorePage() {
       router.push("/login");
       return;
     }
-    if (savingPostId) return;
-    setSavingPostId(postId);
+    if (bookmarkRequests.current.has(postId)) return;
+    bookmarkRequests.current.add(postId);
     const isSaved = Boolean(savedPostIds[postId]);
-    const result = isSaved
-      ? await supabase.from("bookmarks").delete().eq("user_id", userId).eq("post_id", postId)
-      : await supabase.from("bookmarks").insert({ post_id: postId });
-    if (result.error) setMessage(friendlyError(result.error, t));
-    else setSavedPostIds((current) => ({ ...current, [postId]: !isSaved }));
-    setSavingPostId(null);
+    setSavedPostIds((current) => ({ ...current, [postId]: !isSaved }));
+    setSavingPostIds((current) => ({ ...current, [postId]: true }));
+    try {
+      const result = isSaved
+        ? await supabase.from("bookmarks").delete().eq("user_id", userId).eq("post_id", postId)
+        : await supabase.from("bookmarks").insert({ post_id: postId });
+      if (result.error) throw result.error;
+    } catch (error) {
+      setSavedPostIds((current) => ({ ...current, [postId]: isSaved }));
+      const friendlyMessage = friendlyError(error, t);
+      setMessage(friendlyMessage);
+      window.setTimeout(() => setMessage((currentMessage) => currentMessage === friendlyMessage ? "" : currentMessage), 3000);
+    } finally {
+      bookmarkRequests.current.delete(postId);
+      setSavingPostIds((current) => ({ ...current, [postId]: false }));
+    }
   }
 
   return (
@@ -307,19 +422,24 @@ export default function ExplorePage() {
           )}
         </div>
 
-        {loading && <p className="text-gray-700">{t("explore.searching")}</p>}
+        {loading && <div className="space-y-4">{[0, 1, 2].map((index) => <PostSkeleton key={index} />)}</div>}
         {message && <Card className="text-red-700">{message}</Card>}
         {!loading && !message && posts.length === 0 && (
           <Card className="text-gray-700">{t("explore.noResults")}</Card>
         )}
 
         <section className="space-y-4" aria-label="Explore results">
-          {posts.map((post) => {
+          {posts.map((post, index) => {
             const profile = first(post.profiles);
             const professionalTitle = getProfessionalTitle(profile);
 
             return (
-              <Card as="article" key={post.id} className="space-y-4">
+              <Card
+                as="article"
+                key={post.id}
+                className={`post-card space-y-4 ${page === 0 && index < 8 ? "post-entry" : ""}`}
+                style={page === 0 && index < 8 ? { animationDelay: `${index * 40}ms` } : undefined}
+              >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <Badge variant={typeVariants[post.type]}>
@@ -337,9 +457,9 @@ export default function ExplorePage() {
                 </div>
                 <div className="space-y-2">
                   <h2 className="text-xl font-semibold text-gray-900">
-                    <Link href={`/post/${post.id}`}>{post.title}</Link>
+                    <Link href={`/post/${post.id}`} onClick={saveScrollForPost}>{post.title}</Link>
                   </h2>
-                  <PostBody body={post.body} href={`/post/${post.id}`} />
+                  <PostBody body={post.body} href={`/post/${post.id}`} onNavigate={saveScrollForPost} />
                 </div>
                 {post.topics?.length > 0 && (
                   <ul className="flex flex-wrap gap-2" aria-label={t("common.topics")}>
@@ -379,6 +499,7 @@ export default function ExplorePage() {
                     <Link
                       className="inline-flex h-11 min-w-11 items-center justify-center gap-1 rounded-full px-2 text-sm text-gray-600 hover:bg-white/80 hover:text-deep-plum focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
                       href={`/post/${post.id}#comments-heading`}
+                      onClick={saveScrollForPost}
                       aria-label={`${commentCounts[post.id] ?? 0} ${t("post.comments")}`}
                       title={t("post.comments")}
                     >
@@ -387,19 +508,14 @@ export default function ExplorePage() {
                       </svg>
                       <span>{commentCounts[post.id] ?? 0}</span>
                     </Link>
-                    <button
-                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-gray-600 hover:bg-white/80 hover:text-deep-plum focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
-                      type="button"
-                      onClick={() => void toggleBookmark(post.id)}
-                      disabled={savingPostId === post.id}
-                      aria-label={t(savedPostIds[post.id] ? "post.removeSaved" : "post.savePost")}
-                      aria-pressed={Boolean(savedPostIds[post.id])}
-                      title={t(savedPostIds[post.id] ? "post.removeSaved" : "post.savePost")}
-                    >
-                      <svg className="h-5 w-5" viewBox="0 0 24 24" fill={savedPostIds[post.id] ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-                        <path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-4-6 4z" />
-                      </svg>
-                    </button>
+                    <BookmarkButton
+                      saved={Boolean(savedPostIds[post.id])}
+                      disabled={savingPostIds[post.id] === true}
+                      saveLabel={t("post.savePost")}
+                      savedLabel={t("post.removeSaved")}
+                      onToggle={() => void toggleBookmark(post.id)}
+                      className="shrink-0 rounded-full text-gray-600 hover:bg-white/80 hover:text-deep-plum focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
+                    />
                   </div>
                 </div>
               </Card>
@@ -407,6 +523,8 @@ export default function ExplorePage() {
           })}
         </section>
 
+        {loadingMore && <div className="space-y-4">{[0, 1, 2].map((index) => <PostSkeleton key={index} />)}</div>}
+        {!loading && hasMore && posts.length > 0 && <div ref={loadMoreSentinel} className="h-px" aria-hidden="true" />}
         {!loading && !message && hasMore && posts.length > 0 && (
           <Button
             variant="secondary"
@@ -415,7 +533,7 @@ export default function ExplorePage() {
             onClick={() => void handleLoadMore()}
             disabled={loadingMore}
           >
-            {loadingMore ? "Loading..." : t("common.loadMore")}
+            {t("common.loadMore")}
           </Button>
         )}
     </PageShell>

@@ -9,6 +9,7 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
+import SuccessCheck from "@/components/ui/SuccessCheck";
 import { useLanguage } from "@/components/LanguageProvider";
 
 type PostType = "experience" | "question" | "knowledge";
@@ -24,6 +25,7 @@ export default function NewPostPage() {
   const [body, setBody] = useState("");
   const [topics, setTopics] = useState("");
   const [message, setMessage] = useState("");
+  const [published, setPublished] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -41,6 +43,7 @@ export default function NewPostPage() {
     event.preventDefault();
     setLoading(true);
     setMessage("");
+    setPublished(false);
 
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) {
@@ -76,6 +79,9 @@ export default function NewPostPage() {
       return;
     }
 
+    setPublished(true);
+    setMessage(t("new.published"));
+    await new Promise((resolve) => window.setTimeout(resolve, 600));
     router.push("/feed");
   }
 
@@ -164,7 +170,12 @@ export default function NewPostPage() {
             />
           </label>
 
-          {message && <p className="text-sm text-red-600">{message}</p>}
+          {message && (
+            <p className={`inline-flex items-center gap-2 text-sm ${published ? "text-emerald-800" : "text-red-600"}`} role="status">
+              {published && <SuccessCheck />}
+              {message}
+            </p>
+          )}
           <p className="flex items-start gap-2 text-xs leading-5 text-gray-600">
             <svg className="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
               <rect x="5" y="10" width="14" height="11" rx="2" />
