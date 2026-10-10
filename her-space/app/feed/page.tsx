@@ -32,6 +32,7 @@ type Post = {
   title: string;
   body: string;
   topics: string[];
+  sensitive: boolean;
   created_at: string;
   profiles: Profile | Profile[] | null;
 };
@@ -84,6 +85,7 @@ export default function FeedPage() {
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [savedPostIds, setSavedPostIds] = useState<Record<string, boolean>>({});
   const [savingPostIds, setSavingPostIds] = useState<Record<string, boolean>>({});
+  const [revealedPostIds, setRevealedPostIds] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<"all" | "following">("all");
   const [restoreReady, setRestoreReady] = useState(false);
   const [page, setPage] = useState(0);
@@ -139,7 +141,7 @@ export default function FeedPage() {
       supabase.auth.getUser(),
       supabase
         .from("posts")
-        .select("id, author_id, type, provenance, sources, title, body, topics, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+        .select("id, author_id, type, provenance, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
         .order("created_at", { ascending: false })
         .range(from, to),
     ]);
@@ -425,10 +427,19 @@ export default function FeedPage() {
                 <h2 className="text-xl font-semibold text-gray-900">
                   <Link href={`/post/${post.id}`} onClick={saveScrollForPost}>{post.title}</Link>
                 </h2>
-                <PostBody body={post.body} href={`/post/${post.id}`} onNavigate={saveScrollForPost} />
+                {post.sensitive && !revealedPostIds[post.id] ? (
+                  <div className="space-y-3 rounded-2xl border border-rose-200 bg-rose-50/70 p-4" role="note">
+                    <p className="text-sm text-rose-950">{t("read.sensitiveWarning")}</p>
+                    <Button variant="secondary" type="button" onClick={() => setRevealedPostIds((current) => ({ ...current, [post.id]: true }))}>
+                      {t("read.showPost")}
+                    </Button>
+                  </div>
+                ) : (
+                  <PostBody body={post.body} href={`/post/${post.id}`} onNavigate={saveScrollForPost} />
+                )}
               </div>
 
-              {post.topics?.length > 0 && (
+              {(!post.sensitive || revealedPostIds[post.id]) && post.topics?.length > 0 && (
                 <ul className="flex flex-wrap gap-2" aria-label={t("common.topics")}>
                   {post.topics.map((topic, index) => (
                     <li

@@ -13,6 +13,7 @@ type LikeButtonProps = {
 export default function LikeButton({ count, liked, onToggle }: LikeButtonProps) {
   const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
+  const inFlight = useRef(false);
   const heartRef = useRef<SVGSVGElement>(null);
   const previousLiked = useRef(liked);
   const didMount = useRef(false);
@@ -35,11 +36,13 @@ export default function LikeButton({ count, liked, onToggle }: LikeButtonProps) 
   }, [liked]);
 
   async function handleClick() {
-    if (loading) return;
+    if (inFlight.current) return;
+    inFlight.current = true;
     setLoading(true);
     try {
       await onToggle();
     } finally {
+      inFlight.current = false;
       setLoading(false);
     }
   }

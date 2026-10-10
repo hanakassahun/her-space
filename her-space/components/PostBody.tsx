@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useLanguage } from "@/components/LanguageProvider";
+import UserText from "@/components/UserText";
 
 export default function PostBody({ body, href, onNavigate }: { body: string; href: string; onNavigate?: () => void }) {
   const { t } = useLanguage();
@@ -27,9 +28,7 @@ export default function PostBody({ body, href, onNavigate }: { body: string; hre
 
   return (
     <div className="space-y-1">
-      <p ref={bodyRef} className="line-clamp-4 break-words whitespace-pre-wrap text-gray-800">
-        {body}
-      </p>
+      <UserText ref={bodyRef} text={body} className="line-clamp-4 text-gray-800" />
       {isTruncated && (
         <Link className="inline-flex min-h-11 items-center text-sm font-semibold text-deep-plum underline underline-offset-4" href={href} onClick={onNavigate}>
           {t("common.readMore")}

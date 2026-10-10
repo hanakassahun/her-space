@@ -80,6 +80,15 @@ html[data-lowend="true"] .glass {
   contain-intrinsic-size: auto 280px;
 }
 
+.user-text-en {
+  line-height: 1.7;
+}
+
+.user-text-am {
+  font-family: var(--font-noto-ethiopic), var(--font-dm-sans), sans-serif;
+  line-height: 1.8;
+}
+
 .more-sheet {
   overscroll-behavior: contain;
 }

@@ -12,6 +12,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Textarea from "@/components/ui/Textarea";
 import Input from "@/components/ui/Input";
+import UserText from "@/components/UserText";
 import { useLanguage } from "@/components/LanguageProvider";
 
 type Professional = { title: string } | { title: string }[] | null;
@@ -33,6 +34,7 @@ type Post = {
   title: string;
   body: string;
   topics: string[];
+  sensitive: boolean;
   created_at: string;
   profiles: PostProfile | PostProfile[] | null;
 };
@@ -65,6 +67,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
   const [profile, setProfile] = useState<Profile | null>(null);
   const [bioDraft, setBioDraft] = useState("");
   const [posts, setPosts] = useState<Post[]>([]);
+  const [revealedPostIds, setRevealedPostIds] = useState<Record<string, boolean>>({});
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [postTitleDraft, setPostTitleDraft] = useState("");
   const [postBodyDraft, setPostBodyDraft] = useState("");
@@ -114,7 +117,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
           supabase
             .from("posts")
             .select(
-              "id, author_id, type, provenance, sources, title, body, topics, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))"
+              "id, author_id, type, provenance, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))"
             )
             .eq("author_id", id)
             .order("created_at", { ascending: false }),
@@ -211,7 +214,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
         ...(post.provenance === "evidence" ? { sources } : {}),
       })
       .eq("id", post.id)
-      .select("id, author_id, type, provenance, sources, title, body, topics, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+      .select("id, author_id, type, provenance, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
       .single();
 
     if (error) setMessage(friendlyError(error, t));
@@ -248,9 +251,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                     <h1 className="text-3xl font-bold text-deep-plum">
                       {profile.display_name || "Her Space member"}
                     </h1>
-                    <p className="mt-1 max-w-xl whitespace-pre-wrap text-gray-700">
-                      {profile.bio || ""}
-                    </p>
+                    <UserText text={profile.bio || ""} className="mt-1 max-w-xl text-gray-700" />
                     <p className="mt-2 text-sm text-gray-600">
                       {followerCount} {t("profile.followers")} · {followingCount} {t("profile.following")}
                     </p>
@@ -348,7 +349,16 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                   <h3 className="text-xl font-semibold text-gray-900">
                     <Link href={`/post/${post.id}`}>{post.title}</Link>
                   </h3>
-                  <p className="whitespace-pre-wrap text-gray-800">{post.body}</p>
+                  {post.sensitive && !revealedPostIds[post.id] ? (
+                    <div className="space-y-3 rounded-2xl border border-rose-200 bg-rose-50/70 p-4" role="note">
+                      <p className="text-sm text-rose-950">{t("read.sensitiveWarning")}</p>
+                      <Button variant="secondary" type="button" onClick={() => setRevealedPostIds((current) => ({ ...current, [post.id]: true }))}>
+                        {t("read.showPost")}
+                      </Button>
+                    </div>
+                  ) : (
+                    <UserText text={post.body} className="text-gray-800" />
+                  )}
                   {userId === id && (
                     <div className="flex flex-wrap gap-2 pt-1">
                       <Button variant="secondary" className="text-sm" type="button" onClick={() => beginPostEdit(post)}>Edit</Button>
@@ -360,7 +370,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                 </div>
               )}
               <ProvenanceBadge provenance={post.provenance} sources={post.sources} />
-              {post.topics?.length > 0 && (
+              {(!post.sensitive || revealedPostIds[post.id]) && post.topics?.length > 0 && (
                   <ul className="flex flex-wrap gap-2" aria-label={t("common.topics")}>
                   {post.topics.map((topic, index) => (
                     <li

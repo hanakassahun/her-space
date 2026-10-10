@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
+import UserText from "@/components/UserText";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 
@@ -182,14 +183,14 @@ export default function AdminPage() {
                 {post && (
                   <div className="space-y-1 rounded-2xl bg-blush-rose/30 p-4">
                     <h3 className="font-semibold text-gray-900">Reported post: {post.title}</h3>
-                    <p className="whitespace-pre-wrap text-gray-800">{post.body}</p>
+                    <UserText text={post.body} className="text-gray-800" />
                   </div>
                 )}
 
                 {comment && (
                   <div className="space-y-1 rounded-2xl bg-soft-lilac/60 p-4">
                     <h3 className="font-semibold text-gray-900">Reported comment</h3>
-                    <p className="whitespace-pre-wrap text-gray-800">{comment.body}</p>
+                    <UserText text={comment.body} className="text-gray-800" />
                   </div>
                 )}
 
