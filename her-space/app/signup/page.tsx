@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { friendlyError } from "@/lib/errors";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -32,7 +33,7 @@ export default function SignupPage() {
       { p_code: trimmedInviteCode }
     );
     if (inviteError) {
-      setMessage(inviteError.message);
+      setMessage(friendlyError(inviteError, t));
       setLoading(false);
       return;
     }
@@ -44,12 +45,7 @@ export default function SignupPage() {
 
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error || !data.user) {
-      const signupMessage = error?.message ?? "Something went wrong.";
-      setMessage(
-        signupMessage.toLowerCase().includes("you can only request this after")
-          ? t("signup.rateLimit")
-          : signupMessage
-      );
+      setMessage(friendlyError(error, t));
       setLoading(false);
       return;
     }
@@ -59,7 +55,7 @@ export default function SignupPage() {
       .insert({ id: data.user.id, display_name: displayName });
 
     if (profileError) {
-      setMessage(profileError.message);
+      setMessage(friendlyError(profileError, t));
       setLoading(false);
       return;
     }

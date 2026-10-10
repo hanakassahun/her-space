@@ -10,6 +10,7 @@ import LanguageSwitcher from "@/components/LanguageSwitcher";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import InstallBanner from "@/components/InstallBanner";
+import WelcomeCards from "@/components/WelcomeCards";
 
 export default function Home() {
   const { t } = useLanguage();
@@ -51,6 +52,7 @@ export default function Home() {
       {!loading && name && (
         <section className="mt-8 w-full max-w-3xl space-y-4 text-left">
           <p className="text-center text-deep-plum">{t("home.welcome")} {name} 🌸</p>
+          {userId && <WelcomeCards />}
           <InstallBanner />
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {(["feed", "explore", "learn", "journal", "library", "resources"] as NavKey[]).map((key) => {

@@ -4,6 +4,7 @@ import { FormEvent, use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { friendlyError } from "@/lib/errors";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
@@ -121,24 +122,22 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
 
       if (cancelled) return;
       if (profileResult.error) {
-        setMessage(profileResult.error.message);
+        setMessage(friendlyError(profileResult.error, t));
       } else {
         setProfile(profileResult.data as Profile);
         setBioDraft(profileResult.data.bio ?? "");
       }
       if (followersResult.error || followingResult.error || followResult.error) {
-        setMessage(
-          followersResult.error?.message ??
-            followingResult.error?.message ??
-            followResult.error?.message ??
-            t("profile.followError")
-        );
+        setMessage(friendlyError(
+          followersResult.error ?? followingResult.error ?? followResult.error,
+          t
+        ));
       }
       setFollowerCount(followersResult.count ?? 0);
       setFollowingCount(followingResult.count ?? 0);
       setIsFollowing(Boolean(followResult.data));
       if (postsResult.error) {
-        setMessage(postsResult.error.message);
+        setMessage(friendlyError(postsResult.error, t));
       } else {
         setPosts((postsResult.data ?? []) as Post[]);
       }
@@ -161,7 +160,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
       .update({ bio: bioDraft.trim() })
       .eq("id", userId);
     if (error) {
-      setMessage(error.message);
+      setMessage(friendlyError(error, t));
     } else {
       setProfile((current) => (current ? { ...current, bio: bioDraft.trim() } : current));
     }
@@ -176,7 +175,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
       ? await supabase.from("follows").delete().eq("follower_id", userId).eq("followee_id", id)
       : await supabase.from("follows").insert({ followee_id: id });
     if (result.error) {
-      setMessage(result.error.message);
+      setMessage(friendlyError(result.error, t));
     } else {
       setIsFollowing(!isFollowing);
       setFollowerCount((count) => count + (isFollowing ? -1 : 1));
@@ -215,7 +214,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
       .select("id, author_id, type, provenance, sources, title, body, topics, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
       .single();
 
-    if (error) setMessage(error.message);
+    if (error) setMessage(friendlyError(error, t));
     else {
       setPosts((current) => current.map((item) => item.id === post.id ? data as Post : item));
       setEditingPostId(null);
@@ -230,7 +229,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
     setDeletingPostId(post.id);
     setMessage("");
     const { error } = await supabase.from("posts").delete().eq("id", post.id);
-    if (error) setMessage(error.message);
+    if (error) setMessage(friendlyError(error, t));
     else setPosts((current) => current.filter((item) => item.id !== post.id));
     setDeletingPostId(null);
   }

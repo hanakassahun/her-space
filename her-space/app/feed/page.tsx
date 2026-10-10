@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { friendlyError } from "@/lib/errors";
 import { navConfig } from "@/lib/nav";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
 import LikeButton from "@/components/LikeButton";
@@ -105,7 +106,7 @@ export default function FeedPage() {
     setIsSignedIn(Boolean(currentUserId));
 
     if (postsResult.error) {
-      setMessage(postsResult.error.message);
+      setMessage(friendlyError(postsResult.error, t));
       setLoading(false);
       setLoadingMore(false);
       return;
@@ -124,7 +125,7 @@ export default function FeedPage() {
         supabase.from("follows").select("followee_id").eq("follower_id", currentUserId),
       ]);
 
-      if (likesResult.error) setMessage(likesResult.error.message);
+      if (likesResult.error) setMessage(friendlyError(likesResult.error, t));
       else {
         setLikeStates((current) => {
           const nextLikes = { ...current };
@@ -140,7 +141,7 @@ export default function FeedPage() {
           return nextLikes;
         });
       }
-      if (followsResult.error) setMessage(followsResult.error.message);
+      if (followsResult.error) setMessage(friendlyError(followsResult.error, t));
       else setFollowingIds((followsResult.data ?? []).map((follow) => follow.followee_id));
     } else {
       setLikeStates((current) => (reset ? {} : current));
@@ -166,7 +167,7 @@ export default function FeedPage() {
       : await supabase.from("likes").insert({ post_id: postId });
 
     if (result.error) {
-      setMessage(result.error.message);
+      setMessage(friendlyError(result.error, t));
     } else {
       setLikeStates((states) => ({
         ...states,
@@ -228,8 +229,17 @@ export default function FeedPage() {
         {loading && <p className="text-gray-700">{t("feed.loading")}</p>}
         {message && <Card className="text-red-700">{message}</Card>}
         {!loading && !message && visiblePosts.length === 0 && (
-          <Card className="text-gray-700">
-            {activeTab === "following" ? t("feed.noFollowing") : t("feed.noPosts")}
+          <Card className="space-y-3 text-gray-700">
+            <p>{activeTab === "following" ? t("feed.noFollowing") : t("feed.noPosts")}</p>
+            {activeTab === "following" && (
+              <p className="text-sm text-gray-600">{t("empty.followingHint")}</p>
+            )}
+            <Button
+              type="button"
+              onClick={() => activeTab === "following" ? setActiveTab("all") : router.push("/new")}
+            >
+              {activeTab === "following" ? t("empty.browseFeed") : t("empty.writeFirst")}
+            </Button>
           </Card>
         )}
 

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { friendlyError } from "@/lib/errors";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
@@ -64,7 +65,7 @@ export default function LearnPage() {
         .order("category", { ascending: true })
         .order("title", { ascending: true });
 
-      if (error) setMessage(error.message);
+      if (error) setMessage(friendlyError(error, t));
       else setArticles((data ?? []) as Article[]);
       setLoading(false);
     }

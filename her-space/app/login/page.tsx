@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { friendlyError } from "@/lib/errors";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -24,7 +25,7 @@ export default function LoginPage() {
 
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
-      setMessage(error.message);
+      setMessage(friendlyError(error, t));
       setLoading(false);
       return;
     }

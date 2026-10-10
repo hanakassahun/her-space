@@ -4,12 +4,15 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { friendlyError } from "@/lib/errors";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import { useLanguage } from "@/components/LanguageProvider";
 
 export default function SettingsPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [confirmation, setConfirmation] = useState("");
@@ -40,7 +43,7 @@ export default function SettingsPage() {
     setMessage("");
     const { error } = await supabase.rpc("delete_my_account");
     if (error) {
-      setMessage(error.message);
+      setMessage(friendlyError(error, t));
       setDeleting(false);
       return;
     }

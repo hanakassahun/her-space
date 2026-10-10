@@ -4,6 +4,7 @@ import { FormEvent, use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { friendlyError } from "@/lib/errors";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
 import LikeButton from "@/components/LikeButton";
 import PageShell from "@/components/ui/PageShell";
@@ -109,7 +110,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       .order("created_at", { ascending: true });
 
     if (error) {
-      setMessage(error.message);
+      setMessage(friendlyError(error, t));
       return;
     }
 
@@ -142,19 +143,19 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       ]);
 
       if (postResult.error) {
-        setMessage(postResult.error.message);
+        setMessage(friendlyError(postResult.error, t));
       } else {
         setPost(postResult.data as Post);
       }
 
       if (bookmarkResult.error) {
-        setMessage(bookmarkResult.error.message);
+        setMessage(friendlyError(bookmarkResult.error, t));
       } else {
         setSaved(Boolean(bookmarkResult.data));
       }
 
       if (likesResult.error) {
-        setMessage(likesResult.error.message);
+        setMessage(friendlyError(likesResult.error, t));
       } else {
         setLikeCount(likesResult.data.length);
         setLiked(likesResult.data.some((like) => like.user_id === authData.user.id));
@@ -184,7 +185,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       : await supabase.from("bookmarks").insert({ post_id: id });
 
     if (result.error) {
-      setMessage(result.error.message);
+      setMessage(friendlyError(result.error, t));
     } else {
       setSaved(!saved);
     }
@@ -198,7 +199,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       : await supabase.from("likes").insert({ post_id: id });
 
     if (result.error) {
-      setMessage(result.error.message);
+      setMessage(friendlyError(result.error, t));
     } else {
       setLiked(!liked);
       setLikeCount((count) => count + (liked ? -1 : 1));
@@ -217,7 +218,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
     });
 
     if (error) {
-      setMessage(error.message);
+      setMessage(friendlyError(error, t));
     } else {
       setCommentBody("");
       await loadComments(id);
@@ -260,7 +261,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       .single();
 
     if (error) {
-      setMessage(error.message);
+      setMessage(friendlyError(error, t));
     } else {
       setPost(data as Post);
       setEditingPost(false);
@@ -275,7 +276,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
     setDeletingPost(true);
     const { error } = await supabase.from("posts").delete().eq("id", post.id);
     if (error) {
-      setMessage(error.message);
+      setMessage(friendlyError(error, t));
       setDeletingPost(false);
       return;
     }
@@ -289,7 +290,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
     setDeletingCommentId(comment.id);
     const { error } = await supabase.from("comments").delete().eq("id", comment.id);
     if (error) {
-      setMessage(error.message);
+      setMessage(friendlyError(error, t));
       setDeletingCommentId(null);
       return;
     }
@@ -314,7 +315,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
     });
 
     if (error) {
-      setMessage(error.message);
+      setMessage(friendlyError(error, t));
     } else {
       setReportFeedback((current) => ({ ...current, [targetId]: t("post.reportThanks") }));
       setReportReason("");

@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { friendlyError } from "@/lib/errors";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -49,7 +50,7 @@ export default function ResetPasswordPage() {
     setMessage("");
     const { error } = await supabase.auth.updateUser({ password });
     if (error) {
-      setMessage(error.message);
+      setMessage(friendlyError(error, t));
       setSaving(false);
       return;
     }

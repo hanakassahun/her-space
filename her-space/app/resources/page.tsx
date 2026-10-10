@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { friendlyError } from "@/lib/errors";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
@@ -81,7 +82,7 @@ export default function ResourcesPage() {
         .order("city", { ascending: true })
         .order("name", { ascending: true });
 
-      if (error) setMessage(error.message);
+      if (error) setMessage(friendlyError(error, t));
       else setResources((data ?? []) as Resource[]);
       setLoading(false);
     }
@@ -121,7 +122,7 @@ export default function ResourcesPage() {
       details: suggestion.trim(),
     });
 
-    if (error) setMessage(error.message);
+    if (error) setMessage(friendlyError(error, t));
     else {
       setSuggestion("");
       setMessage(t("resources.suggestionSent"));

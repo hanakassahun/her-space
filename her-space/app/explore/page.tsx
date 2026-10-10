@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { friendlyError } from "@/lib/errors";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
@@ -140,7 +141,7 @@ export default function ExplorePage() {
 
     const { data, error } = await query;
     if (error) {
-      setMessage(error.message);
+      setMessage(friendlyError(error, t));
       setLoading(false);
       setLoadingMore(false);
       return;

@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { friendlyError } from "@/lib/errors";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -70,7 +71,7 @@ export default function NewPostPage() {
     });
 
     if (error) {
-      setMessage(error.message);
+      setMessage(friendlyError(error, t));
       setLoading(false);
       return;
     }
@@ -163,6 +164,13 @@ export default function NewPostPage() {
           </label>
 
           {message && <p className="text-sm text-red-600">{message}</p>}
+          <p className="flex items-start gap-2 text-xs leading-5 text-gray-600">
+            <svg className="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+              <rect x="5" y="10" width="14" height="11" rx="2" />
+              <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+            </svg>
+            {t("new.visibility")}
+          </p>
           <Button
             className="w-full"
             type="submit"

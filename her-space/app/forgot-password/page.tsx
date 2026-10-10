@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { friendlyError } from "@/lib/errors";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -13,6 +14,7 @@ export default function ForgotPasswordPage() {
   const { t } = useLanguage();
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function requestReset(event: FormEvent<HTMLFormElement>) {
@@ -20,10 +22,13 @@ export default function ForgotPasswordPage() {
     if (loading) return;
 
     setLoading(true);
-    await supabase.auth.resetPasswordForEmail(email.trim(), {
+    setSubmitted(false);
+    setMessage("");
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: `${window.location.origin}/reset-password`,
     });
-    setSubmitted(true);
+    if (error) setMessage(friendlyError(error, t));
+    else setSubmitted(true);
     setLoading(false);
   }
 
@@ -54,6 +59,7 @@ export default function ForgotPasswordPage() {
             {t("forgot.genericConfirmation")}
           </p>
         )}
+        {message && <p className="text-sm text-red-700" role="alert">{message}</p>}
         <Link className="text-sm font-medium text-deep-plum underline" href="/login">
           {t("forgot.backToLogin")}
         </Link>

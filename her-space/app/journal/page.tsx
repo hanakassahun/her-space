@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { friendlyError } from "@/lib/errors";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -144,7 +145,7 @@ export default function JournalPage() {
       setUserId(authData.user.id);
       const { data, error } = await fetchJournalEntries(authData.user.id);
       if (error) {
-        setMessage(error.message);
+        setMessage(friendlyError(error, t));
       } else {
         setEntries(data);
         const todayEntry = data.find((entry) => entry.entry_date === getLocalDate());
@@ -219,14 +220,14 @@ export default function JournalPage() {
     );
 
     if (error) {
-      setMessage(error.message);
+      setMessage(friendlyError(error, t));
     } else {
       setMessage("Entry saved.");
       setEditingPastDate(null);
       setEntryDate(getLocalDate());
       const { data, error: refreshError } = await fetchJournalEntries(userId);
       if (refreshError) {
-        setMessage(refreshError.message);
+        setMessage(friendlyError(refreshError, t));
       } else {
         setEntries(data);
         const todayEntry = data.find((entry) => entry.entry_date === getLocalDate());
@@ -441,7 +442,10 @@ export default function JournalPage() {
 
         {loading && <p className="text-gray-700">{t("journal.loading")}</p>}
         {!loading && pastEntries.length === 0 && (
-          <Card className="text-gray-700">{t("journal.earlierEmpty")}</Card>
+          <Card className="space-y-2 text-gray-700">
+            <p>{t("journal.earlierEmpty")}</p>
+            <p className="text-sm text-gray-600">{t("empty.journalHint")}</p>
+          </Card>
         )}
 
         {pastEntries.map((entry) => {

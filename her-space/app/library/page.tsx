@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { friendlyError } from "@/lib/errors";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
@@ -95,7 +96,7 @@ export default function LibraryPage() {
         .order("created_at", { ascending: false });
 
       if (error) {
-        setMessage(error.message);
+        setMessage(friendlyError(error, t));
       } else {
         const rows = (data ?? []) as BookmarkRow[];
         setSavedPosts(
@@ -130,7 +131,7 @@ export default function LibraryPage() {
       .eq("post_id", postId);
 
     if (error) {
-      setMessage(error.message);
+      setMessage(friendlyError(error, t));
     } else {
       setSavedPosts((current) => current.filter(({ post }) => post.id !== postId));
     }
@@ -174,8 +175,12 @@ export default function LibraryPage() {
         {loading && <p className="text-gray-700">{t("library.loading")}</p>}
         {message && <Card className="text-red-700">{message}</Card>}
         {!loading && !message && savedPosts.length === 0 && (
-          <Card className="text-gray-700">
-            {t("library.empty")}
+          <Card className="space-y-3 text-gray-700">
+            <p>{t("library.empty")}</p>
+            <p className="text-sm text-gray-600">{t("empty.libraryHint")}</p>
+            <Button type="button" onClick={() => router.push("/feed")}>
+              {t("empty.browseFeed")}
+            </Button>
           </Card>
         )}
         {!loading && !message && savedPosts.length > 0 && visiblePosts.length === 0 && (
