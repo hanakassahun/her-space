@@ -156,6 +156,8 @@ const en = {
   "write.sensitive": "This post may be sensitive",
   "write.sensitiveHint": "Readers will see a short warning before the text.",
   "write.privacyTip": "Avoid real names, phone numbers, or photos of other people.",
+  "write.titlePlaceholder": "Give your post a title",
+  "write.bodyPlaceholder": "Write here...",
   "write.preview": "Preview",
   "write.keepEditing": "Keep editing",
   "new.type": "Type",

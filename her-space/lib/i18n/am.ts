@@ -162,6 +162,8 @@ const am: Record<TranslationKey, string> = {
   "write.sensitive": "ይህ ጽሑፍ ስሱ ሊሆን ይችላል",
   "write.sensitiveHint": "አንባቢዎች ከጽሑፉ በፊት አጭር ማስጠንቀቂያ ያያሉ።",
   "write.privacyTip": "የሌሎች ሰዎችን እውነተኛ ስም፣ ስልክ ቁጥር ወይም ፎቶ አታካትቺ።",
+  "write.titlePlaceholder": "ለጽሑፍሽ ርዕስ ስጪ",
+  "write.bodyPlaceholder": "እዚህ ጻፊ...",
   "write.preview": "ቅድመ እይታ",
   "write.keepEditing": "ማረምሽን ቀጥይ",
   "new.type": "ዓይነት",

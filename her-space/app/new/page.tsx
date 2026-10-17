@@ -293,7 +293,7 @@ export default function NewPostPage() {
                     <Button
                       key={postType}
                       variant={type === postType ? "primary" : "secondary"}
-                      className={`h-auto min-h-[84px] w-full min-w-0 flex-col justify-center gap-1 rounded-2xl px-2 py-2 text-center ${type === postType ? "shadow-glow" : ""}`}
+                      className={`h-auto min-h-[84px] w-full min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-2 py-3 text-center ${type === postType ? "shadow-glow" : ""}`}
                       type="button"
                       aria-pressed={type === postType}
                       onClick={() => {
@@ -302,29 +302,28 @@ export default function NewPostPage() {
                         setSources("");
                       }}
                     >
-                      <span className="flex w-full min-w-0 flex-col items-center gap-1">
-                        {postType === "experience" ? (
-                          <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M12 21s-8-4.5-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 6.5-8 11-8 11Z" /></svg>
-                        ) : postType === "question" ? (
-                          <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2v-6.5A7.5 7.5 0 1 1 20 11.5Z" /><path d="M9.5 9a2.5 2.5 0 1 1 4.3 1.7c-.9.9-1.8 1.1-1.8 2.3M12 16.5h.01" /></svg>
-                        ) : (
-                          <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M12 3 4 7v5c0 5 3.4 8 8 9 4.6-1 8-4 8-9V7l-8-4Z" /><path d="m8.5 12 2.2 2.2 4.8-4.8" /></svg>
-                        )}
-                        <span className="w-full break-words text-sm font-semibold leading-tight [overflow-wrap:anywhere]">{t(`new.${postType}` as const)}</span>
-                      </span>
+                      {postType === "experience" ? (
+                        <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M12 21s-8-4.5-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 6.5-8 11-8 11Z" /></svg>
+                      ) : postType === "question" ? (
+                        <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2v-6.5A7.5 7.5 0 1 1 20 11.5Z" /><path d="M9.5 9a2.5 2.5 0 1 1 4.3 1.7c-.9.9-1.8 1.1-1.8 2.3M12 16.5h.01" /></svg>
+                      ) : (
+                        <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M12 3 4 7v5c0 5 3.4 8 8 9 4.6-1 8-4 8-9V7l-8-4Z" /><path d="m8.5 12 2.2 2.2 4.8-4.8" /></svg>
+                      )}
+                      <span className="w-full break-normal text-sm font-semibold leading-tight hyphens-none text-center [overflow-wrap:normal]">{t(`new.${postType}` as const)}</span>
                     </Button>
                   ))}
                 </div>
-                <p className="break-words text-sm leading-snug text-gray-600">
+                <p className="text-sm leading-snug text-gray-600">
                   {t(typeDescriptionKeys[type])}
                 </p>
               </fieldset>
 
-              <label className="block space-y-2 text-sm font-medium text-deep-plum">
+              <label className="block text-sm font-medium text-deep-plum">
                 {t("common.title")}
                 <Input
-                  className="write-title-input !rounded-none !border-x-0 !border-t-0 !border-b-2 !border-b-[#CDBDEB] !bg-transparent !px-1 !text-[22px] !font-medium focus:!border-b-[#8F72BE] focus:!ring-0"
+                  className="write-title-input mt-1 !rounded-none !border-x-0 !border-t-0 !border-b-2 !border-b-[#CDBDEB] !bg-transparent !px-1 !pb-2 !pt-1 !text-[22px] !font-medium placeholder:text-[#9d8fad] focus:!border-b-[#8F72BE] focus:!ring-0"
                   maxLength={150}
+                  placeholder={t("write.titlePlaceholder")}
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
                   required
@@ -335,9 +334,9 @@ export default function NewPostPage() {
               {!body.trim() && (
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-deep-plum">{t("write.starters")}</p>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="hide-scrollbar flex snap-x gap-2 overflow-x-auto pb-1 pr-3">
                     {starterKeys[type].map((key) => (
-                      <Button key={key} variant="secondary" type="button" className="max-w-full whitespace-normal break-words px-3 text-xs" onClick={() => addStarter(t(key))}>
+                      <Button key={key} variant="secondary" type="button" className="shrink-0 snap-start whitespace-nowrap px-3 text-xs" onClick={() => addStarter(t(key))}>
                         {t(key)}
                       </Button>
                     ))}
@@ -351,6 +350,7 @@ export default function NewPostPage() {
                   className="min-h-40 resize-y"
                   rows={6}
                   maxLength={5000}
+                  placeholder={t("write.bodyPlaceholder")}
                   value={body}
                   onChange={(event) => setBody(event.target.value)}
                   required
@@ -359,19 +359,17 @@ export default function NewPostPage() {
               </label>
 
               <div className="space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Button
-                    variant="ghost"
+                <div className="flex items-center justify-between gap-2">
+                  <button
                     type="button"
-                    className="justify-start px-1 text-sm font-medium"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[#CDBDEB] bg-white px-3 py-1.5 text-sm font-medium text-deep-plum shadow-sm hover:bg-soft-lilac/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
                     aria-expanded={topicsExpanded}
                     onClick={() => setTopicsExpanded((current) => !current)}
                   >
+                    <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
                     {t("write.addTopics")}
-                    <svg className={`ml-1 h-4 w-4 transition-transform ${topicsExpanded ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-                      <path d="m6 9 6 6 6-6" />
-                    </svg>
-                  </Button>
+                    <svg className={`h-3.5 w-3.5 shrink-0 transition-transform ${topicsExpanded ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+                  </button>
                   <span className="text-xs text-gray-600">{mergedTopics.length}/5</span>
                 </div>
                 {mergedTopics.length > 0 && (
@@ -460,14 +458,13 @@ export default function NewPostPage() {
                 </button>
               </div>
 
-              <div className="space-y-2 text-sm leading-snug text-gray-600">
-                <p>{t("write.privacyTip")}</p>
-                <p className="flex items-start gap-2">
-                  <svg className="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-                    <rect x="5" y="10" width="14" height="11" rx="2" />
-                    <path d="M8 10V7a4 4 0 0 1 8 0v3" />
-                  </svg>
-                  {t("new.visibility")}
+              <div className="flex items-start gap-2 rounded-xl bg-soft-lilac/30 px-3 py-2.5">
+                <svg className="mt-0.5 h-4 w-4 shrink-0 text-deep-plum/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                  <rect x="5" y="10" width="14" height="11" rx="2" />
+                  <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+                </svg>
+                <p className="text-[13px] leading-snug text-gray-600">
+                  {t("write.privacyTip")}{" "}{t("new.visibility")}
                 </p>
               </div>
             </>

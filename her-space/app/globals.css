@@ -105,6 +105,14 @@ html[data-lowend="true"] .glass {
   overscroll-behavior: contain;
 }
 
+.hide-scrollbar {
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 .skeleton-shimmer {
   position: relative;
   overflow: hidden;
