@@ -18,6 +18,7 @@ import BookmarkButton from "@/components/ui/BookmarkButton";
 import { useLanguage } from "@/components/LanguageProvider";
 import TimeAgo from "@/components/TimeAgo";
 import { useAuth } from "@/components/AuthProvider";
+import SuggestedMembers from "@/components/SuggestedMembers";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -41,7 +42,22 @@ type Post = {
 };
 
 type LikeState = { count: number; liked: boolean };
-type FeedRestoreState = { scrollY: number; pages: number; tab: "all" | "following" };
+type FeedTab = "forYou" | "latest" | "following";
+type RecommendationReason = "follow" | "interest" | "popular" | "recent";
+type FeedRestoreState = { scrollY: number; pages: number; tab: FeedTab };
+
+const feedTabLabels = {
+  forYou: "feed.forYou",
+  latest: "feed.latest",
+  following: "feed.following",
+} as const;
+
+const reasonTranslationKeys: Record<RecommendationReason, "feed.whyFollow" | "feed.whyInterest" | "feed.whyPopular" | "feed.whyRecent"> = {
+  follow: "feed.whyFollow",
+  interest: "feed.whyInterest",
+  popular: "feed.whyPopular",
+  recent: "feed.whyRecent",
+};
 
 const typeVariants: Record<Post["type"], "rose" | "sky" | "mint"> = {
   experience: "rose",
@@ -85,13 +101,14 @@ export default function FeedPage() {
   const isSignedIn = Boolean(currentUserId);
   const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
+  const [reasonsByPostId, setReasonsByPostId] = useState<Record<string, RecommendationReason>>({});
   const [followingIds, setFollowingIds] = useState<string[]>([]);
   const [likeStates, setLikeStates] = useState<Record<string, LikeState>>({});
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [savedPostIds, setSavedPostIds] = useState<Record<string, boolean>>({});
   const [savingPostIds, setSavingPostIds] = useState<Record<string, boolean>>({});
   const [revealedPostIds, setRevealedPostIds] = useState<Record<string, boolean>>({});
-  const [activeTab, setActiveTab] = useState<"all" | "following">("all");
+  const [activeTab, setActiveTab] = useState<FeedTab>("forYou");
   const [restoreReady, setRestoreReady] = useState(false);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -110,10 +127,11 @@ export default function FeedPage() {
         const restoreKey = window.sessionStorage.getItem("feed:return-key");
         const serialized = restoreKey ? window.sessionStorage.getItem(restoreKey) : null;
         if (serialized) {
-          const saved = JSON.parse(serialized) as FeedRestoreState;
+          const saved = JSON.parse(serialized) as Omit<FeedRestoreState, "tab"> & { tab: FeedTab | "all" };
           if (Number.isFinite(saved.scrollY) && Number.isInteger(saved.pages) && saved.pages > 0) {
-            restoreState.current = saved;
-            setActiveTab(saved.tab);
+            const restored = { ...saved, tab: saved.tab === "all" ? "latest" : saved.tab };
+            restoreState.current = restored;
+            setActiveTab(restored.tab);
           }
         }
       } catch {
@@ -142,23 +160,72 @@ export default function FeedPage() {
     else setLoadingMore(true);
     setMessage("");
 
-    const postsResult = await supabase
+    let incomingPosts: Post[];
+    let pageHasMore: boolean;
+
+    if (activeTab === "forYou") {
+      const { data, error } = await supabase.rpc("feed_for_you", {
+        p_limit: PAGE_SIZE,
+        p_offset: from,
+      });
+      if (error) {
+        setMessage(friendlyError(error, t));
+        setLoading(false);
+        setLoadingMore(false);
+        return;
+      }
+
+      const recommendations = (data ?? []) as { id: string; score: number; reason: RecommendationReason }[];
+      const uniqueRecommendations = [...new Map(recommendations.map((row) => [row.id, row])).values()];
+      const postIds = uniqueRecommendations.map((row) => row.id);
+      pageHasMore = recommendations.length === PAGE_SIZE;
+
+      if (postIds.length > 0) {
+        const { data: postsData, error: postsError } = await supabase
+          .from("posts")
+          .select("id, author_id, type, provenance, audience, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+          .in("id", postIds);
+        if (postsError) {
+          setMessage(friendlyError(postsError, t));
+          setLoading(false);
+          setLoadingMore(false);
+          return;
+        }
+        const postsById = new Map(((postsData ?? []) as Post[]).map((post) => [post.id, post]));
+        incomingPosts = postIds.flatMap((postId) => {
+          const post = postsById.get(postId);
+          return post ? [post] : [];
+        });
+      } else {
+        incomingPosts = [];
+      }
+
+      const nextReasons = Object.fromEntries(
+        uniqueRecommendations.map(({ id, reason }) => [id, reason])
+      ) as Record<string, RecommendationReason>;
+      setReasonsByPostId((current) => reset ? nextReasons : { ...current, ...nextReasons });
+    } else {
+      const postsResult = await supabase
         .from("posts")
         .select("id, author_id, type, provenance, audience, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
         .order("created_at", { ascending: false })
         .range(from, to);
 
-    if (postsResult.error) {
-      setMessage(friendlyError(postsResult.error, t));
-      setLoading(false);
-      setLoadingMore(false);
-      return;
+      if (postsResult.error) {
+        setMessage(friendlyError(postsResult.error, t));
+        setLoading(false);
+        setLoadingMore(false);
+        return;
+      }
+
+      incomingPosts = (postsResult.data ?? []) as Post[];
+      pageHasMore = incomingPosts.length === PAGE_SIZE;
+      if (reset) setReasonsByPostId({});
     }
 
-    const incomingPosts = (postsResult.data ?? []) as Post[];
     const nextPosts = reset ? incomingPosts : mergeUniquePosts(posts, incomingPosts);
     setPosts(nextPosts);
-    setHasMore(incomingPosts.length === PAGE_SIZE);
+    setHasMore(pageHasMore);
     setPage(nextPage);
 
     if (incomingPosts.length > 0) {
@@ -232,7 +299,7 @@ export default function FeedPage() {
 
     setLoading(false);
     setLoadingMore(false);
-  }, [currentUserId, posts, t]);
+  }, [activeTab, currentUserId, posts, t]);
 
   const loadPostsPageRef = useRef(loadPostsPage);
   useEffect(() => {
@@ -358,32 +425,27 @@ export default function FeedPage() {
           </Link>
         </header>
 
-        <nav className="flex gap-2" aria-label={t("feed.posts")}>
-          <Button
-            variant={activeTab === "all" ? "primary" : "secondary"}
-            className="text-sm"
-            type="button"
-            aria-pressed={activeTab === "all"}
-            onClick={() => setActiveTab("all")}
-          >
-            {t("feed.all")}
-          </Button>
-          <Button
-            variant={activeTab === "following" ? "primary" : "secondary"}
-            className="text-sm"
-            type="button"
-            aria-pressed={activeTab === "following"}
-            onClick={() => {
-              if (!isSignedIn) router.push("/login");
-              else setActiveTab("following");
-            }}
-          >
-            {t("feed.following")}
-          </Button>
+        <nav className="flex flex-wrap gap-2" aria-label={t("feed.posts")}>
+          {(Object.keys(feedTabLabels) as FeedTab[]).map((tab) => (
+            <Button
+              key={tab}
+              variant={activeTab === tab ? "primary" : "secondary"}
+              className="min-h-11 whitespace-normal text-sm"
+              type="button"
+              aria-pressed={activeTab === tab}
+              onClick={() => {
+                if (tab === "following" && !isSignedIn) router.push("/login");
+                else setActiveTab(tab);
+              }}
+            >
+              {t(feedTabLabels[tab])}
+            </Button>
+          ))}
         </nav>
 
         {loading && <div className="space-y-4">{[0, 1, 2].map((index) => <PostSkeleton key={index} />)}</div>}
         {message && <Card className="text-red-700">{message}</Card>}
+        {activeTab === "forYou" && page === 0 && !loading && !message && posts.length > 0 && <SuggestedMembers />}
         {!loading && !message && visiblePosts.length === 0 && (
           <Card className="space-y-3 text-gray-700">
             <p>{activeTab === "following" ? t("feed.noFollowing") : t("feed.noPosts")}</p>
@@ -392,12 +454,13 @@ export default function FeedPage() {
             )}
             <Button
               type="button"
-              onClick={() => activeTab === "following" ? setActiveTab("all") : router.push("/new")}
+              onClick={() => activeTab === "following" ? setActiveTab("latest") : router.push("/new")}
             >
               {activeTab === "following" ? t("empty.browseFeed") : t("empty.writeFirst")}
             </Button>
           </Card>
         )}
+        {!loading && !message && activeTab === "following" && visiblePosts.length === 0 && <SuggestedMembers />}
 
         <section className="space-y-4" aria-label="Posts">
           {visiblePosts.map((post, index) => (
@@ -417,6 +480,9 @@ export default function FeedPage() {
                 </div>
                 <TimeAgo className="text-sm text-gray-500" date={post.created_at} />
               </div>
+              {activeTab === "forYou" && reasonsByPostId[post.id] && (
+                <p className="text-xs text-gray-500">{t(reasonTranslationKeys[reasonsByPostId[post.id]])}</p>
+              )}
 
               <div className="space-y-2">
                 <h2 className="text-xl font-semibold text-gray-900">
