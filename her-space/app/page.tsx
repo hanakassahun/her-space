@@ -1,6 +1,7 @@
  "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { navConfig, resolveNavHref } from "@/lib/nav";
 import NavIcon from "@/components/NavIcon";
@@ -8,8 +9,9 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/components/AuthProvider";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
-import InstallBanner from "@/components/InstallBanner";
-import WelcomeCards from "@/components/WelcomeCards";
+
+const InstallBanner = dynamic(() => import("@/components/InstallBanner"), { ssr: false });
+const WelcomeCards = dynamic(() => import("@/components/WelcomeCards"), { ssr: false });
 
 export default function Home() {
   const { t } = useLanguage();

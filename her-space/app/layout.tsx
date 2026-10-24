@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans, Noto_Sans_Ethiopic, Sora } from "next/font/google";
+import { preconnect } from "react-dom";
 import AppChrome from "@/components/AppChrome";
 import { AuthProvider } from "@/components/AuthProvider";
 import { LanguageProvider } from "@/components/LanguageProvider";
@@ -43,6 +44,15 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (supabaseUrl) {
+    try {
+      preconnect(new URL(supabaseUrl).origin, { crossOrigin: "anonymous" });
+    } catch {
+      // Ignore an invalid optional endpoint; Supabase reports its own configuration errors.
+    }
+  }
+
   return (
     <html
       lang="en"

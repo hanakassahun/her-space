@@ -10,7 +10,14 @@ import {
   type ReactNode,
 } from "react";
 import en, { type TranslationKey } from "@/lib/i18n/en";
-import am from "@/lib/i18n/am";
+
+type AmDictionary = typeof import("@/lib/i18n/am").default;
+let amDictionaryPromise: Promise<AmDictionary> | null = null;
+
+function loadAmDictionary() {
+  amDictionaryPromise ??= import("@/lib/i18n/am").then((module) => module.default);
+  return amDictionaryPromise;
+}
 
 export type Language = "en" | "am";
 
@@ -29,12 +36,31 @@ function readCookieLanguage(): Language | null {
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Language>("en");
+  const [am, setAm] = useState<AmDictionary | null>(null);
 
   useEffect(() => {
     const saved = window.localStorage.getItem("lang");
     const storedLang = saved === "am" || saved === "en" ? saved : readCookieLanguage();
     if (storedLang) setLangState(storedLang);
+    if (storedLang === "am") {
+      void loadAmDictionary().then(setAm).catch(() => setAm(null));
+    }
   }, []);
+
+  useEffect(() => {
+    if (lang !== "am" || am) return;
+    let active = true;
+    void loadAmDictionary()
+      .then((dictionary) => {
+        if (active) setAm(dictionary);
+      })
+      .catch(() => {
+        if (active) setAm(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [am, lang]);
 
   useEffect(() => {
     document.documentElement.lang = lang;
@@ -47,9 +73,9 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const t = useCallback((key: TranslationKey) => {
-    if (lang === "am") return am[key] || en[key];
+    if (lang === "am" && am) return am[key] || en[key];
     return en[key];
-  }, [lang]);
+  }, [am, lang]);
 
   const value = useMemo(() => ({ lang, setLang, t }), [lang, setLang, t]);
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;

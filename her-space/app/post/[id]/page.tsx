@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, use, useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -15,10 +16,11 @@ import Textarea from "@/components/ui/Textarea";
 import Input from "@/components/ui/Input";
 import BookmarkButton from "@/components/ui/BookmarkButton";
 import UserText from "@/components/UserText";
-import MemberActionsMenu from "@/components/MemberActionsMenu";
 import { useLanguage } from "@/components/LanguageProvider";
 import TimeAgo from "@/components/TimeAgo";
 import { useAuth } from "@/components/AuthProvider";
+
+const MemberActionsMenu = dynamic(() => import("@/components/MemberActionsMenu"), { ssr: false });
 
 type PostType = "experience" | "question" | "knowledge";
 type Professional = { title: string } | { title: string }[] | null;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -18,7 +19,6 @@ import BookmarkButton from "@/components/ui/BookmarkButton";
 import { useLanguage } from "@/components/LanguageProvider";
 import TimeAgo from "@/components/TimeAgo";
 import { useAuth } from "@/components/AuthProvider";
-import SuggestedMembers from "@/components/SuggestedMembers";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -72,6 +72,8 @@ const typeTranslationKeys = {
 } as const;
 
 const PAGE_SIZE = 20;
+
+const SuggestedMembers = dynamic(() => import("@/components/SuggestedMembers"), { ssr: false });
 
 function mergeUniquePosts(current: Post[], incoming: Post[]) {
   const merged = new Map(current.map((post) => [post.id, post]));

@@ -1,18 +1,16 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
-import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import SuccessCheck from "@/components/ui/SuccessCheck";
-import ProvenanceBadge from "@/components/ProvenanceBadge";
-import UserText from "@/components/UserText";
 import { useLanguage } from "@/components/LanguageProvider";
 import type { TranslationKey } from "@/lib/i18n/en";
 import { useAuth } from "@/components/AuthProvider";
@@ -49,11 +47,7 @@ const typeDescriptionKeys: Record<PostType, TranslationKey> = {
   knowledge: "write.typeKnowledgeDesc",
 };
 
-const typeVariants: Record<PostType, "rose" | "sky" | "mint"> = {
-  experience: "rose",
-  question: "sky",
-  knowledge: "mint",
-};
+const PostPreview = dynamic(() => import("@/components/PostPreview"), { ssr: false });
 
 function parseTopicText(value: string) {
   return value.split(/[,،፣]/).map((topic) => topic.trim()).filter(Boolean);
@@ -283,27 +277,17 @@ export default function NewPostPage() {
 
         <form className="space-y-5" onSubmit={handleSubmit}>
           {preview ? (
-            <div className="space-y-4">
-              <Card as="article" className="post-card space-y-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant={typeVariants[type]}>{t(`new.${type}` as const)}</Badge>
-                  <ProvenanceBadge provenance={provenance} sources={sources.split("\n").map((source) => source.trim()).filter(Boolean)} />
-                </div>
-                <div className="space-y-2">
-                  <h2 className="break-words text-xl font-semibold text-gray-900">{title || t("common.title")}</h2>
-                  <UserText text={body} className="min-h-6 text-gray-800" />
-                </div>
-                {mergedTopics.length > 0 && (
-                  <ul className="flex flex-wrap gap-2" aria-label={t("common.topics")}>
-                    {mergedTopics.map((topic) => <li key={topic}><Badge variant="lilac">{topic}</Badge></li>)}
-                  </ul>
-                )}
-                {sensitive && <p className="text-sm text-gray-600">{t("write.sensitive")}</p>}
-              </Card>
-              <Button variant="secondary" type="button" onClick={() => setPreview(false)}>
-                {t("write.keepEditing")}
-              </Button>
-            </div>
+            <PostPreview
+              type={type}
+              provenance={provenance}
+              sources={sources.split("\n").map((source) => source.trim()).filter(Boolean)}
+              title={title}
+              body={body}
+              topics={mergedTopics}
+              sensitive={sensitive}
+              t={t}
+              onKeepEditing={() => setPreview(false)}
+            />
           ) : (
             <>
               <fieldset className="space-y-2">

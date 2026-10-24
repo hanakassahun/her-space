@@ -1,15 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { desktopAccountNavOrder, desktopPrimaryNavOrder, isNavItemActive, isTopLevelPath, navConfig, resolveNavHref } from "@/lib/nav";
+import { desktopPrimaryNavOrder, isNavItemActive, isTopLevelPath, navConfig, resolveNavHref } from "@/lib/nav";
 import NavIcon from "@/components/NavIcon";
-import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/components/AuthProvider";
 import { useLanguage } from "@/components/LanguageProvider";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import BackButton from "@/components/BackButton";
+
+const AccountMenu = dynamic(() => import("@/components/AccountMenu"), { ssr: false });
 
 export default function AppHeader() {
   const pathname = usePathname();
@@ -38,11 +40,6 @@ export default function AppHeader() {
       document.removeEventListener("keydown", handleEscape);
     };
   }, [accountOpen]);
-
-  async function logOut() {
-    setAccountOpen(false);
-    await supabase.auth.signOut();
-  }
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/70 bg-pearl-white/95">
@@ -94,34 +91,7 @@ export default function AppHeader() {
             H
           </button>
           {accountOpen && (
-            <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-2xl border border-white/70 bg-pearl-white p-2 shadow-xl" role="menu" aria-label="Account menu">
-              {desktopAccountNavOrder.map((key) => {
-                const item = navConfig[key];
-                if (item.adminOnly && !isAdmin) return null;
-                const active = isNavItemActive(key, pathname);
-                return (
-                  <Link
-                    className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium ${active ? "bg-soft-lilac/70 text-deep-plum" : "text-gray-700 hover:bg-white"}`}
-                    href={resolveNavHref(key, userId)}
-                    key={key}
-                    role="menuitem"
-                    aria-current={active ? "page" : undefined}
-                    onClick={() => setAccountOpen(false)}
-                  >
-                    <NavIcon icon={item.icon} className="h-4 w-4" />
-                    {t(item.label)}
-                  </Link>
-                );
-              })}
-              <button
-                className="mt-1 flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium text-rose-900 hover:bg-rose-50"
-                type="button"
-                role="menuitem"
-                onClick={() => void logOut()}
-              >
-                {t("nav.logout")}
-              </button>
-            </div>
+            <AccountMenu pathname={pathname} userId={userId} isAdmin={isAdmin} onClose={() => setAccountOpen(false)} />
           )}
         </div>
       </div>
