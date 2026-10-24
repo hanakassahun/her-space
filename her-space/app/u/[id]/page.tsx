@@ -13,6 +13,7 @@ import Button from "@/components/ui/Button";
 import Textarea from "@/components/ui/Textarea";
 import Input from "@/components/ui/Input";
 import UserText from "@/components/UserText";
+import MemberActionsMenu from "@/components/MemberActionsMenu";
 import { useLanguage } from "@/components/LanguageProvider";
 
 type Professional = { title: string } | { title: string }[] | null;
@@ -82,6 +83,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
   const [savingBio, setSavingBio] = useState(false);
   const [updatingFollow, setUpdatingFollow] = useState(false);
   const [message, setMessage] = useState("");
+  const [blockState, setBlockState] = useState<"mute" | "block" | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -261,15 +263,37 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
             )}
           </div>
           {userId && userId !== id && profile && (
-            <Button
-              className="mt-7"
-              variant={isFollowing ? "secondary" : "primary"}
-              type="button"
-              onClick={toggleFollow}
-              disabled={updatingFollow}
-            >
-              {isFollowing ? t("profile.unfollow") : t("profile.follow")}
-            </Button>
+            <div className="mt-7 flex items-center gap-2">
+              {blockState == null && (
+                <Button
+                  variant={isFollowing ? "secondary" : "primary"}
+                  type="button"
+                  onClick={toggleFollow}
+                  disabled={updatingFollow}
+                >
+                  {isFollowing ? t("profile.unfollow") : t("profile.follow")}
+                </Button>
+              )}
+              {blockState === "mute" && <Badge variant="lilac">{t("safety.mutedLabel")}</Badge>}
+              {blockState === "block" && <Badge variant="rose">{t("safety.blockedLabel")}</Badge>}
+              <MemberActionsMenu
+                memberId={id}
+                onChanged={(state) => {
+                  setBlockState(state);
+                  if (state === null) {
+                    // Reload posts when unmuted/unblocked
+                    supabase
+                      .from("posts")
+                      .select("id, author_id, type, provenance, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+                      .eq("author_id", id)
+                      .order("created_at", { ascending: false })
+                      .then(({ data }) => {
+                        if (data) setPosts(data as Post[]);
+                      });
+                  }
+                }}
+              />
+            </div>
           )}
         </header>
 
@@ -306,9 +330,15 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
 
         <section className="space-y-4" aria-label="Posts by this user">
           <h2 className="text-xl font-semibold text-deep-plum">{t("profile.posts")}</h2>
-          {!loading && posts.length === 0 && profile && (
-            <Card className="text-gray-700">{t("status.noPosts")}</Card>
-          )}
+          {blockState !== null ? (
+            <Card className="text-gray-700">
+              {t(blockState === "mute" ? "safety.muteInfo" : "safety.blockInfo")}
+            </Card>
+          ) : (
+            <>
+              {!loading && posts.length === 0 && profile && (
+                <Card className="text-gray-700">{t("status.noPosts")}</Card>
+              )}
           {posts.map((post) => (
             <Card as="article" key={post.id} className="post-card space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -384,6 +414,8 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
               )}
             </Card>
           ))}
+            </>
+          )}
         </section>
     </PageShell>
   );

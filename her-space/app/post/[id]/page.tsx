@@ -15,6 +15,7 @@ import Textarea from "@/components/ui/Textarea";
 import Input from "@/components/ui/Input";
 import BookmarkButton from "@/components/ui/BookmarkButton";
 import UserText from "@/components/UserText";
+import MemberActionsMenu from "@/components/MemberActionsMenu";
 import { useLanguage } from "@/components/LanguageProvider";
 
 type PostType = "experience" | "question" | "knowledge";
@@ -166,8 +167,8 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
         supabase.from("likes").select("user_id").eq("post_id", id),
       ]);
 
-      if (postResult.error) {
-        setMessage(friendlyError(postResult.error, t));
+      if (postResult.error || !postResult.data) {
+        setMessage(friendlyError(postResult.error ?? new Error("not found"), t));
       } else {
         const loadedPost = postResult.data as Post;
         setPost(loadedPost);
@@ -438,7 +439,15 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
   return (
     <PageShell className="max-w-3xl space-y-6 px-4 py-6 md:px-6 md:py-10">
         {loading && <p className="text-gray-700">{t("post.loading")}</p>}
-        {message && <Card className="text-red-700">{message}</Card>}
+        {!loading && !post && (
+          <Card className="space-y-4">
+            <p className="text-gray-700">{t("safety.unavailable")}</p>
+            <Button variant="secondary" type="button" onClick={() => router.push("/feed")}>
+              {t("common.backToFeed")}
+            </Button>
+          </Card>
+        )}
+        {message && post && <Card className="text-red-700">{message}</Card>}
 
         {post && (
           <>
@@ -479,7 +488,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                     <span className="gradient-aurora flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white" aria-hidden="true">
                       {getAuthorName(post.profiles).trim().charAt(0).toLocaleUpperCase() || "H"}
                     </span>
-                    <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
                       <Link className="font-medium text-deep-plum underline" href={`/u/${post.author_id}`}>
                         {getAuthorName(post.profiles)}
                       </Link>
@@ -490,6 +499,14 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                       )}
                       <time className="text-gray-500" dateTime={post.created_at}>{formatDate(post.created_at)}</time>
                     </span>
+                    {post.author_id !== userId && (
+                      <MemberActionsMenu
+                        memberId={post.author_id}
+                        onChanged={(state) => {
+                          if (state === "mute" || state === "block") router.push("/feed");
+                        }}
+                      />
+                    )}
                   </div>
                   <p className="text-sm text-gray-600">{getReadingMinutes(post.body)} {t("read.minRead")}</p>
 
@@ -553,9 +570,23 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                           {getAuthorName(comment.profiles)}
                           {comment.author_id === post.author_id && <Badge variant="sky">{t("read.author")}</Badge>}
                         </p>
-                        <time className="text-xs text-gray-500" dateTime={comment.created_at}>
-                          {formatDate(comment.created_at)}
-                        </time>
+                        <div className="flex items-center gap-1">
+                          <time className="text-xs text-gray-500" dateTime={comment.created_at}>
+                            {formatDate(comment.created_at)}
+                          </time>
+                          {comment.author_id !== userId && (
+                            <MemberActionsMenu
+                              memberId={comment.author_id}
+                              onChanged={(state) => {
+                                if (state === "mute" || state === "block") {
+                                  setComments((current) =>
+                                    current.filter((c) => c.author_id !== comment.author_id)
+                                  );
+                                }
+                              }}
+                            />
+                          )}
+                        </div>
                       </div>
                       <UserText text={comment.body} className="text-gray-800" />
                       {comment.author_id === userId && (
