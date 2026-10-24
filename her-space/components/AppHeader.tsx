@@ -8,6 +8,7 @@ import NavIcon from "@/components/NavIcon";
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import BackButton from "@/components/BackButton";
 
 type AppHeaderProps = {
   userId: string;
@@ -49,19 +50,7 @@ export default function AppHeader({ userId, isAdmin }: AppHeaderProps) {
   return (
     <header className="sticky top-0 z-40 border-b border-white/70 bg-pearl-white/95">
       <div className="mx-auto flex min-h-14 max-w-7xl items-center gap-3 px-4 md:min-h-16 md:px-6">
-        {showBack && (
-          <button
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-deep-plum hover:bg-soft-lilac/50 md:hidden"
-            type="button"
-            aria-label="Go back"
-            title="Go back"
-            onClick={() => router.back()}
-          >
-            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="m15 18-6-6 6-6M9 12h12" />
-            </svg>
-          </button>
-        )}
+        {showBack && <BackButton />}
         <Link className="shrink-0 text-lg font-bold text-deep-plum md:text-xl" href={navConfig.home.href}>
           Her Space
         </Link>

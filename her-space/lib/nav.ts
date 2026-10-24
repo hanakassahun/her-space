@@ -96,9 +96,25 @@ export function isNavItemActive(key: NavKey, pathname: string) {
 }
 
 export function isTopLevelPath(pathname: string) {
-  return pathname === "/u/" || pathname.startsWith("/u/") ||
-    desktopNavOrder.some((key) => {
-      const href = navConfig[key].href;
-      return !href.includes("{") && pathname === href;
-    });
+  const topLevelPaths = new Set([
+    "/",
+    "/feed",
+    "/explore",
+    "/journal",
+    "/learn",
+    "/library",
+    "/resources",
+    "/login",
+    "/signup",
+  ]);
+
+  return topLevelPaths.has(pathname);
+}
+
+export function getBackFallbackPath(pathname: string) {
+  if (pathname.startsWith("/post/") || pathname.startsWith("/u/")) return "/feed";
+  if (pathname.startsWith("/learn/")) return "/learn";
+  if (pathname.startsWith("/admin")) return "/admin";
+  if (pathname === "/new" || pathname === "/settings" || pathname === "/feedback") return "/";
+  return "/";
 }
