@@ -69,6 +69,8 @@ const am: Record<TranslationKey, string> = {
   "signup.and": "እና",
   "signup.create": "መለያ ክፈቺ",
   "signup.creating": "በመክፈት ላይ...",
+  "signup.displayNameLength": "የመጠሪያ ስም ቢያንስ 2 እና በማብቂያ 30 ቁምፊዎች መሆን አለበት።",
+  "signup.failed": "መለያሽን መክፈት አልቻልንም። እባክሽ የግብዣ ኮድሽንና የመጠሪያ ስምሽን አረጋግጪና እንደገና ሞክሪ።",
   "legal.rules": "የማህበረሰብ ደንቦች",
   "legal.privacy": "ግላዊነት",
   "legal.terms": "ውሎች",

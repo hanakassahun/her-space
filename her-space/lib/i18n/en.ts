@@ -63,6 +63,8 @@ const en = {
   "signup.and": "and",
   "signup.create": "Create account",
   "signup.creating": "Creating...",
+  "signup.displayNameLength": "Display name must be between 2 and 30 characters.",
+  "signup.failed": "We couldn't create your account. Please check your invite code and display name, then try again.",
   "legal.rules": "Community rules",
   "legal.privacy": "Privacy",
   "legal.terms": "Terms",

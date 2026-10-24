@@ -27,7 +27,15 @@ export default function SignupPage() {
     setLoading(true);
     setMessage("");
 
+    const trimmedDisplayName = displayName.trim();
     const trimmedInviteCode = inviteCode.trim();
+
+    if (trimmedDisplayName.length < 2 || trimmedDisplayName.length > 30) {
+      setMessage(t("signup.displayNameLength"));
+      setLoading(false);
+      return;
+    }
+
     const { data: inviteIsValid, error: inviteError } = await supabase.rpc(
       "is_invite_code_valid",
       { p_code: trimmedInviteCode }
@@ -43,24 +51,27 @@ export default function SignupPage() {
       return;
     }
 
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          display_name: trimmedDisplayName,
+          invite_code: trimmedInviteCode,
+        },
+      },
+    });
+
     if (error || !data.user) {
-      setMessage(friendlyError(error, t));
+      if (error?.message?.includes("Database error saving new user")) {
+        setMessage(t("signup.failed"));
+      } else {
+        setMessage(friendlyError(error, t));
+      }
       setLoading(false);
       return;
     }
 
-    const { error: profileError } = await supabase
-      .from("profiles")
-      .insert({ id: data.user.id, display_name: displayName });
-
-    if (profileError) {
-      setMessage(friendlyError(profileError, t));
-      setLoading(false);
-      return;
-    }
-
-    await supabase.rpc("redeem_invite_code", { p_code: trimmedInviteCode });
     router.push("/");
   }
 

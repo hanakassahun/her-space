@@ -1,3 +1,4 @@
+import Link from "next/link";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 
@@ -37,7 +38,7 @@ export default function RulesPage() {
       <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium leading-6 text-rose-950">
         In an emergency, contact local emergency services or go to the nearest health facility.
       </p>
-      <p className="text-sm text-gray-600">Questions or concerns? Contact us at [your contact email].</p>
+      <p className="text-sm text-gray-600">Questions or concerns? Contact us at <Link href="mailto:hannabirle@gmail.com">hannabirle@gmail.com</Link>.</p>
     </PageShell>
   );
 }

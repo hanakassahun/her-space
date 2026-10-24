@@ -26,7 +26,7 @@ export default function TermsPage() {
         <p className="leading-7 text-gray-800">Keep your sign-in details secure. You are responsible for what you post. You can delete your account in Settings; deletion is permanent and removes associated content.</p>
       </Card>
 
-      <p className="text-sm leading-6 text-gray-700">Questions about these terms? Contact [your contact email]. Effective date: [date].</p>
+      <p className="text-sm leading-6 text-gray-700">Questions about these terms? Contact hannabirle@gmail.com. Effective date: October 1, 2026.</p>
     </PageShell>
   );
 }
