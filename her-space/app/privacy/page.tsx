@@ -1,7 +1,11 @@
+"use client";
+
+import { useLanguage } from "@/components/LanguageProvider";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 
 export default function PrivacyPage() {
+  const { t } = useLanguage();
   return (
     <PageShell className="max-w-3xl space-y-6 px-4 py-6 md:px-6 md:py-10">
       <header className="space-y-2">
@@ -13,6 +17,9 @@ export default function PrivacyPage() {
       <Card as="section" className="space-y-3">
         <h2 className="text-xl font-semibold text-deep-plum">What we store</h2>
         <p className="leading-7 text-gray-800">To provide the service, we store your email address, display name, posts, comments, saves, likes, follows, and journal entries. If you submit reports or suggestions, we store those too so they can be reviewed.</p>
+        <ul className="list-disc space-y-2 pl-5 leading-7 text-gray-800">
+          <li className="break-words">{t("privacy.ageInterests")}</li>
+        </ul>
       </Card>
 
       <Card as="section" className="space-y-3">

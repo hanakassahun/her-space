@@ -27,6 +27,7 @@ type Post = {
   id: string;
   type: "experience" | "question" | "knowledge";
   provenance: "personal" | "community" | "evidence";
+  audience: "all" | "adult";
   sources: string[];
   title: string;
   body: string;
@@ -90,7 +91,7 @@ export default function LibraryPage() {
       const { data, error } = await supabase
         .from("bookmarks")
         .select(
-          "created_at, posts!bookmarks_post_id_fkey(id, type, provenance, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title)))"
+          "created_at, posts!bookmarks_post_id_fkey(id, type, provenance, audience, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title)))"
         )
         .eq("user_id", userId)
         .order("created_at", { ascending: false });
@@ -215,6 +216,7 @@ export default function LibraryPage() {
                   <Badge variant={typeVariants[post.type]}>
                     {t(typeTranslationKeys[post.type])}
                   </Badge>
+                  {post.audience === "adult" && <Badge variant="lilac">{t("audience.badge")}</Badge>}
                   <TimeAgo className="text-sm text-gray-500" date={savedAt} prefix={t("library.saved")} />
                 </div>
 

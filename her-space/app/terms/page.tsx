@@ -1,7 +1,11 @@
+"use client";
+
+import { useLanguage } from "@/components/LanguageProvider";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 
 export default function TermsPage() {
+  const { t } = useLanguage();
   return (
     <PageShell className="max-w-3xl space-y-6 px-4 py-6 md:px-6 md:py-10">
       <header className="space-y-2">
@@ -13,6 +17,11 @@ export default function TermsPage() {
       <Card as="section" className="space-y-4">
         <h2 className="text-xl font-semibold text-deep-plum">Use the community respectfully</h2>
         <p className="leading-7 text-gray-800">Follow the Community rules, respect other members’ privacy, and only share information you have the right to share. Do not use Her Space to harass people, sell products, or post harmful or unlawful content.</p>
+      </Card>
+
+      <Card as="section" className="space-y-4">
+        <h2 className="text-xl font-semibold text-deep-plum">{t("terms.ageTitle")}</h2>
+        <p className="break-words leading-7 text-gray-800">{t("terms.ageBody")}</p>
       </Card>
 
       <Card as="section" className="space-y-4">

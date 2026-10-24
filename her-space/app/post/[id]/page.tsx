@@ -32,6 +32,7 @@ type Post = {
   author_id: string;
   type: PostType;
   provenance: "personal" | "community" | "evidence";
+  audience: "all" | "adult";
   sources: string[];
   title: string;
   body: string;
@@ -151,7 +152,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       const [postResult, bookmarkResult, likesResult, commentsResult] = await Promise.all([
         supabase
           .from("posts")
-          .select("id, author_id, type, provenance, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+          .select("id, author_id, type, provenance, audience, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
           .eq("id", id)
           .single(),
         supabase
@@ -317,7 +318,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
         ...(post.provenance === "evidence" ? { sources } : {}),
       })
       .eq("id", post.id)
-      .select("id, author_id, type, provenance, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+      .select("id, author_id, type, provenance, audience, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
       .single();
 
     if (error) {
@@ -484,6 +485,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                   <h1 className="break-words text-2xl font-bold text-gray-900">{post.title}</h1>
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant={typeVariants[post.type]}>{t(typeTranslationKeys[post.type])}</Badge>
+                    {post.audience === "adult" && <Badge variant="lilac">{t("audience.badge")}</Badge>}
                     <ProvenanceBadge provenance={post.provenance} sources={post.sources} />
                   </div>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-gray-600">

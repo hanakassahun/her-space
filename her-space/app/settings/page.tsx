@@ -12,6 +12,7 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/components/AuthProvider";
+import InterestPicker from "@/components/InterestPicker";
 
 type BlockRow = {
   blocked_id: string;
@@ -36,6 +37,11 @@ export default function SettingsPage() {
   const [message, setMessage] = useState("");
   const [blockRows, setBlockRows] = useState<BlockRow[]>([]);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [ageGroup, setAgeGroup] = useState<"teen" | "adult" | null>(null);
+  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const [savedInterests, setSavedInterests] = useState<string[]>([]);
+  const [savingInterests, setSavingInterests] = useState(false);
+  const [interestMessage, setInterestMessage] = useState("");
 
   useEffect(() => {
     async function checkSession() {
@@ -45,18 +51,80 @@ export default function SettingsPage() {
         return;
       }
 
-      const { data: rows } = await supabase
-        .from("user_blocks")
-        .select(
-          "blocked_id, kind, created_at, profiles!user_blocks_blocked_id_fkey(display_name)"
-        )
-        .order("created_at", { ascending: false });
+      const [blocksResult, interestsResult, privateResult] = await Promise.all([
+        supabase
+          .from("user_blocks")
+          .select("blocked_id, kind, created_at, profiles!user_blocks_blocked_id_fkey(display_name)")
+          .order("created_at", { ascending: false }),
+        supabase.from("member_interests").select("topic").eq("user_id", userId).order("topic"),
+        supabase.from("member_private").select("age_group").eq("user_id", userId).maybeSingle(),
+      ]);
 
-      setBlockRows((rows ?? []) as BlockRow[]);
+      setBlockRows((blocksResult.data ?? []) as BlockRow[]);
+      const interests = ((interestsResult.data ?? []) as { topic: string }[]).map(({ topic }) => topic.toLowerCase());
+      setSelectedInterests(interests);
+      setSavedInterests(interests);
+      setAgeGroup(privateResult.data?.age_group === "teen" || privateResult.data?.age_group === "adult" ? privateResult.data.age_group : null);
+      if (interestsResult.error) setInterestMessage(friendlyError(interestsResult.error, t));
+      else if (privateResult.error) setInterestMessage(friendlyError(privateResult.error, t));
       setLoading(false);
     }
     void checkSession();
-  }, [authLoading, router, userId]);
+  }, [authLoading, router, t, userId]);
+
+  async function saveInterests() {
+    if (!userId || savingInterests) return;
+    const nextInterests = [...new Set(selectedInterests.map((topic) => topic.toLowerCase()))].slice(0, 6);
+    const removed = savedInterests.filter((topic) => !nextInterests.includes(topic));
+    const added = nextInterests.filter((topic) => !savedInterests.includes(topic));
+    setSavingInterests(true);
+    setInterestMessage("");
+
+    if (removed.length > 0) {
+      const { error } = await supabase
+        .from("member_interests")
+        .delete()
+        .eq("user_id", userId)
+        .in("topic", removed);
+      if (error) {
+        setInterestMessage(friendlyError(error, t));
+        setSavingInterests(false);
+        return;
+      }
+      setSavedInterests((current) => current.filter((topic) => !removed.includes(topic)));
+    }
+
+    if (added.length > 0) {
+      const { error } = await supabase
+        .from("member_interests")
+        .insert(added.map((topic) => ({ user_id: userId, topic })));
+      if (error) {
+        setInterestMessage(friendlyError(error, t));
+        setSavingInterests(false);
+        return;
+      }
+    }
+
+    setSelectedInterests(nextInterests);
+    setSavedInterests(nextInterests);
+    setInterestMessage(t("settings.interestsSaved"));
+    setSavingInterests(false);
+  }
+
+  async function resetInterests() {
+    if (!userId || savingInterests || !window.confirm(t("settings.interestsResetConfirm"))) return;
+    setSavingInterests(true);
+    setInterestMessage("");
+    const { error } = await supabase.from("member_interests").delete().eq("user_id", userId);
+    if (error) {
+      setInterestMessage(friendlyError(error, t));
+    } else {
+      setSelectedInterests([]);
+      setSavedInterests([]);
+      setInterestMessage(t("settings.interestsSaved"));
+    }
+    setSavingInterests(false);
+  }
 
   async function logOut() {
     await supabase.auth.signOut();
@@ -106,6 +174,33 @@ export default function SettingsPage() {
         <h1 className="text-3xl font-bold text-deep-plum">Settings</h1>
         <p className="mt-2 text-gray-700">Account and community information.</p>
       </header>
+
+      <Card as="section" className="space-y-4">
+        <div>
+          <h2 className="text-xl font-semibold text-deep-plum">{t("settings.interests")}</h2>
+          <p className="mt-1 text-sm text-gray-700">{t("onb.interestsBody")}</p>
+        </div>
+        <div className="space-y-3">
+          <p className="text-right text-sm text-gray-600">{selectedInterests.length}/6</p>
+          <InterestPicker selected={selectedInterests} onChange={setSelectedInterests} disabled={savingInterests} />
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <Button type="button" disabled={savingInterests} onClick={() => void saveInterests()}>
+            {t("common.saveChanges")}
+          </Button>
+          <Button variant="secondary" type="button" disabled={savingInterests} onClick={() => void resetInterests()}>
+            {t("settings.interestsReset")}
+          </Button>
+        </div>
+        {interestMessage && <p className="break-words text-sm text-gray-700" role="status">{interestMessage}</p>}
+        <div className="border-t border-soft-lilac/70 pt-4">
+          <h3 className="font-semibold text-deep-plum">{t("settings.ageGroup")}</h3>
+          {ageGroup && <p className="mt-1 text-sm text-gray-700">{t(ageGroup === "teen" ? "onb.age13" : "onb.age18")}</p>}
+          <Link className="mt-2 inline-flex min-h-11 items-center break-words text-sm text-deep-plum underline" href="/feedback">
+            {t("settings.ageChange")}
+          </Link>
+        </div>
+      </Card>
 
       <Card as="section" className="space-y-4">
         <h2 className="text-xl font-semibold text-deep-plum">Community information</h2>

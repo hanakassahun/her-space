@@ -30,6 +30,7 @@ type Post = {
   author_id: string;
   type: "experience" | "question" | "knowledge";
   provenance: "personal" | "community" | "evidence";
+  audience: "all" | "adult";
   sources: string[];
   title: string;
   body: string;
@@ -143,7 +144,7 @@ export default function FeedPage() {
 
     const postsResult = await supabase
         .from("posts")
-        .select("id, author_id, type, provenance, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+        .select("id, author_id, type, provenance, audience, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
         .order("created_at", { ascending: false })
         .range(from, to);
 
@@ -411,6 +412,7 @@ export default function FeedPage() {
                   <Badge variant={typeVariants[post.type]}>
                     {t(typeTranslationKeys[post.type])}
                   </Badge>
+                  {post.audience === "adult" && <Badge variant="lilac">{t("audience.badge")}</Badge>}
                   <ProvenanceBadge provenance={post.provenance} sources={post.sources} short />
                 </div>
                 <TimeAgo className="text-sm text-gray-500" date={post.created_at} />

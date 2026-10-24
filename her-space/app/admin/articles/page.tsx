@@ -18,6 +18,7 @@ type Article = {
   title: string;
   summary: string;
   category: ArticleCategory;
+  audience: "all" | "adult";
   topics: string[];
   normal: string;
   needs_attention: string;
@@ -33,6 +34,7 @@ type ArticleForm = {
   title: string;
   summary: string;
   category: ArticleCategory;
+  audience: "all" | "adult";
   topics: string;
   normal: string;
   needsAttention: string;
@@ -47,6 +49,7 @@ const emptyForm: ArticleForm = {
   title: "",
   summary: "",
   category: "health",
+  audience: "all",
   topics: "",
   normal: "",
   needsAttention: "",
@@ -79,6 +82,7 @@ function formFromArticle(article: Article): ArticleForm {
     title: article.title,
     summary: article.summary,
     category: article.category,
+    audience: article.audience,
     topics: article.topics.join(", "),
     normal: article.normal,
     needsAttention: article.needs_attention,
@@ -92,7 +96,7 @@ function formFromArticle(article: Article): ArticleForm {
 function fetchArticles() {
   return supabase
     .from("articles")
-    .select("id, slug, title, summary, category, topics, normal, needs_attention, see_doctor, doctor_questions, sources, reviewed_by, published")
+    .select("id, slug, title, summary, category, audience, topics, normal, needs_attention, see_doctor, doctor_questions, sources, reviewed_by, published")
     .order("updated_at", { ascending: false });
 }
 
@@ -158,6 +162,7 @@ export default function AdminArticlesPage() {
       title: form.title.trim(),
       summary: form.summary.trim(),
       category: form.category,
+      audience: form.audience,
       topics: form.topics.split(",").map((topic) => topic.trim()).filter(Boolean),
       normal: form.normal.trim(),
       needs_attention: form.needsAttention.trim(),
@@ -243,6 +248,17 @@ export default function AdminArticlesPage() {
                 {categories.map((category) => (
                   <option key={category} value={category}>{categoryLabels[category]}</option>
                 ))}
+              </select>
+            </label>
+            <label className="block space-y-2 text-sm font-medium text-deep-plum">
+              Audience
+              <select
+                className="min-h-11 w-full rounded-2xl border border-[#CDBDEB] bg-white px-4 py-2.5 text-deep-plum focus:border-[#8F72BE] focus:outline-none focus:ring-2 focus:ring-[#B49AD8]"
+                value={form.audience}
+                onChange={(event) => setForm({ ...form, audience: event.target.value as ArticleForm["audience"] })}
+              >
+                <option value="all">All ages</option>
+                <option value="adult">Adults (18+)</option>
               </select>
             </label>
           </div>

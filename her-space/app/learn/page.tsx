@@ -24,6 +24,7 @@ type Article = {
   summary: string;
   summary_am: string | null;
   category: ArticleCategory;
+  audience: "all" | "adult";
   topics: string[];
 };
 
@@ -57,7 +58,7 @@ export default function LearnPage() {
 
       const { data, error } = await supabase
         .from("articles")
-        .select("id, slug, title, title_am, summary, summary_am, category, topics")
+        .select("id, slug, title, title_am, summary, summary_am, category, audience, topics")
         .eq("published", true)
         .order("category", { ascending: true })
         .order("title", { ascending: true });
@@ -140,7 +141,10 @@ export default function LearnPage() {
             </h2>
             {categoryArticles.map((article) => (
               <Card as="article" key={article.id} className="space-y-3">
-                <Badge variant="lilac">{t(categoryTranslationKeys[article.category])}</Badge>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="lilac">{t(categoryTranslationKeys[article.category])}</Badge>
+                  {article.audience === "adult" && <Badge variant="lilac">{t("audience.badge")}</Badge>}
+                </div>
                 <div>
                   <h3 className="text-lg font-semibold text-deep-plum">
                     <Link href={`/learn/${article.slug}`}>{lang === "am" && article.title_am?.trim() ? article.title_am : article.title}</Link>

@@ -19,6 +19,7 @@ type Article = {
   summary: string;
   summary_am: string | null;
   category: string;
+  audience: "all" | "adult";
   topics: string[];
   normal: string;
   normal_am: string | null;
@@ -59,7 +60,7 @@ export default function LearnArticlePage({ params }: { params: Promise<{ slug: s
 
       const { data, error } = await supabase
         .from("articles")
-        .select("id, slug, title, title_am, summary, summary_am, category, topics, normal, normal_am, needs_attention, needs_attention_am, see_doctor, see_doctor_am, doctor_questions, doctor_questions_am, sources, reviewed_by")
+        .select("id, slug, title, title_am, summary, summary_am, category, audience, topics, normal, normal_am, needs_attention, needs_attention_am, see_doctor, see_doctor_am, doctor_questions, doctor_questions_am, sources, reviewed_by")
         .eq("slug", slug)
         .eq("published", true)
         .single();
@@ -97,7 +98,10 @@ export default function LearnArticlePage({ params }: { params: Promise<{ slug: s
       {article && (
         <>
           <header className="space-y-3">
-            <Badge variant="lilac">{t(categoryTranslationKeys[article.category] ?? "explore.health")}</Badge>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="lilac">{t(categoryTranslationKeys[article.category] ?? "explore.health")}</Badge>
+              {article.audience === "adult" && <Badge variant="lilac">{t("audience.badge")}</Badge>}
+            </div>
             <h1 className="text-3xl font-bold text-deep-plum">{articleText?.title}</h1>
             <p className="text-lg leading-7 text-gray-700">{articleText?.summary}</p>
             {article.topics.length > 0 && (

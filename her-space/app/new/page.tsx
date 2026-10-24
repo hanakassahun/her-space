@@ -19,6 +19,7 @@ import { useAuth } from "@/components/AuthProvider";
 
 type PostType = "experience" | "question" | "knowledge";
 type Provenance = "personal" | "community" | "evidence";
+type AgeGroup = "teen" | "adult";
 type Draft = {
   title: string;
   body: string;
@@ -78,6 +79,8 @@ export default function NewPostPage() {
   const [extraTopics, setExtraTopics] = useState("");
   const [topicsExpanded, setTopicsExpanded] = useState(false);
   const [sensitive, setSensitive] = useState(false);
+  const [ageSetting, setAgeSetting] = useState<{ userId: string; ageGroup: AgeGroup } | null>(null);
+  const [adultsOnly, setAdultsOnly] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [draftReady, setDraftReady] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
@@ -86,6 +89,7 @@ export default function NewPostPage() {
   const [published, setPublished] = useState(false);
   const [loading, setLoading] = useState(false);
   const userIdRef = useRef<string | null>(null);
+  const ageGroup = ageSetting?.userId === currentUserId ? ageSetting.ageGroup : null;
 
   function clearDraftFor(id: string) {
     try {
@@ -105,6 +109,25 @@ export default function NewPostPage() {
       if (previousUserId && !currentUserId) clearDraftFor(previousUserId);
       userIdRef.current = currentUserId;
       setUserId(currentUserId);
+      setAdultsOnly(false);
+
+      if (currentUserId) {
+        void (async () => {
+          try {
+            const { data, error } = await supabase
+              .from("member_private")
+              .select("age_group")
+              .eq("user_id", currentUserId)
+              .maybeSingle();
+            if (!active || error) return;
+            if (data?.age_group === "teen" || data?.age_group === "adult") {
+              setAgeSetting({ userId: currentUserId, ageGroup: data.age_group });
+            }
+          } catch {
+            // Keep adult-only publishing unavailable if the age row cannot be read.
+          }
+        })();
+      }
 
       let restored = false;
       if (currentUserId) {
@@ -224,6 +247,7 @@ export default function NewPostPage() {
       body: body.trim(),
       topics: mergedTopics,
       sensitive,
+      audience: ageGroup === "adult" && adultsOnly ? "adult" : "all",
     });
 
     if (error) {
@@ -453,6 +477,30 @@ export default function NewPostPage() {
                   <span className={`h-7 w-7 rounded-full bg-white shadow-sm transition-transform ${sensitive ? "translate-x-7" : "translate-x-0"}`} />
                 </button>
               </div>
+
+              {ageGroup === "adult" && (
+                <div className="space-y-2">
+                  <div className="flex items-start justify-between gap-4 rounded-2xl border border-[#CDBDEB] bg-white p-3">
+                    <span className="min-w-0">
+                      <span className="block break-words text-sm font-medium text-deep-plum">{t("audience.adultsOnly")}</span>
+                      <span className="mt-1 block break-words text-xs leading-5 text-gray-600">{t("audience.adultsHint")}</span>
+                    </span>
+                    <button
+                      className={`relative inline-flex h-11 w-16 shrink-0 items-center rounded-full border px-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle ${adultsOnly ? "gradient-aurora border-transparent" : "border-[#CDBDEB] bg-soft-lilac/40"}`}
+                      type="button"
+                      role="switch"
+                      aria-checked={adultsOnly}
+                      aria-label={t("audience.adultsOnly")}
+                      onClick={() => setAdultsOnly((current) => !current)}
+                    >
+                      <span className={`h-7 w-7 rounded-full bg-white shadow-sm transition-transform ${adultsOnly ? "translate-x-7" : "translate-x-0"}`} />
+                    </button>
+                  </div>
+                  {!adultsOnly && mergedTopics.some((topic) => ["sexual health", "contraception"].includes(topic.toLowerCase())) && (
+                    <p className="break-words text-xs leading-5 text-gray-600">{t("audience.suggest")}</p>
+                  )}
+                </div>
+              )}
 
               <div className="flex items-start gap-2 rounded-xl bg-soft-lilac/30 px-3 py-2.5">
                 <svg className="mt-0.5 h-4 w-4 shrink-0 text-deep-plum/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">

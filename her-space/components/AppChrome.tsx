@@ -2,16 +2,30 @@
 
 import { useEffect } from "react";
 import type { ReactNode } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import BottomNav from "@/components/BottomNav";
 import ConnectionBanner from "@/components/ConnectionBanner";
 import Card from "@/components/ui/Card";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/components/AuthProvider";
+import { supabase } from "@/lib/supabase";
+import { cacheOnboarded, isOnboardedCached } from "@/lib/onboarding";
+
+const onboardingExemptPaths = new Set([
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+  "/onboarding",
+  "/rules",
+  "/privacy",
+  "/terms",
+]);
 
 export default function AppChrome({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { t } = useLanguage();
   const { user, loading } = useAuth();
   const userId = user?.id ?? null;
@@ -19,7 +33,8 @@ export default function AppChrome({ children }: { children: ReactNode }) {
     pathname === "/login" ||
     pathname === "/signup" ||
     pathname === "/forgot-password" ||
-    pathname === "/reset-password";
+    pathname === "/reset-password" ||
+    pathname === "/onboarding";
   const isMaintenanceMode =
     process.env.NEXT_PUBLIC_MAINTENANCE_MODE === "true" && pathname !== "/login";
 
@@ -35,6 +50,31 @@ export default function AppChrome({ children }: { children: ReactNode }) {
       delete document.documentElement.dataset.lowend;
     };
   }, []);
+
+  useEffect(() => {
+    if (loading || !userId || onboardingExemptPaths.has(pathname) || isOnboardedCached(userId)) return;
+
+    let active = true;
+    async function checkOnboarding(currentUserId: string) {
+      try {
+        const { data, error } = await supabase
+          .from("member_private")
+          .select("user_id")
+          .eq("user_id", currentUserId)
+          .maybeSingle();
+        if (!active || error) return;
+        if (data) cacheOnboarded(currentUserId);
+        else router.replace("/onboarding");
+      } catch {
+        // A failed check must not create a redirect loop.
+      }
+    }
+    void checkOnboarding(userId);
+
+    return () => {
+      active = false;
+    };
+  }, [loading, pathname, router, userId]);
 
   const showNavigation = !loading && Boolean(userId) && !hideOnAuthRoute;
 
