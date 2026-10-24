@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
@@ -8,14 +8,13 @@ import BottomNav from "@/components/BottomNav";
 import ConnectionBanner from "@/components/ConnectionBanner";
 import Card from "@/components/ui/Card";
 import { useLanguage } from "@/components/LanguageProvider";
-import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/components/AuthProvider";
 
 export default function AppChrome({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { t } = useLanguage();
-  const [userId, setUserId] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [sessionChecked, setSessionChecked] = useState(false);
+  const { user, loading } = useAuth();
+  const userId = user?.id ?? null;
   const hideOnAuthRoute =
     pathname === "/login" ||
     pathname === "/signup" ||
@@ -37,45 +36,7 @@ export default function AppChrome({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  useEffect(() => {
-    let active = true;
-
-    async function setAdminForUser(currentUserId: string | null) {
-      if (!currentUserId) {
-        if (active) setIsAdmin(false);
-        return;
-      }
-      const { data } = await supabase
-        .from("admins")
-        .select("user_id")
-        .eq("user_id", currentUserId)
-        .maybeSingle();
-      if (active) setIsAdmin(Boolean(data));
-    }
-
-    void supabase.auth.getUser().then(async ({ data }) => {
-      if (!active) return;
-      const currentUserId = data.user?.id ?? null;
-      setUserId(currentUserId);
-      await setAdminForUser(currentUserId);
-      if (active) setSessionChecked(true);
-    });
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      const currentUserId = session?.user.id ?? null;
-      if (!active) return;
-      setUserId(currentUserId);
-      if (!currentUserId) setIsAdmin(false);
-      window.setTimeout(() => void setAdminForUser(currentUserId), 0);
-    });
-
-    return () => {
-      active = false;
-      authListener.subscription.unsubscribe();
-    };
-  }, []);
-
-  const showNavigation = sessionChecked && Boolean(userId) && !hideOnAuthRoute;
+  const showNavigation = !loading && Boolean(userId) && !hideOnAuthRoute;
 
   if (isMaintenanceMode) {
     return (
@@ -91,12 +52,12 @@ export default function AppChrome({ children }: { children: ReactNode }) {
 
   return (
     <>
-      {showNavigation && userId && <AppHeader userId={userId} isAdmin={isAdmin} />}
+      {showNavigation && userId && <AppHeader />}
       {showNavigation && userId && <ConnectionBanner />}
       <div className={showNavigation ? "min-h-0 flex-1 pb-[calc(5.25rem+env(safe-area-inset-bottom))] md:pb-0" : "min-h-0 flex-1"}>
         {children}
       </div>
-      {showNavigation && userId && <BottomNav userId={userId} isAdmin={isAdmin} />}
+      {showNavigation && userId && <BottomNav />}
     </>
   );
 }

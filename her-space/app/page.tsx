@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
 import { navConfig, resolveNavHref } from "@/lib/nav";
 import NavIcon from "@/components/NavIcon";
 import { useLanguage } from "@/components/LanguageProvider";
+import { useAuth } from "@/components/AuthProvider";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import InstallBanner from "@/components/InstallBanner";
@@ -13,10 +13,9 @@ import WelcomeCards from "@/components/WelcomeCards";
 
 export default function Home() {
   const { t } = useLanguage();
-  const [name, setName] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const { user, displayName, loading } = useAuth();
+  const userId = user?.id ?? null;
+  const name = user ? displayName ?? "friend" : null;
   const [greetingKey, setGreetingKey] = useState<"home.greetingMorning" | "home.greetingAfternoon" | "home.greetingEvening" | null>(null);
 
   useEffect(() => {
@@ -25,29 +24,6 @@ export default function Home() {
       setGreetingKey(hour < 12 ? "home.greetingMorning" : hour < 18 ? "home.greetingAfternoon" : "home.greetingEvening");
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, []);
-
-  useEffect(() => {
-    async function load() {
-      const { data } = await supabase.auth.getUser();
-      if (data.user) {
-        setUserId(data.user.id);
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("display_name")
-          .eq("id", data.user.id)
-          .single();
-        setName(profile?.display_name ?? "friend");
-        const { data: admin } = await supabase
-          .from("admins")
-          .select("user_id")
-          .eq("user_id", data.user.id)
-          .maybeSingle();
-        setIsAdmin(Boolean(admin));
-      }
-      setLoading(false);
-    }
-    load();
   }, []);
 
   return (

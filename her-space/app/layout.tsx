@@ -1,23 +1,30 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans, Noto_Sans_Ethiopic, Sora } from "next/font/google";
 import AppChrome from "@/components/AppChrome";
+import { AuthProvider } from "@/components/AuthProvider";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import "./globals.css";
 
 const sora = Sora({
   variable: "--font-sora",
   subsets: ["latin"],
+  weight: "variable",
+  display: "swap",
 });
 
 const dmSans = DM_Sans({
   variable: "--font-dm-sans",
   subsets: ["latin"],
+  weight: "variable",
+  display: "swap",
 });
 
 const notoSansEthiopic = Noto_Sans_Ethiopic({
   variable: "--font-noto-ethiopic",
   subsets: ["ethiopic", "latin"],
   display: "swap",
+  preload: false,
+  weight: "variable",
 });
 
 export const metadata: Metadata = {
@@ -43,7 +50,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <LanguageProvider>
-          <AppChrome>{children}</AppChrome>
+          <AuthProvider>
+            <AppChrome>{children}</AppChrome>
+          </AuthProvider>
         </LanguageProvider>
       </body>
     </html>

@@ -11,6 +11,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { useLanguage } from "@/components/LanguageProvider";
+import { useAuth } from "@/components/AuthProvider";
 
 type BlockRow = {
   blocked_id: string;
@@ -26,6 +27,8 @@ function getDisplayName(profiles: BlockRow["profiles"]): string {
 
 export default function SettingsPage() {
   const { t } = useLanguage();
+  const { user, loading: authLoading } = useAuth();
+  const userId = user?.id ?? null;
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [confirmation, setConfirmation] = useState("");
@@ -36,8 +39,8 @@ export default function SettingsPage() {
 
   useEffect(() => {
     async function checkSession() {
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) {
+      if (authLoading) return;
+      if (!userId) {
         router.replace("/login");
         return;
       }
@@ -53,7 +56,7 @@ export default function SettingsPage() {
       setLoading(false);
     }
     void checkSession();
-  }, [router]);
+  }, [authLoading, router, userId]);
 
   async function logOut() {
     await supabase.auth.signOut();

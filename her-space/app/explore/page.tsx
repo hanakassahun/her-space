@@ -17,6 +17,7 @@ import PostSkeleton from "@/components/ui/PostSkeleton";
 import BookmarkButton from "@/components/ui/BookmarkButton";
 import { useLanguage } from "@/components/LanguageProvider";
 import TimeAgo from "@/components/TimeAgo";
+import { useAuth } from "@/components/AuthProvider";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -97,8 +98,10 @@ function getProfessionalTitle(profile: Profile | null | undefined) {
 
 export default function ExplorePage() {
   const { t } = useLanguage();
+  const { user, loading: authLoading } = useAuth();
+  const currentUserId = user?.id ?? null;
+  const userId = currentUserId;
   const router = useRouter();
-  const [userId, setUserId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
@@ -111,7 +114,6 @@ export default function ExplorePage() {
   const [revealedPostIds, setRevealedPostIds] = useState<Record<string, boolean>>({});
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  const [authChecked, setAuthChecked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [message, setMessage] = useState("");
@@ -159,17 +161,10 @@ export default function ExplorePage() {
   }
 
   useEffect(() => {
-    async function checkAuth() {
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) {
-        router.replace("/login");
-        return;
-      }
-      setUserId(data.user.id);
-      setAuthChecked(true);
+    if (!authLoading && !currentUserId) {
+      router.replace("/login");
     }
-    void checkAuth();
-  }, [router]);
+  }, [authLoading, currentUserId, router]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -177,7 +172,7 @@ export default function ExplorePage() {
   }, [search]);
 
   const loadPostsPage = useCallback(async (nextPage: number, reset: boolean) => {
-    if (!userId || !authChecked) return;
+    if (!userId || authLoading) return;
 
     if (reset) setLoading(true);
     else setLoadingMore(true);
@@ -261,7 +256,7 @@ export default function ExplorePage() {
     setPage(nextPage);
     setLoading(false);
     setLoadingMore(false);
-  }, [authChecked, debouncedSearch, selectedTopic, t, userId]);
+  }, [authLoading, debouncedSearch, selectedTopic, t, userId]);
 
   const loadPostsPageRef = useRef(loadPostsPage);
   useEffect(() => {
@@ -269,7 +264,7 @@ export default function ExplorePage() {
   }, [loadPostsPage]);
 
   useEffect(() => {
-    if (!userId || !authChecked || !restoreReady) return;
+    if (!userId || authLoading || !restoreReady) return;
     const timeout = window.setTimeout(() => {
       setPosts([]);
       setPage(0);
@@ -277,7 +272,7 @@ export default function ExplorePage() {
       void loadPostsPageRef.current(0, true);
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, [authChecked, debouncedSearch, restoreReady, selectedTopic, userId]);
+  }, [authLoading, debouncedSearch, restoreReady, selectedTopic, userId]);
 
   const handleLoadMore = useCallback(async () => {
     if (loadMoreLock.current || loading || loadingMore || !hasMore) return;

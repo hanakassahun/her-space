@@ -18,6 +18,7 @@ import UserText from "@/components/UserText";
 import MemberActionsMenu from "@/components/MemberActionsMenu";
 import { useLanguage } from "@/components/LanguageProvider";
 import TimeAgo from "@/components/TimeAgo";
+import { useAuth } from "@/components/AuthProvider";
 
 type PostType = "experience" | "question" | "knowledge";
 type Professional = { title: string } | { title: string }[] | null;
@@ -80,14 +81,6 @@ function getProfessionalTitle(profiles: Post["profiles"]) {
   return (Array.isArray(professional) ? professional[0] : professional)?.title;
 }
 
-function formatDate(date: string) {
-  return new Date(date).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
   function getReadingMinutes(body: string) {
     const count = /[\u1200-\u137F]/.test(body)
       ? body.replace(/\s/g, "").length / 900
@@ -98,6 +91,8 @@ function formatDate(date: string) {
 export default function PostPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { lang, t } = useLanguage();
+  const { user, loading: authLoading } = useAuth();
+  const currentUserId = user?.id ?? null;
   const router = useRouter();
   const [post, setPost] = useState<Post | null>(null);
   const [relatedArticle, setRelatedArticle] = useState<RelatedArticle | null>(null);
@@ -145,15 +140,15 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
   useEffect(() => {
     async function loadPost() {
       setRelatedArticle(null);
-      const { data: authData } = await supabase.auth.getUser();
-      if (!authData.user) {
+      if (authLoading) return;
+      if (!currentUserId) {
         router.replace("/login");
         return;
       }
 
-      setUserId(authData.user.id);
+      setUserId(currentUserId);
 
-      const [postResult, bookmarkResult, likesResult] = await Promise.all([
+      const [postResult, bookmarkResult, likesResult, commentsResult] = await Promise.all([
         supabase
           .from("posts")
           .select("id, author_id, type, provenance, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
@@ -162,10 +157,15 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
         supabase
           .from("bookmarks")
           .select("post_id")
-          .eq("user_id", authData.user.id)
+          .eq("user_id", currentUserId)
           .eq("post_id", id)
           .maybeSingle(),
         supabase.from("likes").select("user_id").eq("post_id", id),
+        supabase
+          .from("comments")
+          .select("id, author_id, body, created_at, profiles!comments_author_id_fkey(display_name)")
+          .eq("post_id", id)
+          .order("created_at", { ascending: true }),
       ]);
 
       if (postResult.error || !postResult.data) {
@@ -201,18 +201,19 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
         setMessage(friendlyError(likesResult.error, t));
       } else {
         setLikeCount(likesResult.data.length);
-        setLiked(likesResult.data.some((like) => like.user_id === authData.user.id));
+        setLiked(likesResult.data.some((like) => like.user_id === currentUserId));
       }
 
       if (!postResult.error) {
-        await loadComments(id);
+        if (commentsResult.error) setMessage(friendlyError(commentsResult.error, t));
+        else setComments((commentsResult.data ?? []) as Comment[]);
       }
 
       setLoading(false);
     }
 
     void loadPost();
-  }, [id, router]);
+  }, [authLoading, currentUserId, id, router, t]);
 
   async function toggleBookmark() {
     if (!userId || bookmarkRequest.current) return;

@@ -2,23 +2,20 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { desktopAccountNavOrder, desktopPrimaryNavOrder, isNavItemActive, isTopLevelPath, navConfig, resolveNavHref } from "@/lib/nav";
 import NavIcon from "@/components/NavIcon";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/components/AuthProvider";
 import { useLanguage } from "@/components/LanguageProvider";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import BackButton from "@/components/BackButton";
 
-type AppHeaderProps = {
-  userId: string;
-  isAdmin: boolean;
-};
-
-export default function AppHeader({ userId, isAdmin }: AppHeaderProps) {
+export default function AppHeader() {
   const pathname = usePathname();
-  const router = useRouter();
   const { t } = useLanguage();
+  const { user, isAdmin } = useAuth();
+  const userId = user?.id ?? "";
   const showBack = !isTopLevelPath(pathname);
   const [accountOpen, setAccountOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);

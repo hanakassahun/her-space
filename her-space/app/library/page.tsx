@@ -15,6 +15,7 @@ import BookmarkButton from "@/components/ui/BookmarkButton";
 import UserText from "@/components/UserText";
 import { useLanguage } from "@/components/LanguageProvider";
 import TimeAgo from "@/components/TimeAgo";
+import { useAuth } from "@/components/AuthProvider";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -65,18 +66,11 @@ function getProfessionalTitle(profile: Profile | null | undefined) {
   return first(profile?.verified_professionals ?? null)?.title;
 }
 
-function formatDate(date: string) {
-  return new Date(date).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
 export default function LibraryPage() {
   const { t } = useLanguage();
+  const { user, loading: authLoading } = useAuth();
+  const userId = user?.id ?? null;
   const router = useRouter();
-  const [userId, setUserId] = useState<string | null>(null);
   const [savedPosts, setSavedPosts] = useState<SavedPost[]>([]);
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -87,19 +81,18 @@ export default function LibraryPage() {
 
   useEffect(() => {
     async function loadLibrary() {
-      const { data: authData } = await supabase.auth.getUser();
-      if (!authData.user) {
+      if (authLoading) return;
+      if (!userId) {
         router.replace("/login");
         return;
       }
 
-      setUserId(authData.user.id);
       const { data, error } = await supabase
         .from("bookmarks")
         .select(
           "created_at, posts!bookmarks_post_id_fkey(id, type, provenance, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title)))"
         )
-        .eq("user_id", authData.user.id)
+        .eq("user_id", userId)
         .order("created_at", { ascending: false });
 
       if (error) {
@@ -117,7 +110,7 @@ export default function LibraryPage() {
     }
 
     void loadLibrary();
-  }, [router]);
+  }, [authLoading, router, t, userId]);
 
   const topics = [...new Set(savedPosts.flatMap(({ post }) => post.topics ?? []))].sort(
     (left, right) => left.localeCompare(right)

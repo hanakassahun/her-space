@@ -5,17 +5,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { mobileNavOrder, moreNavOrder, isNavItemActive, navConfig, resolveNavHref } from "@/lib/nav";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/components/AuthProvider";
 import NavIcon from "@/components/NavIcon";
 import { useLanguage } from "@/components/LanguageProvider";
 
-type BottomNavProps = {
-  userId: string;
-  isAdmin: boolean;
-};
-
-export default function BottomNav({ userId, isAdmin }: BottomNavProps) {
+export default function BottomNav() {
   const pathname = usePathname();
   const { t } = useLanguage();
+  const { user, isAdmin } = useAuth();
+  const userId = user?.id ?? "";
   const [moreOpen, setMoreOpen] = useState(false);
   const [sheetMounted, setSheetMounted] = useState(false);
   const [sheetPresented, setSheetPresented] = useState(false);

@@ -17,6 +17,7 @@ import PostSkeleton from "@/components/ui/PostSkeleton";
 import BookmarkButton from "@/components/ui/BookmarkButton";
 import { useLanguage } from "@/components/LanguageProvider";
 import TimeAgo from "@/components/TimeAgo";
+import { useAuth } from "@/components/AuthProvider";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -77,10 +78,12 @@ function getAuthorName(profiles: Post["profiles"]) {
 
 export default function FeedPage() {
   const { t } = useLanguage();
+  const { user, loading: authLoading } = useAuth();
+  const currentUserId = user?.id ?? null;
+  const userId = currentUserId;
+  const isSignedIn = Boolean(currentUserId);
   const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
-  const [isSignedIn, setIsSignedIn] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
   const [followingIds, setFollowingIds] = useState<string[]>([]);
   const [likeStates, setLikeStates] = useState<Record<string, LikeState>>({});
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
@@ -138,18 +141,11 @@ export default function FeedPage() {
     else setLoadingMore(true);
     setMessage("");
 
-    const [authResult, postsResult] = await Promise.all([
-      supabase.auth.getUser(),
-      supabase
+    const postsResult = await supabase
         .from("posts")
         .select("id, author_id, type, provenance, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
         .order("created_at", { ascending: false })
-        .range(from, to),
-    ]);
-
-    const currentUserId = authResult.data.user?.id ?? null;
-    setUserId(currentUserId);
-    setIsSignedIn(Boolean(currentUserId));
+        .range(from, to);
 
     if (postsResult.error) {
       setMessage(friendlyError(postsResult.error, t));
@@ -166,9 +162,15 @@ export default function FeedPage() {
 
     if (incomingPosts.length > 0) {
       const postIds = incomingPosts.map((post) => post.id);
-      const [likesResult, commentsResult] = await Promise.all([
+      const [likesResult, commentsResult, followsResult, bookmarksResult] = await Promise.all([
         supabase.from("likes").select("post_id, user_id").in("post_id", postIds),
         supabase.from("comments").select("post_id").in("post_id", postIds),
+        currentUserId
+          ? supabase.from("follows").select("followee_id").eq("follower_id", currentUserId)
+          : Promise.resolve({ data: [], error: null }),
+        currentUserId
+          ? supabase.from("bookmarks").select("post_id").eq("user_id", currentUserId).in("post_id", postIds)
+          : Promise.resolve({ data: [], error: null }),
       ]);
 
       if (likesResult.error) setMessage(friendlyError(likesResult.error, t));
@@ -199,10 +201,6 @@ export default function FeedPage() {
       }
 
       if (currentUserId) {
-        const [followsResult, bookmarksResult] = await Promise.all([
-          supabase.from("follows").select("followee_id").eq("follower_id", currentUserId),
-          supabase.from("bookmarks").select("post_id").eq("user_id", currentUserId).in("post_id", postIds),
-        ]);
         if (followsResult.error) setMessage(friendlyError(followsResult.error, t));
         else setFollowingIds((followsResult.data ?? []).map((follow) => follow.followee_id));
         if (bookmarksResult.error) setMessage(friendlyError(bookmarksResult.error, t));
@@ -233,7 +231,7 @@ export default function FeedPage() {
 
     setLoading(false);
     setLoadingMore(false);
-  }, [posts, t]);
+  }, [currentUserId, posts, t]);
 
   const loadPostsPageRef = useRef(loadPostsPage);
   useEffect(() => {
@@ -241,10 +239,10 @@ export default function FeedPage() {
   }, [loadPostsPage]);
 
   useEffect(() => {
-    if (!restoreReady) return;
+    if (!restoreReady || authLoading) return;
     const timeout = window.setTimeout(() => void loadPostsPageRef.current(0, true), 0);
     return () => window.clearTimeout(timeout);
-  }, [activeTab, restoreReady]);
+  }, [activeTab, authLoading, currentUserId, restoreReady]);
 
   async function toggleLike(postId: string) {
     if (!userId) {

@@ -1,9 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
 import PageShell from "@/components/ui/PageShell";
@@ -12,6 +10,7 @@ import Button from "@/components/ui/Button";
 import Textarea from "@/components/ui/Textarea";
 import SuccessCheck from "@/components/ui/SuccessCheck";
 import { useLanguage } from "@/components/LanguageProvider";
+import { useAuth } from "@/components/AuthProvider";
 
 type Kind = "bug" | "confusing" | "idea" | "other";
 
@@ -24,9 +23,9 @@ const KINDS: { value: Kind; labelKey: "feedback.kindBug" | "feedback.kindConfusi
 
 export default function FeedbackPage() {
   const { t } = useLanguage();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  const [ready, setReady] = useState(false);
   const [kind, setKind] = useState<Kind>("idea");
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
@@ -34,14 +33,8 @@ export default function FeedbackPage() {
   const [sent, setSent] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) {
-        router.replace("/login");
-      } else {
-        setReady(true);
-      }
-    });
-  }, [router]);
+    if (!authLoading && !user) router.replace("/login");
+  }, [authLoading, router, user]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -76,8 +69,6 @@ export default function FeedbackPage() {
       setSent(true);
     }
   }
-
-  if (!ready) return null;
 
   if (sent) {
     return (

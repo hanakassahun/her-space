@@ -16,6 +16,7 @@ import UserText from "@/components/UserText";
 import MemberActionsMenu from "@/components/MemberActionsMenu";
 import { useLanguage } from "@/components/LanguageProvider";
 import TimeAgo from "@/components/TimeAgo";
+import { useAuth } from "@/components/AuthProvider";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -53,17 +54,11 @@ const typeTranslationKeys = {
   knowledge: "postType.knowledge",
 } as const;
 
-function formatDate(date: string) {
-  return new Date(date).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
 export default function UserProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { t } = useLanguage();
+  const { user, loading: authLoading } = useAuth();
+  const currentUserId = user?.id ?? null;
   const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -90,12 +85,11 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
     let cancelled = false;
 
     async function loadProfile() {
-      const { data: authData } = await supabase.auth.getUser();
-      if (!authData.user) {
+      if (authLoading) return;
+      if (!currentUserId) {
         router.replace("/login");
         return;
       }
-      const currentUserId = authData.user.id;
       setUserId(currentUserId);
 
       const [profileResult, followersResult, followingResult, followResult, postsResult] =
@@ -154,7 +148,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
     return () => {
       cancelled = true;
     };
-  }, [id, router]);
+  }, [authLoading, currentUserId, id, router, t]);
 
   async function saveBio(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

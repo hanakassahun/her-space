@@ -12,6 +12,7 @@ import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import PostSkeleton from "@/components/ui/PostSkeleton";
 import { useLanguage } from "@/components/LanguageProvider";
+import { useAuth } from "@/components/AuthProvider";
 
 type ArticleCategory = "health" | "body_beauty" | "mind_life" | "life_stages";
 
@@ -26,13 +27,6 @@ type Article = {
   topics: string[];
 };
 
-const categoryLabels: Record<ArticleCategory, string> = {
-  health: "Health",
-  body_beauty: "Body & Beauty",
-  mind_life: "Mind & Life",
-  life_stages: "Life stages",
-};
-
 const categoryTranslationKeys = {
   health: "explore.health",
   body_beauty: "explore.bodyBeauty",
@@ -44,6 +38,8 @@ const categories: ArticleCategory[] = ["health", "body_beauty", "mind_life", "li
 
 export default function LearnPage() {
   const { lang, t } = useLanguage();
+  const { user, loading: authLoading } = useAuth();
+  const userId = user?.id ?? null;
   const router = useRouter();
   const [articles, setArticles] = useState<Article[]>([]);
   const [search, setSearch] = useState("");
@@ -53,8 +49,8 @@ export default function LearnPage() {
 
   useEffect(() => {
     async function loadArticles() {
-      const { data: authData } = await supabase.auth.getUser();
-      if (!authData.user) {
+      if (authLoading) return;
+      if (!userId) {
         router.replace("/login");
         return;
       }
@@ -72,7 +68,7 @@ export default function LearnPage() {
     }
 
     void loadArticles();
-  }, [router]);
+  }, [authLoading, router, t, userId]);
 
   const filteredArticles = useMemo(() => {
     const term = search.trim().toLocaleLowerCase();

@@ -15,6 +15,7 @@ import ProvenanceBadge from "@/components/ProvenanceBadge";
 import UserText from "@/components/UserText";
 import { useLanguage } from "@/components/LanguageProvider";
 import type { TranslationKey } from "@/lib/i18n/en";
+import { useAuth } from "@/components/AuthProvider";
 
 type PostType = "experience" | "question" | "knowledge";
 type Provenance = "personal" | "community" | "evidence";
@@ -65,6 +66,8 @@ function hasDraftContent(draft: Draft) {
 
 export default function NewPostPage() {
   const { t } = useLanguage();
+  const { user, loading: authLoading } = useAuth();
+  const currentUserId = user?.id ?? null;
   const router = useRouter();
   const [type, setType] = useState<PostType>("experience");
   const [provenance, setProvenance] = useState<Provenance>("personal");
@@ -94,18 +97,12 @@ export default function NewPostPage() {
 
   useEffect(() => {
     let active = true;
-    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
-      if (event !== "SIGNED_OUT") return;
-      const currentUserId = userIdRef.current;
-      if (currentUserId) clearDraftFor(currentUserId);
-      userIdRef.current = null;
-      setUserId(null);
-    });
 
     async function restoreUserDraft() {
-      const { data } = await supabase.auth.getUser();
+      if (authLoading) return;
       if (!active) return;
-      const currentUserId = data.user?.id ?? null;
+      const previousUserId = userIdRef.current;
+      if (previousUserId && !currentUserId) clearDraftFor(previousUserId);
       userIdRef.current = currentUserId;
       setUserId(currentUserId);
 
@@ -146,9 +143,8 @@ export default function NewPostPage() {
     void restoreUserDraft();
     return () => {
       active = false;
-      authListener.subscription.unsubscribe();
     };
-  }, []);
+  }, [authLoading, currentUserId]);
 
   useEffect(() => {
     if (!draftReady || !userId) return;

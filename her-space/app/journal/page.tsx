@@ -13,6 +13,7 @@ import Textarea from "@/components/ui/Textarea";
 import Badge from "@/components/ui/Badge";
 import SuccessCheck from "@/components/ui/SuccessCheck";
 import { useLanguage } from "@/components/LanguageProvider";
+import { useAuth } from "@/components/AuthProvider";
 import type { TranslationKey } from "@/lib/i18n/en";
 
 type PeriodStatus = "none" | "spotting" | "light" | "medium" | "heavy";
@@ -123,6 +124,8 @@ async function fetchJournalEntries(userId: string) {
 
 export default function JournalPage() {
   const { t } = useLanguage();
+  const { user, loading: authLoading } = useAuth();
+  const currentUserId = user?.id ?? null;
   const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
@@ -138,14 +141,14 @@ export default function JournalPage() {
 
   useEffect(() => {
     async function initializeJournal() {
-      const { data: authData } = await supabase.auth.getUser();
-      if (!authData.user) {
+      if (authLoading) return;
+      if (!currentUserId) {
         router.replace("/login");
         return;
       }
 
-      setUserId(authData.user.id);
-      const { data, error } = await fetchJournalEntries(authData.user.id);
+      setUserId(currentUserId);
+      const { data, error } = await fetchJournalEntries(currentUserId);
       if (error) {
         setMessage(friendlyError(error, t));
       } else {
@@ -157,7 +160,7 @@ export default function JournalPage() {
     }
 
     void initializeJournal();
-  }, [router]);
+  }, [authLoading, currentUserId, router, t]);
 
   function toggleSymptom(symptom: string) {
     setDraft((current) => ({

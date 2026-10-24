@@ -12,6 +12,7 @@ import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import { useLanguage } from "@/components/LanguageProvider";
 import TimeAgo from "@/components/TimeAgo";
+import { useAuth } from "@/components/AuthProvider";
 
 type ResourceKind =
   | "clinic"
@@ -48,16 +49,10 @@ const kindLabelKeys = {
 
 const kindValues: ResourceKind[] = ["clinic", "hospital", "gynecologist", "pharmacy", "counseling", "hotline", "other"];
 
-function formatDate(date: string) {
-  return new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
 export default function ResourcesPage() {
   const { t } = useLanguage();
+  const { user, loading: authLoading } = useAuth();
+  const userId = user?.id ?? null;
   const router = useRouter();
   const [resources, setResources] = useState<Resource[]>([]);
   const [search, setSearch] = useState("");
@@ -70,8 +65,8 @@ export default function ResourcesPage() {
 
   useEffect(() => {
     async function loadResources() {
-      const { data: authData } = await supabase.auth.getUser();
-      if (!authData.user) {
+      if (authLoading) return;
+      if (!userId) {
         router.replace("/login");
         return;
       }
@@ -89,7 +84,7 @@ export default function ResourcesPage() {
     }
 
     void loadResources();
-  }, [router]);
+  }, [authLoading, router, t, userId]);
 
   const areas = useMemo(
     () => [...new Set(resources.map((resource) => resource.area?.trim()).filter((area): area is string => Boolean(area)))].sort(),

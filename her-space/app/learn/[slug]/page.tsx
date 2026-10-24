@@ -8,6 +8,7 @@ import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import { useLanguage } from "@/components/LanguageProvider";
+import { useAuth } from "@/components/AuthProvider";
 import type { TranslationKey } from "@/lib/i18n/en";
 
 type Article = {
@@ -41,6 +42,8 @@ const categoryTranslationKeys: Record<string, TranslationKey> = {
 export default function LearnArticlePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
   const { lang, t } = useLanguage();
+  const { user, loading: authLoading } = useAuth();
+  const userId = user?.id ?? null;
   const router = useRouter();
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,8 +51,8 @@ export default function LearnArticlePage({ params }: { params: Promise<{ slug: s
 
   useEffect(() => {
     async function loadArticle() {
-      const { data: authData } = await supabase.auth.getUser();
-      if (!authData.user) {
+      if (authLoading) return;
+      if (!userId) {
         router.replace("/login");
         return;
       }
@@ -67,7 +70,7 @@ export default function LearnArticlePage({ params }: { params: Promise<{ slug: s
     }
 
     void loadArticle();
-  }, [router, slug]);
+  }, [authLoading, router, slug, t, userId]);
 
   const articleText = article ? {
     title: lang === "am" && article.title_am?.trim() ? article.title_am : article.title,
