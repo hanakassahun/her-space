@@ -17,6 +17,7 @@ import BookmarkButton from "@/components/ui/BookmarkButton";
 import UserText from "@/components/UserText";
 import MemberActionsMenu from "@/components/MemberActionsMenu";
 import { useLanguage } from "@/components/LanguageProvider";
+import TimeAgo from "@/components/TimeAgo";
 
 type PostType = "experience" | "question" | "knowledge";
 type Professional = { title: string } | { title: string }[] | null;
@@ -497,7 +498,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                           {t("common.verifiedProfessional")} {getProfessionalTitle(post.profiles)}
                         </span>
                       )}
-                      <time className="text-gray-500" dateTime={post.created_at}>{formatDate(post.created_at)}</time>
+                        <TimeAgo className="text-gray-500" date={post.created_at} />
                     </span>
                     {post.author_id !== userId && (
                       <MemberActionsMenu
@@ -571,9 +572,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                           {comment.author_id === post.author_id && <Badge variant="sky">{t("read.author")}</Badge>}
                         </p>
                         <div className="flex items-center gap-1">
-                          <time className="text-xs text-gray-500" dateTime={comment.created_at}>
-                            {formatDate(comment.created_at)}
-                          </time>
+                          <TimeAgo className="text-xs text-gray-500" date={comment.created_at} />
                           {comment.author_id !== userId && (
                             <MemberActionsMenu
                               memberId={comment.author_id}

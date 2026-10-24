@@ -16,6 +16,7 @@ import Button from "@/components/ui/Button";
 import PostSkeleton from "@/components/ui/PostSkeleton";
 import BookmarkButton from "@/components/ui/BookmarkButton";
 import { useLanguage } from "@/components/LanguageProvider";
+import TimeAgo from "@/components/TimeAgo";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -414,13 +415,7 @@ export default function FeedPage() {
                   </Badge>
                   <ProvenanceBadge provenance={post.provenance} sources={post.sources} short />
                 </div>
-                <time className="text-sm text-gray-500" dateTime={post.created_at}>
-                  {new Date(post.created_at).toLocaleDateString(undefined, {
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </time>
+                <TimeAgo className="text-sm text-gray-500" date={post.created_at} />
               </div>
 
               <div className="space-y-2">

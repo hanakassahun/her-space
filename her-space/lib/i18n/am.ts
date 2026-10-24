@@ -369,6 +369,7 @@ const am: Record<TranslationKey, string> = {
   "common.body": "ይዘት",
   "common.email": "ኢሜይል",
   "common.password": "የይለፍ ቃል",
+  "time.justNow": "አሁን",
   "common.add": "ጨምሪ",
   "common.send": "ላኪ",
   "common.report": "ሪፖርት አድርጊ",

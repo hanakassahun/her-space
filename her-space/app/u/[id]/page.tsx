@@ -15,6 +15,7 @@ import Input from "@/components/ui/Input";
 import UserText from "@/components/UserText";
 import MemberActionsMenu from "@/components/MemberActionsMenu";
 import { useLanguage } from "@/components/LanguageProvider";
+import TimeAgo from "@/components/TimeAgo";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -345,9 +346,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                 <Badge variant={typeVariants[post.type]}>
                   {t(typeTranslationKeys[post.type])}
                 </Badge>
-                <time className="text-sm text-gray-500" dateTime={post.created_at}>
-                  {formatDate(post.created_at)}
-                </time>
+                <TimeAgo className="text-sm text-gray-500" date={post.created_at} />
               </div>
               {editingPostId === post.id ? (
                 <form className="space-y-3" onSubmit={(event) => savePostEdit(event, post)}>

@@ -363,6 +363,7 @@ const en = {
   "common.body": "Body",
   "common.email": "Email",
   "common.password": "Password",
+  "time.justNow": "just now",
   "common.add": "Add",
   "common.send": "Send",
   "common.report": "Report",

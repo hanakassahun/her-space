@@ -11,6 +11,7 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import { useLanguage } from "@/components/LanguageProvider";
+import TimeAgo from "@/components/TimeAgo";
 
 type ResourceKind =
   | "clinic"
@@ -207,7 +208,7 @@ export default function ResourcesPage() {
             {resource.notes && <p className="whitespace-pre-wrap text-sm leading-6 text-gray-700">{resource.notes}</p>}
             {resource.last_verified && (
               <p className="border-t border-white/70 pt-3 text-xs text-gray-600">
-                {t("resources.lastVerified")} {formatDate(resource.last_verified)}
+                {t("resources.lastVerified")} <TimeAgo date={resource.last_verified} />
               </p>
             )}
           </Card>

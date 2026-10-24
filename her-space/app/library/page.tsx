@@ -14,6 +14,7 @@ import PostSkeleton from "@/components/ui/PostSkeleton";
 import BookmarkButton from "@/components/ui/BookmarkButton";
 import UserText from "@/components/UserText";
 import { useLanguage } from "@/components/LanguageProvider";
+import TimeAgo from "@/components/TimeAgo";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -221,9 +222,7 @@ export default function LibraryPage() {
                   <Badge variant={typeVariants[post.type]}>
                     {t(typeTranslationKeys[post.type])}
                   </Badge>
-                  <time className="text-sm text-gray-500" dateTime={savedAt}>
-                    {t("library.saved")} {formatDate(savedAt)}
-                  </time>
+                  <TimeAgo className="text-sm text-gray-500" date={savedAt} prefix={t("library.saved")} />
                 </div>
 
                 <div className="space-y-2">
