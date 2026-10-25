@@ -30,6 +30,7 @@ type Post = {
   type: "experience" | "question" | "knowledge";
   provenance: "personal" | "community" | "evidence";
   audience: "all" | "adult";
+  like_count: number;
   sources: string[];
   title: string;
   body: string;
@@ -182,7 +183,7 @@ export default function ExplorePage() {
     let query = supabase
       .from("posts")
       .select(
-        "id, author_id, type, provenance, audience, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))"
+        "id, author_id, type, provenance, audience, like_count, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))"
       )
       .order("created_at", { ascending: false })
       .range(nextPage * PAGE_SIZE, nextPage * PAGE_SIZE + PAGE_SIZE - 1);
@@ -210,25 +211,24 @@ export default function ExplorePage() {
     const postIds = incomingPosts.map((post) => post.id);
     if (postIds.length > 0 && userId) {
       const [likesResult, commentsResult, bookmarksResult] = await Promise.all([
-        supabase.from("likes").select("post_id, user_id").in("post_id", postIds),
+        supabase.from("likes").select("post_id").eq("user_id", userId).in("post_id", postIds),
         supabase.from("comments").select("post_id").in("post_id", postIds),
         supabase.from("bookmarks").select("post_id").eq("user_id", userId).in("post_id", postIds),
       ]);
 
-      if (likesResult.error) setMessage(friendlyError(likesResult.error, t));
-      else {
-        setLikeStates((current) => {
-          const next = reset ? {} : { ...current };
-          for (const post of incomingPosts) next[post.id] = { count: 0, liked: false };
+      setLikeStates((current) => {
+        const next = reset ? {} : { ...current };
+        for (const post of incomingPosts) next[post.id] = { count: post.like_count, liked: false };
+        if (!likesResult.error) {
           for (const like of likesResult.data ?? []) {
             const state = next[like.post_id] ?? { count: 0, liked: false };
-            state.count += 1;
-            if (like.user_id === userId) state.liked = true;
+            state.liked = true;
             next[like.post_id] = state;
           }
-          return next;
-        });
-      }
+        }
+        return next;
+      });
+      if (likesResult.error) setMessage(friendlyError(likesResult.error, t));
       if (!commentsResult.error) {
         setCommentCounts((current) => {
           const counts = reset ? {} : { ...current };

@@ -35,6 +35,7 @@ type Post = {
   type: PostType;
   provenance: "personal" | "community" | "evidence";
   audience: "all" | "adult";
+  like_count: number;
   sources: string[];
   title: string;
   body: string;
@@ -154,7 +155,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       const [postResult, bookmarkResult, likesResult, commentsResult] = await Promise.all([
         supabase
           .from("posts")
-          .select("id, author_id, type, provenance, audience, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+          .select("id, author_id, type, provenance, audience, like_count, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
           .eq("id", id)
           .single(),
         supabase
@@ -163,7 +164,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
           .eq("user_id", currentUserId)
           .eq("post_id", id)
           .maybeSingle(),
-        supabase.from("likes").select("user_id").eq("post_id", id),
+        supabase.from("likes").select("post_id").eq("user_id", currentUserId).in("post_id", [id]),
         supabase
           .from("comments")
           .select("id, author_id, body, created_at, profiles!comments_author_id_fkey(display_name)")
@@ -176,6 +177,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       } else {
         const loadedPost = postResult.data as Post;
         setPost(loadedPost);
+        setLikeCount(loadedPost.like_count);
         if (loadedPost.topics?.length) {
           const overlapTerms = [...new Set(loadedPost.topics.flatMap((topic) => [topic, topic.toLowerCase(), topic.toUpperCase()]))];
           const { data: articleCandidates } = await supabase
@@ -203,8 +205,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       if (likesResult.error) {
         setMessage(friendlyError(likesResult.error, t));
       } else {
-        setLikeCount(likesResult.data.length);
-        setLiked(likesResult.data.some((like) => like.user_id === currentUserId));
+        setLiked((likesResult.data ?? []).some((like) => like.post_id === id));
       }
 
       if (!postResult.error) {
@@ -320,7 +321,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
         ...(post.provenance === "evidence" ? { sources } : {}),
       })
       .eq("id", post.id)
-      .select("id, author_id, type, provenance, audience, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+      .select("id, author_id, type, provenance, audience, like_count, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
       .single();
 
     if (error) {

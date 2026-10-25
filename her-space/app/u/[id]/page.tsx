@@ -36,6 +36,7 @@ type Post = {
   type: "experience" | "question" | "knowledge";
   provenance: "personal" | "community" | "evidence";
   audience: "all" | "adult";
+  like_count: number;
   sources: string[];
   title: string;
   body: string;
@@ -117,7 +118,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
           supabase
             .from("posts")
             .select(
-              "id, author_id, type, provenance, audience, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))"
+              "id, author_id, type, provenance, audience, like_count, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))"
             )
             .eq("author_id", id)
             .order("created_at", { ascending: false }),
@@ -214,7 +215,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
         ...(post.provenance === "evidence" ? { sources } : {}),
       })
       .eq("id", post.id)
-      .select("id, author_id, type, provenance, audience, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+      .select("id, author_id, type, provenance, audience, like_count, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
       .single();
 
     if (error) setMessage(friendlyError(error, t));
@@ -282,7 +283,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                     // Reload posts when unmuted/unblocked
                     supabase
                       .from("posts")
-                      .select("id, author_id, type, provenance, audience, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+                      .select("id, author_id, type, provenance, audience, like_count, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
                       .eq("author_id", id)
                       .order("created_at", { ascending: false })
                       .then(({ data }) => {
@@ -344,6 +345,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                   {t(typeTranslationKeys[post.type])}
                 </Badge>
                 {post.audience === "adult" && <Badge variant="lilac">{t("audience.badge")}</Badge>}
+                <span className="text-xs text-gray-500">{post.like_count} {t("like.likes")}</span>
                 <TimeAgo className="text-sm text-gray-500" date={post.created_at} />
               </div>
               {editingPostId === post.id ? (

@@ -32,6 +32,7 @@ type Post = {
   type: "experience" | "question" | "knowledge";
   provenance: "personal" | "community" | "evidence";
   audience: "all" | "adult";
+  like_count: number;
   sources: string[];
   title: string;
   body: string;
@@ -185,7 +186,7 @@ export default function FeedPage() {
       if (postIds.length > 0) {
         const { data: postsData, error: postsError } = await supabase
           .from("posts")
-          .select("id, author_id, type, provenance, audience, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+          .select("id, author_id, type, provenance, audience, like_count, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
           .in("id", postIds);
         if (postsError) {
           setMessage(friendlyError(postsError, t));
@@ -209,7 +210,7 @@ export default function FeedPage() {
     } else {
       const postsResult = await supabase
         .from("posts")
-        .select("id, author_id, type, provenance, audience, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+        .select("id, author_id, type, provenance, audience, like_count, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
         .order("created_at", { ascending: false })
         .range(from, to);
 
@@ -233,7 +234,9 @@ export default function FeedPage() {
     if (incomingPosts.length > 0) {
       const postIds = incomingPosts.map((post) => post.id);
       const [likesResult, commentsResult, followsResult, bookmarksResult] = await Promise.all([
-        supabase.from("likes").select("post_id, user_id").in("post_id", postIds),
+        currentUserId
+          ? supabase.from("likes").select("post_id").eq("user_id", currentUserId).in("post_id", postIds)
+          : Promise.resolve({ data: [], error: null }),
         supabase.from("comments").select("post_id").in("post_id", postIds),
         currentUserId
           ? supabase.from("follows").select("followee_id").eq("follower_id", currentUserId)
@@ -243,22 +246,21 @@ export default function FeedPage() {
           : Promise.resolve({ data: [], error: null }),
       ]);
 
-      if (likesResult.error) setMessage(friendlyError(likesResult.error, t));
-      else {
-        setLikeStates((current) => {
-          const nextLikes = reset ? {} : { ...current };
-          for (const post of incomingPosts) {
-            nextLikes[post.id] = { count: 0, liked: false };
-          }
+      setLikeStates((current) => {
+        const nextLikes = reset ? {} : { ...current };
+        for (const post of incomingPosts) {
+          nextLikes[post.id] = { count: post.like_count, liked: false };
+        }
+        if (!likesResult.error) {
           for (const like of likesResult.data ?? []) {
             const state = nextLikes[like.post_id] ?? { count: 0, liked: false };
-            state.count += 1;
-            if (currentUserId && like.user_id === currentUserId) state.liked = true;
+            state.liked = true;
             nextLikes[like.post_id] = state;
           }
-          return nextLikes;
-        });
-      }
+        }
+        return nextLikes;
+      });
+      if (likesResult.error) setMessage(friendlyError(likesResult.error, t));
       if (!commentsResult.error) {
         setCommentCounts((current) => {
           const counts = reset ? {} : { ...current };
