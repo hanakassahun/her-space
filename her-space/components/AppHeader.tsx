@@ -10,6 +10,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useLanguage } from "@/components/LanguageProvider";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import BackButton from "@/components/BackButton";
+import NotificationBell from "@/components/NotificationBell";
 
 const AccountMenu = dynamic(() => import("@/components/AccountMenu"), { ssr: false });
 
@@ -78,6 +79,7 @@ export default function AppHeader() {
           <NavIcon icon={navConfig.write.icon} className="h-4 w-4" />
           {t(navConfig.write.label)}
         </Link>
+        <NotificationBell />
         <LanguageSwitcher className="inline-flex" />
         <div className="relative hidden shrink-0 md:block" ref={accountMenuRef}>
           <button

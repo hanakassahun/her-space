@@ -14,6 +14,7 @@ export type NavIconKey =
   | "settings"
   | "rules"
   | "feedback"
+  | "notifications"
   | "more";
 
 export type NavKey =
@@ -29,7 +30,8 @@ export type NavKey =
   | "admin"
   | "settings"
   | "rules"
-  | "feedback";
+  | "feedback"
+  | "notifications";
 
 export type NavItem = {
   label: TranslationKey;
@@ -52,6 +54,7 @@ export const navConfig: Record<NavKey, NavItem> = {
   settings: { label: "nav.settings", href: "/settings", icon: "settings" },
   rules: { label: "nav.rules", href: "/rules", icon: "rules" },
   feedback: { label: "nav.feedback", href: "/feedback", icon: "feedback" },
+  notifications: { label: "notif.title", href: "/notifications", icon: "notifications" },
 };
 
 export const desktopNavOrder: NavKey[] = [
@@ -79,10 +82,10 @@ export const desktopPrimaryNavOrder: NavKey[] = [
   "resources",
 ];
 
-export const desktopAccountNavOrder: NavKey[] = ["profile", "rules", "settings", "feedback", "admin"];
+export const desktopAccountNavOrder: NavKey[] = ["profile", "rules", "settings", "feedback", "notifications", "admin"];
 
 export const mobileNavOrder: NavKey[] = ["home", "explore", "write", "journal"];
-export const moreNavOrder: NavKey[] = ["feed", "learn", "library", "resources", "rules", "feedback", "settings", "profile", "admin"];
+export const moreNavOrder: NavKey[] = ["feed", "learn", "library", "resources", "rules", "feedback", "notifications", "settings", "profile", "admin"];
 
 export function resolveNavHref(key: NavKey, userId: string) {
   return navConfig[key].href.replace("{userId}", userId);

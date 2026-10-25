@@ -44,6 +44,8 @@ export default function NavIcon({ icon, className = "h-5 w-5" }: NavIconProps) {
       return <svg {...common}><path d="M7 3h8l4 4v14H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" /><path d="M14 3v5h5M9 12h6M9 16h6" /></svg>;
     case "feedback":
       return <svg {...common}><path d="M20 2H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h14l4 4V4a2 2 0 0 0-2-2Z" /><path d="M8 10h8M8 14h5" /></svg>;
+    case "notifications":
+      return <svg {...common}><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg>;
     case "more":
       return <svg {...common}><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></svg>;
   }
