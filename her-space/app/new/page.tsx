@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
@@ -18,6 +19,15 @@ import { useAuth } from "@/components/AuthProvider";
 type PostType = "experience" | "question" | "knowledge";
 type Provenance = "personal" | "community" | "evidence";
 type AgeGroup = "teen" | "adult";
+type QuotedSource = {
+  id: string;
+  title: string;
+  body: string;
+  type: PostType;
+  provenance: Provenance;
+  allow_reposts: boolean;
+  profiles: { display_name: string | null } | { display_name: string | null }[] | null;
+};
 
 function defaultAllowReposts(postType: PostType, postProvenance: Provenance) {
   return postType === "knowledge" || postProvenance === "evidence";
@@ -64,6 +74,10 @@ function hasDraftContent(draft: Draft) {
   );
 }
 
+function draftStorageKey(userId: string, quoteId: string | null) {
+  return quoteId ? `draft:${userId}:quote:${quoteId}` : `draft:${userId}`;
+}
+
 export default function NewPostPage() {
   const { t } = useLanguage();
   const { user, loading: authLoading } = useAuth();
@@ -87,13 +101,17 @@ export default function NewPostPage() {
   const [preview, setPreview] = useState(false);
   const [message, setMessage] = useState("");
   const [published, setPublished] = useState(false);
+  const [quoteId, setQuoteId] = useState<string | null>(null);
+  const [quotedPost, setQuotedPost] = useState<QuotedSource | null>(null);
+  const [quoteChecked, setQuoteChecked] = useState(false);
+  const [quoteUnavailable, setQuoteUnavailable] = useState(false);
   const [loading, setLoading] = useState(false);
   const userIdRef = useRef<string | null>(null);
   const ageGroup = ageSetting?.userId === currentUserId ? ageSetting.ageGroup : null;
 
-  function clearDraftFor(id: string) {
+  function clearDraftFor(id: string, draftQuoteId: string | null = null) {
     try {
-      window.localStorage.removeItem(`draft:${id}`);
+      window.localStorage.removeItem(draftStorageKey(id, draftQuoteId));
     } catch {
       // Ignore local storage errors.
     }
@@ -105,8 +123,32 @@ export default function NewPostPage() {
     async function restoreUserDraft() {
       if (authLoading) return;
       if (!active) return;
+      const requestedQuoteId = new URLSearchParams(window.location.search).get("quote");
+      setQuoteId(requestedQuoteId);
+      setQuoteUnavailable(false);
+      let sourcePost: QuotedSource | null = null;
+      if (requestedQuoteId) {
+        const { data, error } = await supabase
+          .from("posts")
+          .select("id, title, body, type, provenance, allow_reposts, profiles!posts_author_id_fkey(display_name)")
+          .eq("id", requestedQuoteId)
+          .maybeSingle();
+        if (!active) return;
+        if (error || !data || !data.allow_reposts) {
+          setQuotedPost(null);
+          setQuoteUnavailable(true);
+          setQuoteChecked(true);
+          setDraftReady(true);
+          return;
+        }
+        sourcePost = data as QuotedSource;
+        setQuotedPost(sourcePost);
+      } else {
+        setQuotedPost(null);
+      }
+      setQuoteChecked(true);
       const previousUserId = userIdRef.current;
-      if (previousUserId && !currentUserId) clearDraftFor(previousUserId);
+      if (previousUserId && !currentUserId) clearDraftFor(previousUserId, requestedQuoteId);
       userIdRef.current = currentUserId;
       setUserId(currentUserId);
       setAdultsOnly(false);
@@ -132,7 +174,7 @@ export default function NewPostPage() {
       let restored = false;
       if (currentUserId) {
         try {
-          const stored = window.localStorage.getItem(`draft:${currentUserId}`);
+          const stored = window.localStorage.getItem(draftStorageKey(currentUserId, requestedQuoteId));
           if (stored) {
             const draft = JSON.parse(stored) as Draft;
             if (draft && hasDraftContent(draft)) {
@@ -155,11 +197,19 @@ export default function NewPostPage() {
       }
 
       if (!restored) {
-        const query = new URLSearchParams(window.location.search);
-        const sharedTitle = query.get("title");
-        const sharedTopics = query.get("topics");
-        if (sharedTitle) setTitle(sharedTitle);
-        if (sharedTopics) setExtraTopics(sharedTopics);
+        if (sourcePost) {
+          const titlePrefix = `${t("quote.titlePrefix")} `;
+          const originalTitle = sourcePost.title.trim();
+          setTitle(`${titlePrefix}${originalTitle.slice(0, Math.max(0, 150 - titlePrefix.length))}`);
+          setBody("");
+          setExtraTopics("");
+        } else {
+          const query = new URLSearchParams(window.location.search);
+          const sharedTitle = query.get("title");
+          const sharedTopics = query.get("topics");
+          if (sharedTitle) setTitle(sharedTitle);
+          if (sharedTopics) setExtraTopics(sharedTopics);
+        }
       }
       setDraftReady(true);
     }
@@ -175,7 +225,7 @@ export default function NewPostPage() {
     const draft: Draft = { title, body, type, provenance, topics, extraTopics, sources, sensitive };
     const timeout = window.setTimeout(() => {
       try {
-        const key = `draft:${userId}`;
+        const key = draftStorageKey(userId, quoteId);
         if (hasDraftContent(draft)) window.localStorage.setItem(key, JSON.stringify(draft));
         else window.localStorage.removeItem(key);
       } catch {
@@ -183,10 +233,10 @@ export default function NewPostPage() {
       }
     }, 800);
     return () => window.clearTimeout(timeout);
-  }, [body, draftReady, extraTopics, provenance, sensitive, sources, title, topics, type, userId]);
+  }, [body, draftReady, extraTopics, provenance, quoteId, sensitive, sources, title, topics, type, userId]);
 
   function discardDraft() {
-    if (userId) clearDraftFor(userId);
+    if (userId) clearDraftFor(userId, quoteId);
     setDraftRestored(false);
     setTitle("");
     setBody("");
@@ -251,6 +301,7 @@ export default function NewPostPage() {
       sensitive,
       audience: ageGroup === "adult" && adultsOnly ? "adult" : "all",
       allow_reposts: allowReposts && !sensitive && !adultsOnly,
+      ...(quoteId ? { quoted_post_id: quoteId } : {}),
     });
 
     if (error) {
@@ -260,12 +311,46 @@ export default function NewPostPage() {
     }
 
     setDraftReady(false);
-    clearDraftFor(currentUserId);
+    clearDraftFor(currentUserId, quoteId);
     setDraftRestored(false);
     setPublished(true);
     setMessage(t("new.published"));
     await new Promise((resolve) => window.setTimeout(resolve, 600));
     router.push("/feed");
+  }
+
+  const quoteProfile = quotedPost
+    ? Array.isArray(quotedPost.profiles) ? quotedPost.profiles[0] : quotedPost.profiles
+    : null;
+  const visibleStarterKeys: readonly TranslationKey[] = quotedPost
+    ? ["quote.starter1", "quote.starter2", "quote.starter3"]
+    : starterKeys[type];
+
+  if (!quoteChecked) {
+    return (
+      <PageShell className="max-w-3xl space-y-6">
+        <Card as="div" className="space-y-4" aria-busy="true">
+          <div className="h-7 w-2/3 animate-pulse rounded bg-soft-lilac/60" />
+          <div className="h-24 animate-pulse rounded-xl bg-soft-lilac/40" />
+        </Card>
+      </PageShell>
+    );
+  }
+
+  if (quoteUnavailable) {
+    return (
+      <PageShell className="max-w-3xl px-4 py-6 md:px-6 md:py-10">
+        <Card className="space-y-4">
+          <p className="break-words text-gray-700">{t("quote.unavailable")}</p>
+          <Link
+            className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#CDBDEB] bg-white px-5 py-2 text-sm font-semibold text-deep-plum shadow-sm transition-colors hover:bg-soft-lilac/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
+            href="/feed"
+          >
+            {t("empty.browseFeed")}
+          </Link>
+        </Card>
+      </PageShell>
+    );
   }
 
   return (
@@ -285,6 +370,14 @@ export default function NewPostPage() {
         )}
 
         <form className="space-y-5" onSubmit={handleSubmit}>
+          {quotedPost && (
+            <div className="space-y-2 rounded-xl border border-soft-lilac/70 bg-white/70 p-4">
+              <h2 className="text-xs font-semibold text-gray-600">{t("quote.heading")}</h2>
+              <p className="break-words text-sm font-medium text-deep-plum">{quoteProfile?.display_name || "Her Space member"}</p>
+              <p className="line-clamp-2 break-words font-semibold text-gray-900">{quotedPost.title}</p>
+              <p className="line-clamp-4 break-words text-sm leading-6 text-gray-700">{quotedPost.body}</p>
+            </div>
+          )}
           {preview ? (
             <PostPreview
               type={type}
@@ -350,7 +443,7 @@ export default function NewPostPage() {
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-deep-plum">{t("write.starters")}</p>
                   <div className="hide-scrollbar flex snap-x gap-2 overflow-x-auto pb-1 pr-3">
-                    {starterKeys[type].map((key) => (
+                    {visibleStarterKeys.map((key) => (
                       <Button key={key} variant="secondary" type="button" className="shrink-0 snap-start whitespace-nowrap px-3 text-xs" onClick={() => addStarter(t(key))}>
                         {t(key)}
                       </Button>
@@ -365,7 +458,7 @@ export default function NewPostPage() {
                   className="min-h-40 resize-y"
                   rows={6}
                   maxLength={5000}
-                  placeholder={t("write.bodyPlaceholder")}
+                  placeholder={t(quotedPost ? "quote.bodyPlaceholder" : "write.bodyPlaceholder")}
                   value={body}
                   onChange={(event) => setBody(event.target.value)}
                   required

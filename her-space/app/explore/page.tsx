@@ -19,6 +19,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import TimeAgo from "@/components/TimeAgo";
 import { useAuth } from "@/components/AuthProvider";
 import RepostButton from "@/components/RepostButton";
+import QuotedPostCard from "@/components/QuotedPostCard";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -33,6 +34,8 @@ type Post = {
   audience: "all" | "adult";
   like_count: number;
   allow_reposts: boolean;
+  quoted_post_id: string | null;
+  quoted: { id: string; title: string; body: string; profiles: { display_name: string | null } | { display_name: string | null }[] | null } | { id: string; title: string; body: string; profiles: { display_name: string | null } | { display_name: string | null }[] | null }[] | null;
   sources: string[];
   title: string;
   body: string;
@@ -186,7 +189,7 @@ export default function ExplorePage() {
     let query = supabase
       .from("posts")
       .select(
-        "id, author_id, type, provenance, audience, like_count, allow_reposts, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))"
+        "id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, quoted:posts!posts_quoted_post_id_fkey(id, title, body, profiles!posts_author_id_fkey(display_name)), sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))"
       )
       .order("created_at", { ascending: false })
       .range(nextPage * PAGE_SIZE, nextPage * PAGE_SIZE + PAGE_SIZE - 1);
@@ -468,6 +471,7 @@ export default function ExplorePage() {
                   <h2 className="text-xl font-semibold text-gray-900">
                     <Link href={`/post/${post.id}`} onClick={saveScrollForPost}>{post.title}</Link>
                   </h2>
+                  <QuotedPostCard quotedPostId={post.quoted_post_id} quoted={post.quoted} />
                   {post.sensitive && !revealedPostIds[post.id] ? (
                     <div className="space-y-3 rounded-2xl border border-rose-200 bg-rose-50/70 p-4" role="note">
                       <p className="text-sm text-rose-950">{t("read.sensitiveWarning")}</p>

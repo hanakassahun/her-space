@@ -13,7 +13,7 @@ import PostSkeleton from "@/components/ui/PostSkeleton";
 import { friendlyError } from "@/lib/errors";
 import { supabase } from "@/lib/supabase";
 
-type NotificationKind = "comment" | "follow" | "repost";
+type NotificationKind = "comment" | "follow" | "repost" | "quote";
 type NotificationRow = {
   id: string;
   actor_id: string | null;
@@ -30,6 +30,7 @@ const actionKeys = {
   comment: "notif.comment",
   follow: "notif.follow",
   repost: "notif.repost",
+  quote: "notif.quote",
 } as const;
 
 function first<T>(value: T | T[] | null) {

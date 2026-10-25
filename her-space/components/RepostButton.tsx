@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { useLanguage } from "@/components/LanguageProvider";
 import { friendlyError } from "@/lib/errors";
@@ -16,12 +17,15 @@ type RepostButtonProps = {
 export default function RepostButton({ postId, authorId, allowReposts, initiallyShared }: RepostButtonProps) {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const router = useRouter();
   const [shared, setShared] = useState(initiallyShared);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [hasError, setHasError] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const inFlight = useRef(false);
   const messageTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const menuRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     setShared(initiallyShared);
@@ -30,6 +34,22 @@ export default function RepostButton({ postId, authorId, allowReposts, initially
   useEffect(() => () => {
     if (messageTimeout.current) clearTimeout(messageTimeout.current);
   }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function closeMenu(event: PointerEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    }
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setMenuOpen(false);
+    }
+    document.addEventListener("pointerdown", closeMenu);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeMenu);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [menuOpen]);
 
   if (!user || !allowReposts || authorId === user.id) return null;
 
@@ -64,23 +84,51 @@ export default function RepostButton({ postId, authorId, allowReposts, initially
     }
   }
 
-  const label = t(shared ? "repost.undo" : "repost.button");
+  const label = t("quote.menu");
 
   return (
-    <span className="inline-flex min-w-11 items-center gap-1">
+    <span className="relative inline-flex min-w-11 items-center gap-1" ref={menuRef}>
       <button
         className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition hover:bg-soft-lilac/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle disabled:opacity-50 ${shared ? "text-deep-plum" : "text-gray-600"}`}
         type="button"
         disabled={busy}
         aria-label={label}
         title={label}
-        aria-pressed={shared}
-        onClick={() => void toggleRepost()}
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+        onClick={() => setMenuOpen((open) => !open)}
       >
         <svg className="h-5 w-5" viewBox="0 0 24 24" fill={shared ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M16 3l5 5h-4v3h-2V8H6v3H4V6h12zM8 21l-5-5h4v-3h2v3h9v-3h2v5H8z" />
         </svg>
       </button>
+      {menuOpen && (
+        <div className="absolute bottom-full right-0 z-50 mb-2 min-w-56 rounded-xl border border-[#CDBDEB] bg-white p-1.5 shadow-lg" role="menu">
+          <button
+            className="flex min-h-11 w-full items-center rounded-lg px-3 py-2 text-left text-sm font-medium text-deep-plum hover:bg-soft-lilac/30 disabled:opacity-50"
+            type="button"
+            role="menuitem"
+            disabled={busy}
+            onClick={() => {
+              setMenuOpen(false);
+              void toggleRepost();
+            }}
+          >
+            {t(shared ? "repost.undo" : "quote.shareOnly")}
+          </button>
+          <button
+            className="flex min-h-11 w-full items-center rounded-lg px-3 py-2 text-left text-sm font-medium text-deep-plum hover:bg-soft-lilac/30"
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setMenuOpen(false);
+              router.push(`/new?quote=${encodeURIComponent(postId)}`);
+            }}
+          >
+            {t("quote.button")}
+          </button>
+        </div>
+      )}
       {message && <span className={`max-w-40 break-words text-xs ${hasError ? "text-red-700" : "text-emerald-800"}`} role={hasError ? "alert" : "status"}>{message}</span>}
     </span>
   );

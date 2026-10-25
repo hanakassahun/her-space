@@ -20,6 +20,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import TimeAgo from "@/components/TimeAgo";
 import { useAuth } from "@/components/AuthProvider";
 import RepostButton from "@/components/RepostButton";
+import QuotedPostCard from "@/components/QuotedPostCard";
 
 const MemberActionsMenu = dynamic(() => import("@/components/MemberActionsMenu"), { ssr: false });
 
@@ -38,6 +39,8 @@ type Post = {
   audience: "all" | "adult";
   like_count: number;
   allow_reposts: boolean;
+  quoted_post_id: string | null;
+  quoted: { id: string; title: string; body: string; profiles: { display_name: string | null } | { display_name: string | null }[] | null } | { id: string; title: string; body: string; profiles: { display_name: string | null } | { display_name: string | null }[] | null }[] | null;
   sources: string[];
   title: string;
   body: string;
@@ -159,7 +162,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       const [postResult, bookmarkResult, likesResult, commentsResult, repostsResult] = await Promise.all([
         supabase
           .from("posts")
-          .select("id, author_id, type, provenance, audience, like_count, allow_reposts, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+          .select("id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, quoted:posts!posts_quoted_post_id_fkey(id, title, body, profiles!posts_author_id_fkey(display_name)), sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
           .eq("id", id)
           .single(),
         supabase
@@ -330,7 +333,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
         allow_reposts: editAllowReposts && !post.sensitive && post.audience !== "adult",
       })
       .eq("id", post.id)
-      .select("id, author_id, type, provenance, audience, like_count, allow_reposts, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+      .select("id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, quoted:posts!posts_quoted_post_id_fkey(id, title, body, profiles!posts_author_id_fkey(display_name)), sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
       .single();
 
     if (error) {
@@ -515,6 +518,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
               ) : (
                 <div className="space-y-4">
                   <h1 className="break-words text-2xl font-bold text-gray-900">{post.title}</h1>
+                  <QuotedPostCard quotedPostId={post.quoted_post_id} quoted={post.quoted} />
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant={typeVariants[post.type]}>{t(typeTranslationKeys[post.type])}</Badge>
                     {post.audience === "adult" && <Badge variant="lilac">{t("audience.badge")}</Badge>}
