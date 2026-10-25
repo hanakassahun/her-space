@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
+import FriendlyErrorMessage from "@/components/FriendlyErrorMessage";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -441,10 +442,12 @@ export default function JournalPage() {
           </label>
 
           {message && (
-            <p className="inline-flex items-center gap-2 text-sm text-deep-plum" role="status">
-              {saveSucceeded && <SuccessCheck />}
-              {message}
-            </p>
+            <div className="text-sm text-deep-plum" role="status">
+              <div className="flex items-center gap-2">
+                {saveSucceeded && <SuccessCheck />}
+                <FriendlyErrorMessage message={message} />
+              </div>
+            </div>
           )}
           <Button className="w-full" type="submit" disabled={saving || loading}>
             {saving ? t("journal.saving") : editingPastDate ? t("journal.saveChanges") : t("journal.saveToday")}

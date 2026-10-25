@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
+import FriendlyErrorMessage from "@/components/FriendlyErrorMessage";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
 import LikeButton from "@/components/LikeButton";
 import PageShell from "@/components/ui/PageShell";
@@ -465,7 +466,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
             </Button>
           </Card>
         )}
-        {message && post && <Card className="text-red-700">{message}</Card>}
+        {message && post && <Card className="text-red-700"><FriendlyErrorMessage message={message} /></Card>}
 
         {post && (
           <>

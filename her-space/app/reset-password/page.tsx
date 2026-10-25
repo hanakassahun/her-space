@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
+import FriendlyErrorMessage from "@/components/FriendlyErrorMessage";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -96,7 +97,7 @@ export default function ResetPasswordPage() {
                 required
               />
             </label>
-            {message && <p className="text-sm text-red-700" role="alert">{message}</p>}
+            {message && <p className="text-sm text-red-700" role="alert"><FriendlyErrorMessage message={message} /></p>}
             <Button className="w-full" type="submit" disabled={saving || password.length < 8 || password !== confirmPassword}>
               {saving ? t("reset.saving") : t("reset.update")}
             </Button>

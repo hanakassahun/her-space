@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
+import FriendlyErrorMessage from "@/components/FriendlyErrorMessage";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
@@ -192,7 +193,7 @@ export default function SettingsPage() {
             {t("settings.interestsReset")}
           </Button>
         </div>
-        {interestMessage && <p className="break-words text-sm text-gray-700" role="status">{interestMessage}</p>}
+        {interestMessage && <p className="break-words text-sm text-gray-700" role="status"><FriendlyErrorMessage message={interestMessage} /></p>}
         <div className="border-t border-soft-lilac/70 pt-4">
           <h3 className="font-semibold text-deep-plum">{t("settings.ageGroup")}</h3>
           {ageGroup && <p className="mt-1 text-sm text-gray-700">{t(ageGroup === "teen" ? "onb.age13" : "onb.age18")}</p>}
@@ -285,7 +286,7 @@ export default function SettingsPage() {
             placeholder="DELETE"
           />
         </label>
-        {message && <p className="text-sm font-medium text-red-800" role="alert">{message}</p>}
+        {message && <p className="text-sm font-medium text-red-800" role="alert"><FriendlyErrorMessage message={message} /></p>}
         <Button
           className="bg-rose-800 text-white shadow-none"
           type="button"

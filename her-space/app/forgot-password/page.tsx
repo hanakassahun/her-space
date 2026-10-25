@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
+import FriendlyErrorMessage from "@/components/FriendlyErrorMessage";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -59,7 +60,7 @@ export default function ForgotPasswordPage() {
             {t("forgot.genericConfirmation")}
           </p>
         )}
-        {message && <p className="text-sm text-red-700" role="alert">{message}</p>}
+        {message && <p className="text-sm text-red-700" role="alert"><FriendlyErrorMessage message={message} /></p>}
         <Link className="text-sm font-medium text-deep-plum underline" href="/login">
           {t("forgot.backToLogin")}
         </Link>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { useLanguage } from "@/components/LanguageProvider";
 import { friendlyError } from "@/lib/errors";
+import FriendlyErrorMessage from "@/components/FriendlyErrorMessage";
 import { supabase } from "@/lib/supabase";
 
 type RepostButtonProps = {
@@ -129,7 +130,7 @@ export default function RepostButton({ postId, authorId, allowReposts, initially
           </button>
         </div>
       )}
-      {message && <span className={`max-w-40 break-words text-xs ${hasError ? "text-red-700" : "text-emerald-800"}`} role={hasError ? "alert" : "status"}>{message}</span>}
+      {message && <span className={`max-w-40 break-words text-xs ${hasError ? "text-red-700" : "text-emerald-800"}`} role={hasError ? "alert" : "status"}><FriendlyErrorMessage message={message} /></span>}
     </span>
   );
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
+import FriendlyErrorMessage from "@/components/FriendlyErrorMessage";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -62,7 +63,7 @@ export default function LoginPage() {
         >
           {t("login.forgot")}
         </Link>
-        {message && <p className="text-red-700">{message}</p>}
+        {message && <p className="text-red-700"><FriendlyErrorMessage message={message} /></p>}
         <p className="text-deep-plum">
           {t("login.newHere")} {" "}
           <a className="underline" href="/signup">

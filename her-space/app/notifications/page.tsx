@@ -11,6 +11,7 @@ import Card from "@/components/ui/Card";
 import PageShell from "@/components/ui/PageShell";
 import PostSkeleton from "@/components/ui/PostSkeleton";
 import { friendlyError } from "@/lib/errors";
+import FriendlyErrorMessage from "@/components/FriendlyErrorMessage";
 import { supabase } from "@/lib/supabase";
 
 type NotificationKind = "comment" | "follow" | "repost" | "quote";
@@ -197,7 +198,7 @@ export default function NotificationsPage() {
         )}
       </header>
 
-      {message && <Card className="break-words text-red-700" role="alert">{message}</Card>}
+      {message && <Card className="break-words text-red-700" role="alert"><FriendlyErrorMessage message={message} /></Card>}
       {loading && <div className="space-y-3">{[0, 1, 2].map((index) => <PostSkeleton key={index} />)}</div>}
       {!loading && !message && notifications.length === 0 && !hasMore && (
         <Card className="space-y-4 text-center">

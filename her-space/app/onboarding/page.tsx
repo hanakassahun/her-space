@@ -10,6 +10,7 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import PageShell from "@/components/ui/PageShell";
 import { friendlyError } from "@/lib/errors";
+import FriendlyErrorMessage from "@/components/FriendlyErrorMessage";
 import { cacheOnboarded } from "@/lib/onboarding";
 import { supabase } from "@/lib/supabase";
 
@@ -202,7 +203,7 @@ export default function OnboardingPage() {
                 <Button type="button" onClick={() => router.replace("/")}>{t("onb.start")}</Button>
               </section>
             )}
-            {message && <p className="break-words text-sm text-red-700" role="alert">{message}</p>}
+            {message && <p className="break-words text-sm text-red-700" role="alert"><FriendlyErrorMessage message={message} /></p>}
           </>
         )}
       </Card>

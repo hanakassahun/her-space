@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
+import FriendlyErrorMessage from "@/components/FriendlyErrorMessage";
 import { navConfig } from "@/lib/nav";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
 import LikeButton from "@/components/LikeButton";
@@ -472,7 +473,7 @@ export default function FeedPage() {
         </nav>
 
         {loading && <div className="space-y-4">{[0, 1, 2].map((index) => <PostSkeleton key={index} />)}</div>}
-        {message && <Card className="text-red-700">{message}</Card>}
+        {message && <Card className="text-red-700"><FriendlyErrorMessage message={message} /></Card>}
         {activeTab === "forYou" && page === 0 && !loading && !message && posts.length > 0 && <SuggestedMembers />}
         {!loading && !message && visiblePosts.length === 0 && (
           <Card className="space-y-3 text-gray-700">

@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
+import FriendlyErrorMessage from "@/components/FriendlyErrorMessage";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
@@ -93,7 +94,7 @@ export default function LearnArticlePage({ params }: { params: Promise<{ slug: s
   return (
     <PageShell className="max-w-3xl space-y-6 px-4 py-6 md:px-6 md:py-10">
       {loading && <p className="text-gray-700">Loading article...</p>}
-      {message && <Card className="text-red-700">{message}</Card>}
+      {message && <Card className="text-red-700"><FriendlyErrorMessage message={message} /></Card>}
 
       {article && (
         <>

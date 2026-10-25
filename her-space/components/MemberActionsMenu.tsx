@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
+import FriendlyErrorMessage from "@/components/FriendlyErrorMessage";
 import Button from "@/components/ui/Button";
 import { useLanguage } from "@/components/LanguageProvider";
 
@@ -153,14 +154,14 @@ export default function MemberActionsMenu({ memberId, onChanged }: Props) {
                 </Button>
               </div>
               {resultMsg && (
-                <p className="text-sm text-red-700" role="alert">{resultMsg}</p>
+                <p className="text-sm text-red-700" role="alert"><FriendlyErrorMessage message={resultMsg} /></p>
               )}
             </div>
           ) : (
             <div className="py-2">
               {resultMsg ? (
                 <div className="space-y-2 px-4 py-3">
-                  <p className="text-sm text-gray-800">{resultMsg}</p>
+                  <p className="text-sm text-gray-800"><FriendlyErrorMessage message={resultMsg} /></p>
                   {showReportHint && (
                     <p className="text-xs text-gray-600">{t("safety.reportHint")}</p>
                   )}

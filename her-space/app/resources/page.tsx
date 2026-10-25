@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
+import FriendlyErrorMessage from "@/components/FriendlyErrorMessage";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
@@ -167,7 +168,7 @@ export default function ResourcesPage() {
       </p>
 
       {loading && <p className="text-gray-700">{t("resources.loading")}</p>}
-      {message && <Card className="text-deep-plum" role="status">{message}</Card>}
+      {message && <Card className="text-deep-plum" role="status"><FriendlyErrorMessage message={message} /></Card>}
       {!loading && !message && filteredResources.length === 0 && (
         <Card className="text-gray-700">{t("resources.noResults")}</Card>
       )}

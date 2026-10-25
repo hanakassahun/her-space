@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
+import FriendlyErrorMessage from "@/components/FriendlyErrorMessage";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -163,7 +164,7 @@ export default function FeedbackPage() {
             🔒 {t("feedback.privacy")}
           </p>
 
-          {error && <p className="text-sm text-red-700" role="alert">{error}</p>}
+          {error && <p className="text-sm text-red-700" role="alert"><FriendlyErrorMessage message={error} /></p>}
 
           <Button
             type="submit"

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
+import FriendlyErrorMessage from "@/components/FriendlyErrorMessage";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
@@ -126,7 +127,7 @@ export default function LearnPage() {
       </nav>
 
       {loading && <div className="space-y-4">{[0, 1, 2].map((index) => <PostSkeleton key={index} />)}</div>}
-      {message && <Card className="text-red-700">{message}</Card>}
+      {message && <Card className="text-red-700"><FriendlyErrorMessage message={message} /></Card>}
       {!loading && !message && filteredArticles.length === 0 && (
         <Card className="text-gray-700">{t("learn.noResults")}</Card>
       )}

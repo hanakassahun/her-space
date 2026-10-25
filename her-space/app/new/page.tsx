@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
+import FriendlyErrorMessage from "@/components/FriendlyErrorMessage";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -633,10 +634,12 @@ export default function NewPostPage() {
           )}
 
           {message && (
-            <p className={`inline-flex items-center gap-2 break-words text-sm ${published ? "text-emerald-800" : "text-red-600"}`} role="status">
-              {published && <SuccessCheck />}
-              {message}
-            </p>
+            <div className={`break-words text-sm ${published ? "text-emerald-800" : "text-red-600"}`} role="status">
+              <div className="flex items-center gap-2">
+                {published && <SuccessCheck />}
+                <FriendlyErrorMessage message={message} />
+              </div>
+            </div>
           )}
           <div className="flex flex-wrap gap-3">
             {!preview && (

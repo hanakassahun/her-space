@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
+import FriendlyErrorMessage from "@/components/FriendlyErrorMessage";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
 import LikeButton from "@/components/LikeButton";
 import PostBody from "@/components/PostBody";
@@ -440,7 +441,7 @@ export default function ExplorePage() {
         </div>
 
         {loading && <div className="space-y-4">{[0, 1, 2].map((index) => <PostSkeleton key={index} />)}</div>}
-        {message && <Card className="text-red-700">{message}</Card>}
+        {message && <Card className="text-red-700"><FriendlyErrorMessage message={message} /></Card>}
         {!loading && !message && posts.length === 0 && (
           <Card className="text-gray-700">{t("explore.noResults")}</Card>
         )}

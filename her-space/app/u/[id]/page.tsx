@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
+import FriendlyErrorMessage from "@/components/FriendlyErrorMessage";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
@@ -389,7 +390,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
         )}
 
         {loading && <p className="text-gray-700">{t("status.loadingProfile")}</p>}
-        {message && <Card className="text-red-700">{message}</Card>}
+        {message && <Card className="text-red-700"><FriendlyErrorMessage message={message} /></Card>}
         {!loading && !profile && !message && (
           <Card className="text-gray-700">{t("status.profileNotFound")}</Card>
         )}
