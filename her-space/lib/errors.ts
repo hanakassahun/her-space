@@ -3,6 +3,7 @@ import type { TranslationKey } from "@/lib/i18n/en";
 type Translator = (key: TranslationKey) => string;
 
 export function friendlyError(error: unknown, t: Translator): string {
+  console.error("[Her Space]", error);
   const message =
     error && typeof error === "object" && "message" in error && typeof error.message === "string"
       ? error.message.toLowerCase()
