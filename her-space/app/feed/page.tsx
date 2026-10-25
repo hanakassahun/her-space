@@ -19,6 +19,7 @@ import BookmarkButton from "@/components/ui/BookmarkButton";
 import { useLanguage } from "@/components/LanguageProvider";
 import TimeAgo from "@/components/TimeAgo";
 import { useAuth } from "@/components/AuthProvider";
+import RepostButton from "@/components/RepostButton";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -33,6 +34,7 @@ type Post = {
   provenance: "personal" | "community" | "evidence";
   audience: "all" | "adult";
   like_count: number;
+  allow_reposts: boolean;
   sources: string[];
   title: string;
   body: string;
@@ -107,6 +109,7 @@ export default function FeedPage() {
   const [reasonsByPostId, setReasonsByPostId] = useState<Record<string, RecommendationReason>>({});
   const [followingIds, setFollowingIds] = useState<string[]>([]);
   const [likeStates, setLikeStates] = useState<Record<string, LikeState>>({});
+  const [repostedIds, setRepostedIds] = useState<Record<string, boolean>>({});
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [savedPostIds, setSavedPostIds] = useState<Record<string, boolean>>({});
   const [savingPostIds, setSavingPostIds] = useState<Record<string, boolean>>({});
@@ -186,7 +189,7 @@ export default function FeedPage() {
       if (postIds.length > 0) {
         const { data: postsData, error: postsError } = await supabase
           .from("posts")
-          .select("id, author_id, type, provenance, audience, like_count, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+          .select("id, author_id, type, provenance, audience, like_count, allow_reposts, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
           .in("id", postIds);
         if (postsError) {
           setMessage(friendlyError(postsError, t));
@@ -210,7 +213,7 @@ export default function FeedPage() {
     } else {
       const postsResult = await supabase
         .from("posts")
-        .select("id, author_id, type, provenance, audience, like_count, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+        .select("id, author_id, type, provenance, audience, like_count, allow_reposts, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
         .order("created_at", { ascending: false })
         .range(from, to);
 
@@ -233,7 +236,7 @@ export default function FeedPage() {
 
     if (incomingPosts.length > 0) {
       const postIds = incomingPosts.map((post) => post.id);
-      const [likesResult, commentsResult, followsResult, bookmarksResult] = await Promise.all([
+      const [likesResult, commentsResult, followsResult, bookmarksResult, repostsResult] = await Promise.all([
         currentUserId
           ? supabase.from("likes").select("post_id").eq("user_id", currentUserId).in("post_id", postIds)
           : Promise.resolve({ data: [], error: null }),
@@ -243,6 +246,9 @@ export default function FeedPage() {
           : Promise.resolve({ data: [], error: null }),
         currentUserId
           ? supabase.from("bookmarks").select("post_id").eq("user_id", currentUserId).in("post_id", postIds)
+          : Promise.resolve({ data: [], error: null }),
+        currentUserId
+          ? supabase.from("reposts").select("post_id").eq("user_id", currentUserId).in("post_id", postIds)
           : Promise.resolve({ data: [], error: null }),
       ]);
 
@@ -284,12 +290,26 @@ export default function FeedPage() {
             return saved;
           });
         }
+        if (repostsResult.error) setMessage(friendlyError(repostsResult.error, t));
+        else {
+          setRepostedIds((current) => {
+            const shared = reset ? {} : { ...current };
+            for (const post of incomingPosts) shared[post.id] = false;
+            for (const repost of repostsResult.data ?? []) shared[repost.post_id] = true;
+            return shared;
+          });
+        }
       } else {
         setFollowingIds([]);
         setSavedPostIds((current) => {
           const saved = reset ? {} : { ...current };
           for (const post of incomingPosts) saved[post.id] = false;
           return saved;
+        });
+        setRepostedIds((current) => {
+          const shared = reset ? {} : { ...current };
+          for (const post of incomingPosts) shared[post.id] = false;
+          return shared;
         });
       }
     } else {
@@ -298,6 +318,7 @@ export default function FeedPage() {
         setCommentCounts({});
         setSavedPostIds({});
         setFollowingIds([]);
+        setRepostedIds({});
       }
     }
 
@@ -537,6 +558,14 @@ export default function FeedPage() {
                     liked={likeStates[post.id]?.liked ?? false}
                     onToggle={() => toggleLike(post.id)}
                   />
+                  {post.allow_reposts && post.author_id !== currentUserId && (
+                    <RepostButton
+                      postId={post.id}
+                      authorId={post.author_id}
+                      allowReposts={post.allow_reposts}
+                      initiallyShared={Boolean(repostedIds[post.id])}
+                    />
+                  )}
                   <Link
                     className="inline-flex h-11 min-w-11 items-center justify-center gap-1 rounded-full px-2 text-sm text-gray-600 hover:bg-white/80 hover:text-deep-plum focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
                     href={`/post/${post.id}#comments-heading`}

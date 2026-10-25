@@ -18,6 +18,7 @@ import BookmarkButton from "@/components/ui/BookmarkButton";
 import { useLanguage } from "@/components/LanguageProvider";
 import TimeAgo from "@/components/TimeAgo";
 import { useAuth } from "@/components/AuthProvider";
+import RepostButton from "@/components/RepostButton";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -31,6 +32,7 @@ type Post = {
   provenance: "personal" | "community" | "evidence";
   audience: "all" | "adult";
   like_count: number;
+  allow_reposts: boolean;
   sources: string[];
   title: string;
   body: string;
@@ -110,6 +112,7 @@ export default function ExplorePage() {
   const [restoreReady, setRestoreReady] = useState(false);
   const [posts, setPosts] = useState<Post[]>([]);
   const [likeStates, setLikeStates] = useState<Record<string, LikeState>>({});
+  const [repostedIds, setRepostedIds] = useState<Record<string, boolean>>({});
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [savedPostIds, setSavedPostIds] = useState<Record<string, boolean>>({});
   const [savingPostIds, setSavingPostIds] = useState<Record<string, boolean>>({});
@@ -183,7 +186,7 @@ export default function ExplorePage() {
     let query = supabase
       .from("posts")
       .select(
-        "id, author_id, type, provenance, audience, like_count, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))"
+        "id, author_id, type, provenance, audience, like_count, allow_reposts, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))"
       )
       .order("created_at", { ascending: false })
       .range(nextPage * PAGE_SIZE, nextPage * PAGE_SIZE + PAGE_SIZE - 1);
@@ -210,10 +213,11 @@ export default function ExplorePage() {
     setPosts((current) => (reset ? incomingPosts : mergeUniquePosts(current, incomingPosts)));
     const postIds = incomingPosts.map((post) => post.id);
     if (postIds.length > 0 && userId) {
-      const [likesResult, commentsResult, bookmarksResult] = await Promise.all([
+      const [likesResult, commentsResult, bookmarksResult, repostsResult] = await Promise.all([
         supabase.from("likes").select("post_id").eq("user_id", userId).in("post_id", postIds),
         supabase.from("comments").select("post_id").in("post_id", postIds),
         supabase.from("bookmarks").select("post_id").eq("user_id", userId).in("post_id", postIds),
+        supabase.from("reposts").select("post_id").eq("user_id", userId).in("post_id", postIds),
       ]);
 
       setLikeStates((current) => {
@@ -248,10 +252,21 @@ export default function ExplorePage() {
           return saved;
         });
       }
+      if (repostsResult.error) setMessage(friendlyError(repostsResult.error, t));
+      else {
+        setRepostedIds((current) => {
+          const shared = reset ? {} : { ...current };
+          for (const post of incomingPosts) shared[post.id] = false;
+          for (const repost of repostsResult.data ?? []) shared[repost.post_id] = true;
+          return shared;
+        });
+      }
     } else if (reset) {
       setLikeStates({});
       setCommentCounts({});
       setSavedPostIds({});
+      setRepostedIds({});
+      setRepostedIds({});
     }
     setHasMore(incomingPosts.length === PAGE_SIZE);
     setPage(nextPage);
@@ -499,6 +514,14 @@ export default function ExplorePage() {
                       liked={likeStates[post.id]?.liked ?? false}
                       onToggle={() => toggleLike(post.id)}
                     />
+                    {post.allow_reposts && post.author_id !== currentUserId && (
+                      <RepostButton
+                        postId={post.id}
+                        authorId={post.author_id}
+                        allowReposts={post.allow_reposts}
+                        initiallyShared={Boolean(repostedIds[post.id])}
+                      />
+                    )}
                     <Link
                       className="inline-flex h-11 min-w-11 items-center justify-center gap-1 rounded-full px-2 text-sm text-gray-600 hover:bg-white/80 hover:text-deep-plum focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
                       href={`/post/${post.id}#comments-heading`}

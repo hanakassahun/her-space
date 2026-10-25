@@ -16,6 +16,7 @@ import UserText from "@/components/UserText";
 import { useLanguage } from "@/components/LanguageProvider";
 import TimeAgo from "@/components/TimeAgo";
 import { useAuth } from "@/components/AuthProvider";
+import RepostButton from "@/components/RepostButton";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -25,10 +26,12 @@ type Profile = {
 
 type Post = {
   id: string;
+  author_id: string;
   type: "experience" | "question" | "knowledge";
   provenance: "personal" | "community" | "evidence";
   audience: "all" | "adult";
   like_count: number;
+  allow_reposts: boolean;
   sources: string[];
   title: string;
   body: string;
@@ -74,6 +77,7 @@ export default function LibraryPage() {
   const userId = user?.id ?? null;
   const router = useRouter();
   const [savedPosts, setSavedPosts] = useState<SavedPost[]>([]);
+  const [repostedIds, setRepostedIds] = useState<Record<string, boolean>>({});
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -92,7 +96,7 @@ export default function LibraryPage() {
       const { data, error } = await supabase
         .from("bookmarks")
         .select(
-          "created_at, posts!bookmarks_post_id_fkey(id, type, provenance, audience, like_count, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title)))"
+          "created_at, posts!bookmarks_post_id_fkey(id, author_id, type, provenance, audience, like_count, allow_reposts, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title)))"
         )
         .eq("user_id", userId)
         .order("created_at", { ascending: false });
@@ -101,12 +105,23 @@ export default function LibraryPage() {
         setMessage(friendlyError(error, t));
       } else {
         const rows = (data ?? []) as BookmarkRow[];
-        setSavedPosts(
-          rows.flatMap((row) => {
-            const post = first(row.posts);
-            return post ? [{ savedAt: row.created_at, post }] : [];
-          })
-        );
+        const loadedPosts = rows.flatMap((row) => {
+          const post = first(row.posts);
+          return post ? [{ savedAt: row.created_at, post }] : [];
+        });
+        setSavedPosts(loadedPosts);
+        const postIds = loadedPosts.map(({ post }) => post.id);
+        if (postIds.length > 0) {
+          const { data: reposts, error: repostError } = await supabase
+            .from("reposts")
+            .select("post_id")
+            .eq("user_id", userId)
+            .in("post_id", postIds);
+          if (repostError) setMessage(friendlyError(repostError, t));
+          else setRepostedIds(Object.fromEntries((reposts ?? []).map(({ post_id }) => [post_id, true])));
+        } else {
+          setRepostedIds({});
+        }
       }
       setLoading(false);
     }
@@ -262,14 +277,24 @@ export default function LibraryPage() {
                       </span>
                     )}
                   </p>
-                  <BookmarkButton
-                    saved
-                    disabled={busyPostIds[post.id] === true}
-                    saveLabel={t("post.savePost")}
-                    savedLabel={t("library.unsave")}
-                    onToggle={() => void unsavePost(post.id)}
-                    variant="primary"
-                  />
+                  <div className="flex items-center gap-1">
+                    {post.allow_reposts && post.author_id !== userId && (
+                      <RepostButton
+                        postId={post.id}
+                        authorId={post.author_id}
+                        allowReposts={post.allow_reposts}
+                        initiallyShared={Boolean(repostedIds[post.id])}
+                      />
+                    )}
+                    <BookmarkButton
+                      saved
+                      disabled={busyPostIds[post.id] === true}
+                      saveLabel={t("post.savePost")}
+                      savedLabel={t("library.unsave")}
+                      onToggle={() => void unsavePost(post.id)}
+                      variant="primary"
+                    />
+                  </div>
                 </div>
               </Card>
             );

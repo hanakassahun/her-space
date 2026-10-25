@@ -19,6 +19,7 @@ import UserText from "@/components/UserText";
 import { useLanguage } from "@/components/LanguageProvider";
 import TimeAgo from "@/components/TimeAgo";
 import { useAuth } from "@/components/AuthProvider";
+import RepostButton from "@/components/RepostButton";
 
 const MemberActionsMenu = dynamic(() => import("@/components/MemberActionsMenu"), { ssr: false });
 
@@ -36,6 +37,7 @@ type Post = {
   provenance: "personal" | "community" | "evidence";
   audience: "all" | "adult";
   like_count: number;
+  allow_reposts: boolean;
   sources: string[];
   title: string;
   body: string;
@@ -108,12 +110,14 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
   const [editBody, setEditBody] = useState("");
   const [editTopics, setEditTopics] = useState("");
   const [editSources, setEditSources] = useState("");
+  const [editAllowReposts, setEditAllowReposts] = useState(false);
   const [savingPost, setSavingPost] = useState(false);
   const [deletingPost, setDeletingPost] = useState(false);
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [liked, setLiked] = useState(false);
+  const [reposted, setReposted] = useState(false);
   const [commentBody, setCommentBody] = useState("");
   const [activeReportTarget, setActiveReportTarget] = useState<string | null>(null);
   const [reportReason, setReportReason] = useState("");
@@ -152,10 +156,10 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
 
       setUserId(currentUserId);
 
-      const [postResult, bookmarkResult, likesResult, commentsResult] = await Promise.all([
+      const [postResult, bookmarkResult, likesResult, commentsResult, repostsResult] = await Promise.all([
         supabase
           .from("posts")
-          .select("id, author_id, type, provenance, audience, like_count, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+          .select("id, author_id, type, provenance, audience, like_count, allow_reposts, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
           .eq("id", id)
           .single(),
         supabase
@@ -170,6 +174,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
           .select("id, author_id, body, created_at, profiles!comments_author_id_fkey(display_name)")
           .eq("post_id", id)
           .order("created_at", { ascending: true }),
+        supabase.from("reposts").select("post_id").eq("user_id", currentUserId).in("post_id", [id]),
       ]);
 
       if (postResult.error || !postResult.data) {
@@ -207,6 +212,8 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       } else {
         setLiked((likesResult.data ?? []).some((like) => like.post_id === id));
       }
+      if (repostsResult.error) setMessage(friendlyError(repostsResult.error, t));
+      else setReposted((repostsResult.data ?? []).some((repost) => repost.post_id === id));
 
       if (!postResult.error) {
         if (commentsResult.error) setMessage(friendlyError(commentsResult.error, t));
@@ -296,6 +303,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
     setEditBody(post.body);
     setEditTopics(post.topics.join(", "));
     setEditSources(post.sources.join("\n"));
+    setEditAllowReposts(post.allow_reposts && !post.sensitive && post.audience !== "adult");
     setEditingPost(true);
     setMessage("");
   }
@@ -319,9 +327,10 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
         body: editBody.trim(),
         topics: editTopics.split(/[,،፣]/).map((topic) => topic.trim()).filter(Boolean),
         ...(post.provenance === "evidence" ? { sources } : {}),
+        allow_reposts: editAllowReposts && !post.sensitive && post.audience !== "adult",
       })
       .eq("id", post.id)
-      .select("id, author_id, type, provenance, audience, like_count, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+      .select("id, author_id, type, provenance, audience, like_count, allow_reposts, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
       .single();
 
     if (error) {
@@ -478,6 +487,26 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                       <Textarea className="min-h-24" value={editSources} onChange={(event) => setEditSources(event.target.value)} required />
                     </label>
                   )}
+                  <div className="space-y-1">
+                    <div className="flex items-start justify-between gap-4 rounded-2xl border border-[#CDBDEB] bg-white p-3">
+                      <span className="min-w-0">
+                        <span className="block break-words text-sm font-medium text-deep-plum">{t("repost.allow")}</span>
+                        <span className="mt-1 block break-words text-xs leading-5 text-gray-600">{t("repost.allowHint")}</span>
+                      </span>
+                      <button
+                        className={`relative inline-flex h-11 w-16 shrink-0 items-center rounded-full border px-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle ${editAllowReposts ? "gradient-aurora border-transparent" : "border-[#CDBDEB] bg-soft-lilac/40"}`}
+                        type="button"
+                        role="switch"
+                        aria-checked={editAllowReposts && !post.sensitive && post.audience !== "adult"}
+                        aria-label={t("repost.allow")}
+                        disabled={post.sensitive || post.audience === "adult"}
+                        onClick={() => setEditAllowReposts((current) => !current)}
+                      >
+                        <span className={`h-7 w-7 rounded-full bg-white shadow-sm transition-transform ${editAllowReposts ? "translate-x-7" : "translate-x-0"}`} />
+                      </button>
+                    </div>
+                    {(post.sensitive || post.audience === "adult") && <p className="break-words text-xs text-gray-600">{t("repost.unavailable")}</p>}
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     <Button type="submit" disabled={savingPost}>{savingPost ? t("post.saving") : t("post.saveChanges")}</Button>
                     <Button variant="secondary" type="button" onClick={() => setEditingPost(false)}>{t("common.cancel")}</Button>
@@ -638,6 +667,14 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
           <div className="fixed inset-x-0 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-30 border-t border-soft-lilac/70 bg-pearl-white/95 px-4 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-lg backdrop-blur md:bottom-0 md:px-6 md:pb-2">
             <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
               <LikeButton count={likeCount} liked={liked} onToggle={toggleLike} />
+              {post.allow_reposts && post.author_id !== userId && (
+                <RepostButton
+                  postId={post.id}
+                  authorId={post.author_id}
+                  allowReposts={post.allow_reposts}
+                  initiallyShared={reposted}
+                />
+              )}
               <Button
                 variant="secondary"
                 type="button"

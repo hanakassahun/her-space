@@ -18,6 +18,11 @@ import { useAuth } from "@/components/AuthProvider";
 type PostType = "experience" | "question" | "knowledge";
 type Provenance = "personal" | "community" | "evidence";
 type AgeGroup = "teen" | "adult";
+
+function defaultAllowReposts(postType: PostType, postProvenance: Provenance) {
+  return postType === "knowledge" || postProvenance === "evidence";
+}
+
 type Draft = {
   title: string;
   body: string;
@@ -73,6 +78,7 @@ export default function NewPostPage() {
   const [extraTopics, setExtraTopics] = useState("");
   const [topicsExpanded, setTopicsExpanded] = useState(false);
   const [sensitive, setSensitive] = useState(false);
+  const [allowReposts, setAllowReposts] = useState(false);
   const [ageSetting, setAgeSetting] = useState<{ userId: string; ageGroup: AgeGroup } | null>(null);
   const [adultsOnly, setAdultsOnly] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -138,6 +144,7 @@ export default function NewPostPage() {
               setExtraTopics(draft.extraTopics ?? "");
               setSources(draft.sources ?? "");
               setSensitive(Boolean(draft.sensitive));
+              setAllowReposts(!draft.sensitive && defaultAllowReposts(draft.type ?? "experience", draft.provenance ?? "personal"));
               setDraftRestored(true);
               restored = true;
             }
@@ -189,6 +196,7 @@ export default function NewPostPage() {
     setExtraTopics("");
     setSources("");
     setSensitive(false);
+    setAllowReposts(false);
   }
 
   function toggleTopic(topic: string) {
@@ -242,6 +250,7 @@ export default function NewPostPage() {
       topics: mergedTopics,
       sensitive,
       audience: ageGroup === "adult" && adultsOnly ? "adult" : "all",
+      allow_reposts: allowReposts && !sensitive && !adultsOnly,
     });
 
     if (error) {
@@ -302,8 +311,10 @@ export default function NewPostPage() {
                       aria-pressed={type === postType}
                       onClick={() => {
                         setType(postType);
-                        setProvenance(postType === "experience" ? "personal" : "community");
+                        const nextProvenance = postType === "experience" ? "personal" : "community";
+                        setProvenance(nextProvenance);
                         setSources("");
+                        setAllowReposts(!sensitive && !adultsOnly && defaultAllowReposts(postType, nextProvenance));
                       }}
                     >
                       {postType === "experience" ? (
@@ -429,6 +440,7 @@ export default function NewPostPage() {
                   onChange={(event) => {
                     const nextProvenance = event.target.value as Provenance;
                     setProvenance(nextProvenance);
+                    setAllowReposts(!sensitive && !adultsOnly && defaultAllowReposts(type, nextProvenance));
                     if (nextProvenance !== "evidence") setSources("");
                   }}
                 >
@@ -456,7 +468,11 @@ export default function NewPostPage() {
                   role="switch"
                   aria-checked={sensitive}
                   aria-label={t("write.sensitive")}
-                  onClick={() => setSensitive((current) => !current)}
+                  onClick={() => setSensitive((current) => {
+                    const next = !current;
+                    if (next) setAllowReposts(false);
+                    return next;
+                  })}
                 >
                   <span className={`h-7 w-7 rounded-full bg-white shadow-sm transition-transform ${sensitive ? "translate-x-7" : "translate-x-0"}`} />
                 </button>
@@ -475,7 +491,11 @@ export default function NewPostPage() {
                       role="switch"
                       aria-checked={adultsOnly}
                       aria-label={t("audience.adultsOnly")}
-                      onClick={() => setAdultsOnly((current) => !current)}
+                      onClick={() => setAdultsOnly((current) => {
+                        const next = !current;
+                        if (next) setAllowReposts(false);
+                        return next;
+                      })}
                     >
                       <span className={`h-7 w-7 rounded-full bg-white shadow-sm transition-transform ${adultsOnly ? "translate-x-7" : "translate-x-0"}`} />
                     </button>
@@ -485,6 +505,27 @@ export default function NewPostPage() {
                   )}
                 </div>
               )}
+
+              <div className="space-y-1">
+                <div className="flex items-start justify-between gap-4 rounded-2xl border border-[#CDBDEB] bg-white p-3">
+                  <span className="min-w-0">
+                    <span className="block break-words text-sm font-medium text-deep-plum">{t("repost.allow")}</span>
+                    <span className="mt-1 block break-words text-xs leading-5 text-gray-600">{t("repost.allowHint")}</span>
+                  </span>
+                  <button
+                    className={`relative inline-flex h-11 w-16 shrink-0 items-center rounded-full border px-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle ${allowReposts ? "gradient-aurora border-transparent" : "border-[#CDBDEB] bg-soft-lilac/40"}`}
+                    type="button"
+                    role="switch"
+                    aria-checked={allowReposts && !sensitive && !adultsOnly}
+                    aria-label={t("repost.allow")}
+                    disabled={sensitive || adultsOnly}
+                    onClick={() => setAllowReposts((current) => !current)}
+                  >
+                    <span className={`h-7 w-7 rounded-full bg-white shadow-sm transition-transform ${allowReposts ? "translate-x-7" : "translate-x-0"}`} />
+                  </button>
+                </div>
+                {(sensitive || adultsOnly) && <p className="break-words text-xs text-gray-600">{t("repost.unavailable")}</p>}
+              </div>
 
               <div className="flex items-start gap-2 rounded-xl bg-soft-lilac/30 px-3 py-2.5">
                 <svg className="mt-0.5 h-4 w-4 shrink-0 text-deep-plum/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">

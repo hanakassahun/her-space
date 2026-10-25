@@ -17,6 +17,7 @@ import UserText from "@/components/UserText";
 import { useLanguage } from "@/components/LanguageProvider";
 import TimeAgo from "@/components/TimeAgo";
 import { useAuth } from "@/components/AuthProvider";
+import RepostButton from "@/components/RepostButton";
 
 const MemberActionsMenu = dynamic(() => import("@/components/MemberActionsMenu"), { ssr: false });
 
@@ -28,7 +29,7 @@ type Profile = {
 };
 type PostProfile = {
   display_name: string | null;
-  verified_professionals: Professional;
+  verified_professionals?: Professional;
 };
 type Post = {
   id: string;
@@ -37,6 +38,7 @@ type Post = {
   provenance: "personal" | "community" | "evidence";
   audience: "all" | "adult";
   like_count: number;
+  allow_reposts: boolean;
   sources: string[];
   title: string;
   body: string;
@@ -45,6 +47,7 @@ type Post = {
   created_at: string;
   profiles: PostProfile | PostProfile[] | null;
 };
+type RepostRow = { created_at: string; posts: Post | Post[] | null };
 
 const typeVariants: Record<Post["type"], "rose" | "sky" | "mint"> = {
   experience: "rose",
@@ -58,6 +61,10 @@ const typeTranslationKeys = {
   knowledge: "postType.knowledge",
 } as const;
 
+function first<T>(value: T | T[] | null) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 export default function UserProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { t } = useLanguage();
@@ -68,6 +75,8 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
   const [profile, setProfile] = useState<Profile | null>(null);
   const [bioDraft, setBioDraft] = useState("");
   const [posts, setPosts] = useState<Post[]>([]);
+  const [reposts, setReposts] = useState<RepostRow[]>([]);
+  const [repostedIds, setRepostedIds] = useState<Record<string, boolean>>({});
   const [revealedPostIds, setRevealedPostIds] = useState<Record<string, boolean>>({});
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [postTitleDraft, setPostTitleDraft] = useState("");
@@ -96,7 +105,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
       }
       setUserId(currentUserId);
 
-      const [profileResult, followersResult, followingResult, followResult, postsResult] =
+      const [profileResult, followersResult, followingResult, followResult, postsResult, repostsResult] =
         await Promise.all([
           supabase.from("profiles").select("id, display_name, bio").eq("id", id).single(),
           supabase
@@ -118,9 +127,14 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
           supabase
             .from("posts")
             .select(
-              "id, author_id, type, provenance, audience, like_count, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))"
+              "id, author_id, type, provenance, audience, like_count, allow_reposts, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))"
             )
             .eq("author_id", id)
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("reposts")
+            .select("created_at, posts!reposts_post_id_fkey(id, author_id, type, provenance, audience, like_count, allow_reposts, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name))")
+            .eq("user_id", id)
             .order("created_at", { ascending: false }),
         ]);
 
@@ -144,6 +158,28 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
         setMessage(friendlyError(postsResult.error, t));
       } else {
         setPosts((postsResult.data ?? []) as Post[]);
+      }
+      if (repostsResult.error) {
+        setMessage(friendlyError(repostsResult.error, t));
+      } else {
+        const repostRows = (repostsResult.data ?? []) as RepostRow[];
+        setReposts(repostRows);
+        const repostedPosts = repostRows.map((row) => first(row.posts)).filter((post): post is Post => Boolean(post));
+        const allPostIds = [...new Set([
+          ...((postsResult.data ?? []) as Post[]).map((post) => post.id),
+          ...repostedPosts.map((post) => post.id),
+        ])];
+        if (allPostIds.length > 0) {
+          const { data: sharedRows, error: sharedError } = await supabase
+            .from("reposts")
+            .select("post_id")
+            .eq("user_id", currentUserId)
+            .in("post_id", allPostIds);
+          if (sharedError) setMessage(friendlyError(sharedError, t));
+          else setRepostedIds(Object.fromEntries((sharedRows ?? []).map(({ post_id }) => [post_id, true])));
+        } else {
+          setRepostedIds({});
+        }
       }
       setLoading(false);
     }
@@ -215,7 +251,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
         ...(post.provenance === "evidence" ? { sources } : {}),
       })
       .eq("id", post.id)
-      .select("id, author_id, type, provenance, audience, like_count, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+      .select("id, author_id, type, provenance, audience, like_count, allow_reposts, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
       .single();
 
     if (error) setMessage(friendlyError(error, t));
@@ -237,6 +273,11 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
     else setPosts((current) => current.filter((item) => item.id !== post.id));
     setDeletingPostId(null);
   }
+
+  const sharedPosts = reposts.flatMap((row) => {
+    const post = first(row.posts);
+    return post ? [{ post, sharedAt: row.created_at }] : [];
+  });
 
   return (
     <PageShell className="max-w-3xl space-y-8 px-4 py-6 md:px-6 md:py-10">
@@ -280,15 +321,38 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                 onChanged={(state) => {
                   setBlockState(state);
                   if (state === null) {
-                    // Reload posts when unmuted/unblocked
-                    supabase
-                      .from("posts")
-                      .select("id, author_id, type, provenance, audience, like_count, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
-                      .eq("author_id", id)
-                      .order("created_at", { ascending: false })
-                      .then(({ data }) => {
-                        if (data) setPosts(data as Post[]);
-                      });
+                    void (async () => {
+                      const [postsResult, repostsResult] = await Promise.all([
+                        supabase
+                          .from("posts")
+                          .select("id, author_id, type, provenance, audience, like_count, allow_reposts, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+                          .eq("author_id", id)
+                          .order("created_at", { ascending: false }),
+                        supabase
+                          .from("reposts")
+                          .select("created_at, posts!reposts_post_id_fkey(id, author_id, type, provenance, audience, like_count, allow_reposts, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name))")
+                          .eq("user_id", id)
+                          .order("created_at", { ascending: false }),
+                      ]);
+                      if (postsResult.data) setPosts(postsResult.data as Post[]);
+                      if (repostsResult.data) {
+                        const repostRows = repostsResult.data as RepostRow[];
+                        setReposts(repostRows);
+                        const repostedPosts = repostRows.map((row) => first(row.posts)).filter((post): post is Post => Boolean(post));
+                        const allPostIds = [...new Set([
+                          ...((postsResult.data ?? []) as Post[]).map((post) => post.id),
+                          ...repostedPosts.map((post) => post.id),
+                        ])];
+                        if (allPostIds.length > 0 && currentUserId) {
+                          const { data: sharedRows } = await supabase
+                            .from("reposts")
+                            .select("post_id")
+                            .eq("user_id", currentUserId)
+                            .in("post_id", allPostIds);
+                          if (sharedRows) setRepostedIds(Object.fromEntries(sharedRows.map(({ post_id }) => [post_id, true])));
+                        }
+                      }
+                    })();
                   }
                 }}
               />
@@ -399,6 +463,14 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                 </div>
               )}
               <ProvenanceBadge provenance={post.provenance} sources={post.sources} short />
+              {post.allow_reposts && post.author_id !== userId && (
+                <RepostButton
+                  postId={post.id}
+                  authorId={post.author_id}
+                  allowReposts={post.allow_reposts}
+                  initiallyShared={Boolean(repostedIds[post.id])}
+                />
+              )}
               {(!post.sensitive || revealedPostIds[post.id]) && post.topics?.length > 0 && (
                   <ul className="flex flex-wrap gap-2" aria-label={t("common.topics")}>
                   {post.topics.map((topic, index) => (
@@ -416,6 +488,60 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
             </>
           )}
         </section>
+
+        {profile && !loading && blockState === null && (
+          <section className="space-y-4" aria-labelledby="reposts-heading">
+            <h2 id="reposts-heading" className="text-xl font-semibold text-deep-plum">{t("repost.sectionTitle")}</h2>
+            {sharedPosts.length === 0 ? (
+              <Card className="text-gray-700">{t("repost.none")}</Card>
+            ) : sharedPosts.map(({ post, sharedAt }) => {
+              const postProfile = first(post.profiles);
+              return (
+                <Card as="article" key={`${post.id}-${sharedAt}`} className="post-card space-y-4">
+                  <p className="text-xs font-medium text-gray-500">{t("repost.shared")}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant={typeVariants[post.type]}>{t(typeTranslationKeys[post.type])}</Badge>
+                    {post.audience === "adult" && <Badge variant="lilac">{t("audience.badge")}</Badge>}
+                    <span className="text-xs text-gray-500">{post.like_count} {t("like.likes")}</span>
+                    <TimeAgo className="text-sm text-gray-500" date={sharedAt} />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-semibold text-gray-900">
+                      <Link href={`/post/${post.id}`}>{post.title}</Link>
+                    </h3>
+                    {post.sensitive && !revealedPostIds[post.id] ? (
+                      <div className="space-y-3 rounded-2xl border border-rose-200 bg-rose-50/70 p-4" role="note">
+                        <p className="text-sm text-rose-950">{t("read.sensitiveWarning")}</p>
+                        <Button variant="secondary" type="button" onClick={() => setRevealedPostIds((current) => ({ ...current, [post.id]: true }))}>
+                          {t("read.showPost")}
+                        </Button>
+                      </div>
+                    ) : (
+                      <UserText text={post.body} className="text-gray-800" />
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-600">{t("common.by")} {postProfile?.display_name || "Her Space member"}</p>
+                  <ProvenanceBadge provenance={post.provenance} sources={post.sources} short />
+                  {(!post.sensitive || revealedPostIds[post.id]) && post.topics?.length > 0 && (
+                    <ul className="flex flex-wrap gap-2" aria-label={t("common.topics")}>
+                      {post.topics.map((topic, index) => (
+                        <li key={`${topic}-${index}`}><Badge variant="lilac">{topic}</Badge></li>
+                      ))}
+                    </ul>
+                  )}
+                  {post.allow_reposts && post.author_id !== userId && (
+                    <RepostButton
+                      postId={post.id}
+                      authorId={post.author_id}
+                      allowReposts={post.allow_reposts}
+                      initiallyShared={Boolean(repostedIds[post.id])}
+                    />
+                  )}
+                </Card>
+              );
+            })}
+          </section>
+        )}
     </PageShell>
   );
 }
