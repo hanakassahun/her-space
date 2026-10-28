@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
+import { attachQuoted, type QuotedPost } from "@/lib/quoted";
 import FriendlyErrorMessage from "@/components/FriendlyErrorMessage";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
 import LikeButton from "@/components/LikeButton";
@@ -36,7 +37,7 @@ type Post = {
   like_count: number;
   allow_reposts: boolean;
   quoted_post_id: string | null;
-  quoted: { id: string; title: string; body: string; profiles: { display_name: string | null } | { display_name: string | null }[] | null } | { id: string; title: string; body: string; profiles: { display_name: string | null } | { display_name: string | null }[] | null }[] | null;
+  quoted: QuotedPost | null;
   sources: string[];
   title: string;
   body: string;
@@ -190,7 +191,7 @@ export default function ExplorePage() {
     let query = supabase
       .from("posts")
       .select(
-        "id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, quoted:posts!posts_quoted_post_id_fkey(id, title, body, profiles!posts_author_id_fkey(display_name)), sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))"
+        "id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))"
       )
       .order("created_at", { ascending: false })
       .range(nextPage * PAGE_SIZE, nextPage * PAGE_SIZE + PAGE_SIZE - 1);
@@ -213,7 +214,7 @@ export default function ExplorePage() {
       return;
     }
 
-    const incomingPosts = (data ?? []) as Post[];
+    const incomingPosts = await attachQuoted((data ?? []) as Post[]);
     setPosts((current) => (reset ? incomingPosts : mergeUniquePosts(current, incomingPosts)));
     const postIds = incomingPosts.map((post) => post.id);
     if (postIds.length > 0 && userId) {

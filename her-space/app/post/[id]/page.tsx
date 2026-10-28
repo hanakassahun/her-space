@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
+import { attachQuoted, type QuotedPost } from "@/lib/quoted";
 import FriendlyErrorMessage from "@/components/FriendlyErrorMessage";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
 import LikeButton from "@/components/LikeButton";
@@ -41,7 +42,7 @@ type Post = {
   like_count: number;
   allow_reposts: boolean;
   quoted_post_id: string | null;
-  quoted: { id: string; title: string; body: string; profiles: { display_name: string | null } | { display_name: string | null }[] | null } | { id: string; title: string; body: string; profiles: { display_name: string | null } | { display_name: string | null }[] | null }[] | null;
+  quoted: QuotedPost | null;
   sources: string[];
   title: string;
   body: string;
@@ -163,7 +164,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       const [postResult, bookmarkResult, likesResult, commentsResult, repostsResult] = await Promise.all([
         supabase
           .from("posts")
-          .select("id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, quoted:posts!posts_quoted_post_id_fkey(id, title, body, profiles!posts_author_id_fkey(display_name)), sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+          .select("id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
           .eq("id", id)
           .single(),
         supabase
@@ -184,7 +185,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       if (postResult.error || !postResult.data) {
         setMessage(friendlyError(postResult.error ?? new Error("not found"), t));
       } else {
-        const loadedPost = postResult.data as Post;
+        const [loadedPost] = await attachQuoted([postResult.data as Post]);
         setPost(loadedPost);
         setLikeCount(loadedPost.like_count);
         if (loadedPost.topics?.length) {
@@ -334,13 +335,14 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
         allow_reposts: editAllowReposts && !post.sensitive && post.audience !== "adult",
       })
       .eq("id", post.id)
-      .select("id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, quoted:posts!posts_quoted_post_id_fkey(id, title, body, profiles!posts_author_id_fkey(display_name)), sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+      .select("id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
       .single();
 
     if (error) {
       setMessage(friendlyError(error, t));
     } else {
-      setPost(data as Post);
+      const [updatedPost] = await attachQuoted([data as Post]);
+      setPost(updatedPost);
       setEditingPost(false);
     }
     setSavingPost(false);

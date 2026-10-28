@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
+import { attachQuoted, type QuotedPost } from "@/lib/quoted";
 import FriendlyErrorMessage from "@/components/FriendlyErrorMessage";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
 import PageShell from "@/components/ui/PageShell";
@@ -42,7 +43,7 @@ type Post = {
   like_count: number;
   allow_reposts: boolean;
   quoted_post_id: string | null;
-  quoted: { id: string; title: string; body: string; profiles: { display_name: string | null } | { display_name: string | null }[] | null } | { id: string; title: string; body: string; profiles: { display_name: string | null } | { display_name: string | null }[] | null }[] | null;
+  quoted: QuotedPost | null;
   sources: string[];
   title: string;
   body: string;
@@ -67,6 +68,17 @@ const typeTranslationKeys = {
 
 function first<T>(value: T | T[] | null) {
   return Array.isArray(value) ? value[0] : value;
+}
+
+async function attachQuotedToReposts(rows: RepostRow[]) {
+  const posts = rows.map((row) => first(row.posts)).filter((post): post is Post => Boolean(post));
+  const postsWithQuotes = await attachQuoted(posts);
+  const postsById = new Map(postsWithQuotes.map((post) => [post.id, post]));
+
+  return rows.map((row) => {
+    const post = first(row.posts);
+    return { ...row, posts: post ? postsById.get(post.id) ?? null : null };
+  });
 }
 
 export default function UserProfilePage({ params }: { params: Promise<{ id: string }> }) {
@@ -131,18 +143,26 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
           supabase
             .from("posts")
             .select(
-              "id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, quoted:posts!posts_quoted_post_id_fkey(id, title, body, profiles!posts_author_id_fkey(display_name)), sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))"
+              "id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))"
             )
             .eq("author_id", id)
             .order("created_at", { ascending: false }),
           supabase
             .from("reposts")
-            .select("created_at, posts!reposts_post_id_fkey(id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, quoted:posts!posts_quoted_post_id_fkey(id, title, body, profiles!posts_author_id_fkey(display_name)), sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name))")
+            .select("created_at, posts!reposts_post_id_fkey(id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name))")
             .eq("user_id", id)
             .order("created_at", { ascending: false }),
         ]);
 
       if (cancelled) return;
+      const loadedPosts = postsResult.error
+        ? null
+        : await attachQuoted((postsResult.data ?? []) as Post[]);
+      const loadedReposts = repostsResult.error
+        ? null
+        : await attachQuotedToReposts((repostsResult.data ?? []) as RepostRow[]);
+      if (cancelled) return;
+
       if (profileResult.error) {
         setMessage(friendlyError(profileResult.error, t));
       } else {
@@ -161,16 +181,16 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
       if (postsResult.error) {
         setMessage(friendlyError(postsResult.error, t));
       } else {
-        setPosts((postsResult.data ?? []) as Post[]);
+        setPosts(loadedPosts ?? []);
       }
       if (repostsResult.error) {
         setMessage(friendlyError(repostsResult.error, t));
       } else {
-        const repostRows = (repostsResult.data ?? []) as RepostRow[];
+        const repostRows = loadedReposts ?? [];
         setReposts(repostRows);
         const repostedPosts = repostRows.map((row) => first(row.posts)).filter((post): post is Post => Boolean(post));
         const allPostIds = [...new Set([
-          ...((postsResult.data ?? []) as Post[]).map((post) => post.id),
+          ...(loadedPosts ?? []).map((post) => post.id),
           ...repostedPosts.map((post) => post.id),
         ])];
         if (allPostIds.length > 0) {
@@ -255,12 +275,13 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
         ...(post.provenance === "evidence" ? { sources } : {}),
       })
       .eq("id", post.id)
-      .select("id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, quoted:posts!posts_quoted_post_id_fkey(id, title, body, profiles!posts_author_id_fkey(display_name)), sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+      .select("id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
       .single();
 
     if (error) setMessage(friendlyError(error, t));
     else {
-      setPosts((current) => current.map((item) => item.id === post.id ? data as Post : item));
+      const [updatedPost] = await attachQuoted([data as Post]);
+      setPosts((current) => current.map((item) => item.id === post.id ? updatedPost : item));
       setEditingPostId(null);
     }
     setSavingPost(false);
@@ -329,22 +350,25 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                       const [postsResult, repostsResult] = await Promise.all([
                         supabase
                           .from("posts")
-                          .select("id, author_id, type, provenance, audience, like_count, allow_reposts, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+                          .select("id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
                           .eq("author_id", id)
                           .order("created_at", { ascending: false }),
                         supabase
                           .from("reposts")
-                          .select("created_at, posts!reposts_post_id_fkey(id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, quoted:posts!posts_quoted_post_id_fkey(id, title, body, profiles!posts_author_id_fkey(display_name)), sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name))")
+                          .select("created_at, posts!reposts_post_id_fkey(id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name))")
                           .eq("user_id", id)
                           .order("created_at", { ascending: false }),
                       ]);
-                      if (postsResult.data) setPosts(postsResult.data as Post[]);
+                      const loadedPosts = postsResult.data
+                        ? await attachQuoted(postsResult.data as Post[])
+                        : null;
+                      if (loadedPosts) setPosts(loadedPosts);
                       if (repostsResult.data) {
-                        const repostRows = repostsResult.data as RepostRow[];
+                        const repostRows = await attachQuotedToReposts(repostsResult.data as RepostRow[]);
                         setReposts(repostRows);
                         const repostedPosts = repostRows.map((row) => first(row.posts)).filter((post): post is Post => Boolean(post));
                         const allPostIds = [...new Set([
-                          ...((postsResult.data ?? []) as Post[]).map((post) => post.id),
+                          ...(loadedPosts ?? []).map((post) => post.id),
                           ...repostedPosts.map((post) => post.id),
                         ])];
                         if (allPostIds.length > 0 && currentUserId) {

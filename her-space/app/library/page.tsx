@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
+import { attachQuoted, type QuotedPost } from "@/lib/quoted";
 import FriendlyErrorMessage from "@/components/FriendlyErrorMessage";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
 import PageShell from "@/components/ui/PageShell";
@@ -35,7 +36,7 @@ type Post = {
   like_count: number;
   allow_reposts: boolean;
   quoted_post_id: string | null;
-  quoted: { id: string; title: string; body: string; profiles: { display_name: string | null } | { display_name: string | null }[] | null } | { id: string; title: string; body: string; profiles: { display_name: string | null } | { display_name: string | null }[] | null }[] | null;
+  quoted: QuotedPost | null;
   sources: string[];
   title: string;
   body: string;
@@ -100,8 +101,7 @@ export default function LibraryPage() {
       const { data, error } = await supabase
         .from("bookmarks")
         .select(
-          "created_at, posts!bookmarks_post_id_fkey(id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, quoted:posts!posts_quoted_post_id_fkey(id, title, body, profiles!posts_author_id_fkey(display_name)), sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title)))"
-        )
+          "created_at, posts!bookmarks_post_id_fkey(id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title)))"  )
         .eq("user_id", userId)
         .order("created_at", { ascending: false });
 
@@ -113,7 +113,12 @@ export default function LibraryPage() {
           const post = first(row.posts);
           return post ? [{ savedAt: row.created_at, post }] : [];
         });
-        setSavedPosts(loadedPosts);
+        const postsWithQuotes = await attachQuoted(loadedPosts.map(({ post }) => post));
+        const attachedPostsById = new Map(postsWithQuotes.map((post) => [post.id, post]));
+        setSavedPosts(loadedPosts.map(({ savedAt, post }) => ({
+          savedAt,
+          post: attachedPostsById.get(post.id) ?? post,
+        })));
         const postIds = loadedPosts.map(({ post }) => post.id);
         if (postIds.length > 0) {
           const { data: reposts, error: repostError } = await supabase
