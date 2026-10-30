@@ -27,6 +27,7 @@ type Article = {
   sources: string[];
   reviewed_by: string | null;
   published: boolean;
+  helpful_count: number;
 };
 
 type ArticleForm = {
@@ -96,7 +97,7 @@ function formFromArticle(article: Article): ArticleForm {
 function fetchArticles() {
   return supabase
     .from("articles")
-    .select("id, slug, title, summary, category, audience, topics, normal, needs_attention, see_doctor, doctor_questions, sources, reviewed_by, published")
+    .select("id, slug, title, summary, category, audience, topics, normal, needs_attention, see_doctor, doctor_questions, sources, reviewed_by, published, helpful_count")
     .order("updated_at", { ascending: false });
 }
 
@@ -324,6 +325,7 @@ export default function AdminArticlesPage() {
               </Badge>
             </div>
             <p className="text-sm text-gray-700">{categoryLabels[article.category]}</p>
+            <p className="text-xs text-gray-500">Helpful: {article.helpful_count}</p>
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" className="text-sm" type="button" onClick={() => startEditing(article)}>
                 Edit

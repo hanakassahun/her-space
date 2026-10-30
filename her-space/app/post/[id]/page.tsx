@@ -23,6 +23,7 @@ import TimeAgo from "@/components/TimeAgo";
 import { useAuth } from "@/components/AuthProvider";
 import RepostButton from "@/components/RepostButton";
 import QuotedPostCard from "@/components/QuotedPostCard";
+import HelpfulButton from "@/components/HelpfulButton";
 
 const MemberActionsMenu = dynamic(() => import("@/components/MemberActionsMenu"), { ssr: false });
 
@@ -40,6 +41,7 @@ type Post = {
   provenance: "personal" | "community" | "evidence";
   audience: "all" | "adult";
   like_count: number;
+  helpful_count: number;
   allow_reposts: boolean;
   quoted_post_id: string | null;
   quoted: QuotedPost | null;
@@ -122,6 +124,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
   const [saved, setSaved] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [liked, setLiked] = useState(false);
+  const [helpfulMarked, setHelpfulMarked] = useState(false);
   const [reposted, setReposted] = useState(false);
   const [commentBody, setCommentBody] = useState("");
   const [activeReportTarget, setActiveReportTarget] = useState<string | null>(null);
@@ -161,10 +164,10 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
 
       setUserId(currentUserId);
 
-      const [postResult, bookmarkResult, likesResult, commentsResult, repostsResult] = await Promise.all([
+      const [postResult, bookmarkResult, likesResult, commentsResult, repostsResult, helpfulResult] = await Promise.all([
         supabase
           .from("posts")
-          .select("id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+          .select("id, author_id, type, provenance, audience, like_count, helpful_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
           .eq("id", id)
           .single(),
         supabase
@@ -180,11 +183,14 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
           .eq("post_id", id)
           .order("created_at", { ascending: true }),
         supabase.from("reposts").select("post_id").eq("user_id", currentUserId).in("post_id", [id]),
+        supabase.from("helpful_marks").select("id").eq("post_id", id).eq("user_id", currentUserId).maybeSingle(),
       ]);
 
       if (postResult.error || !postResult.data) {
         setMessage(friendlyError(postResult.error ?? new Error("not found"), t));
       } else {
+        if (helpfulResult.error) setMessage(friendlyError(helpfulResult.error, t));
+        else setHelpfulMarked(Boolean(helpfulResult.data));
         const [loadedPost] = await attachQuoted([postResult.data as Post]);
         setPost(loadedPost);
         setLikeCount(loadedPost.like_count);
@@ -335,7 +341,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
         allow_reposts: editAllowReposts && !post.sensitive && post.audience !== "adult",
       })
       .eq("id", post.id)
-      .select("id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+      .select("id, author_id, type, provenance, audience, like_count, helpful_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
       .single();
 
     if (error) {
@@ -572,6 +578,12 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                       <UserText text={post.body} className="max-w-[65ch] text-[17px] text-gray-800" />
                     </>
                   )}
+                  <HelpfulButton
+                    key={post.id}
+                    postId={post.id}
+                    initialCount={post.helpful_count}
+                    initialMarked={helpfulMarked}
+                  />
 
                   {post.author_id === userId && (
                     <div className="flex flex-wrap gap-2">

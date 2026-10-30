@@ -11,6 +11,7 @@ import Badge from "@/components/ui/Badge";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/components/AuthProvider";
 import type { TranslationKey } from "@/lib/i18n/en";
+import HelpfulButton from "@/components/HelpfulButton";
 
 type Article = {
   id: string;
@@ -21,6 +22,7 @@ type Article = {
   summary_am: string | null;
   category: string;
   audience: "all" | "adult";
+  helpful_count: number;
   topics: string[];
   normal: string;
   normal_am: string | null;
@@ -48,6 +50,7 @@ export default function LearnArticlePage({ params }: { params: Promise<{ slug: s
   const userId = user?.id ?? null;
   const router = useRouter();
   const [article, setArticle] = useState<Article | null>(null);
+  const [helpfulMarked, setHelpfulMarked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
 
@@ -61,13 +64,23 @@ export default function LearnArticlePage({ params }: { params: Promise<{ slug: s
 
       const { data, error } = await supabase
         .from("articles")
-        .select("id, slug, title, title_am, summary, summary_am, category, audience, topics, normal, normal_am, needs_attention, needs_attention_am, see_doctor, see_doctor_am, doctor_questions, doctor_questions_am, sources, reviewed_by")
+        .select("id, slug, title, title_am, summary, summary_am, category, audience, helpful_count, topics, normal, normal_am, needs_attention, needs_attention_am, see_doctor, see_doctor_am, doctor_questions, doctor_questions_am, sources, reviewed_by")
         .eq("slug", slug)
         .eq("published", true)
         .single();
 
       if (error) setMessage(friendlyError(error, t));
-      else setArticle(data as Article);
+      else {
+        const markResult = await supabase
+          .from("helpful_marks")
+          .select("id")
+          .eq("article_id", data.id)
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (markResult.error) setMessage(friendlyError(markResult.error, t));
+        else setHelpfulMarked(Boolean(markResult.data));
+        setArticle(data as Article);
+      }
       setLoading(false);
     }
 
@@ -171,6 +184,12 @@ export default function LearnArticlePage({ params }: { params: Promise<{ slug: s
           <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-950">
             {t("learn.educationNote")}
           </p>
+          <HelpfulButton
+            key={article.id}
+            articleId={article.id}
+            initialCount={article.helpful_count}
+            initialMarked={helpfulMarked}
+          />
         </>
       )}
     </PageShell>

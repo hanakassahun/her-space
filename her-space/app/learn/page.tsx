@@ -29,6 +29,15 @@ type Article = {
   topics: string[];
 };
 
+type Collection = {
+  id: string;
+  slug: string;
+  title: string;
+  title_am: string | null;
+  description: string;
+  description_am: string | null;
+};
+
 const categoryTranslationKeys = {
   health: "explore.health",
   body_beauty: "explore.bodyBeauty",
@@ -44,6 +53,7 @@ export default function LearnPage() {
   const userId = user?.id ?? null;
   const router = useRouter();
   const [articles, setArticles] = useState<Article[]>([]);
+  const [collections, setCollections] = useState<Collection[]>([]);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<ArticleCategory | "all">("all");
   const [loading, setLoading] = useState(true);
@@ -57,15 +67,24 @@ export default function LearnPage() {
         return;
       }
 
-      const { data, error } = await supabase
-        .from("articles")
-        .select("id, slug, title, title_am, summary, summary_am, category, audience, topics")
-        .eq("published", true)
-        .order("category", { ascending: true })
-        .order("title", { ascending: true });
+      const [articleResult, collectionResult] = await Promise.all([
+        supabase
+          .from("articles")
+          .select("id, slug, title, title_am, summary, summary_am, category, audience, topics")
+          .eq("published", true)
+          .order("category", { ascending: true })
+          .order("title", { ascending: true }),
+        supabase
+          .from("collections")
+          .select("id, slug, title, title_am, description, description_am")
+          .eq("published", true)
+          .order("sort_order", { ascending: true }),
+      ]);
 
-      if (error) setMessage(friendlyError(error, t));
-      else setArticles((data ?? []) as Article[]);
+      if (articleResult.error) setMessage(friendlyError(articleResult.error, t));
+      else setArticles((articleResult.data ?? []) as Article[]);
+      if (collectionResult.error) setMessage(friendlyError(collectionResult.error, t));
+      else setCollections((collectionResult.data ?? []) as Collection[]);
       setLoading(false);
     }
 
@@ -125,6 +144,34 @@ export default function LearnPage() {
           </Button>
         ))}
       </nav>
+
+      {collections.length > 0 && (
+        <section className="space-y-3" aria-labelledby="collections-heading">
+          <h2 id="collections-heading" className="text-xl font-semibold text-deep-plum">
+            {t("collections.title")}
+          </h2>
+          <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 md:-mx-6 md:px-6">
+            {collections.map((collection) => (
+              <Link
+                key={collection.id}
+                href={`/collections/${collection.slug}`}
+                className="min-h-11 w-72 shrink-0 snap-start rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle sm:w-80"
+              >
+                <Card as="article" className="h-full space-y-2">
+                  <h3 className="break-words font-semibold text-deep-plum">
+                    {lang === "am" && collection.title_am?.trim() ? collection.title_am : collection.title}
+                  </h3>
+                  <p className="line-clamp-2 break-words text-sm text-gray-700">
+                    {lang === "am" && collection.description_am?.trim()
+                      ? collection.description_am
+                      : collection.description}
+                  </p>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {loading && <div className="space-y-4">{[0, 1, 2].map((index) => <PostSkeleton key={index} />)}</div>}
       {message && <Card className="text-red-700"><FriendlyErrorMessage message={message} /></Card>}
