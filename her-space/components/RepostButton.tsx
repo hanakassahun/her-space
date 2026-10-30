@@ -16,7 +16,7 @@ type RepostButtonProps = {
 };
 
 export default function RepostButton({ postId, authorId, allowReposts, initiallyShared }: RepostButtonProps) {
-  const { user } = useAuth();
+  const { user, quietMode } = useAuth();
   const { t } = useLanguage();
   const router = useRouter();
   const [shared, setShared] = useState(initiallyShared);
@@ -52,7 +52,7 @@ export default function RepostButton({ postId, authorId, allowReposts, initially
     };
   }, [menuOpen]);
 
-  if (!user || !allowReposts || authorId === user.id) return null;
+  if (quietMode || !user || !allowReposts || authorId === user.id) return null;
 
   async function toggleRepost() {
     if (!user || inFlight.current) return;

@@ -104,7 +104,7 @@ function getProfessionalTitle(profiles: Post["profiles"]) {
 export default function PostPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { lang, t } = useLanguage();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, quietMode, quietModeSaving, quietModeError, setQuietMode } = useAuth();
   const currentUserId = user?.id ?? null;
   const router = useRouter();
   const [post, setPost] = useState<Post | null>(null);
@@ -659,26 +659,41 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                 </div>
               )}
 
-              <Card as="div" className="space-y-3">
-              <form id="comment-form" className="space-y-3" onSubmit={handleCommentSubmit}>
-                <label className="block space-y-2 text-sm font-medium text-gray-900">
-                  {t("post.addComment")}
-                  <Textarea
-                    className="min-h-28"
-                    value={commentBody}
-                    onChange={(event) => setCommentBody(event.target.value)}
-                    maxLength={2000}
-                    required
-                  />
-                </label>
-                <Button
-                  type="submit"
-                  disabled={submittingComment || !commentBody.trim()}
-                >
-                  {submittingComment ? t("post.commenting") : t("post.comment")}
-                </Button>
-              </form>
-              </Card>
+              {quietMode ? (
+                <Card as="div" className="space-y-3 text-gray-600">
+                  <p className="break-words text-sm">{t("quiet.commentsOff")}</p>
+                  {quietModeError && <p className="break-words text-sm text-red-700" role="alert">{quietModeError}</p>}
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    disabled={quietModeSaving}
+                    onClick={() => void setQuietMode(false)}
+                  >
+                    {t("quiet.turnOff")}
+                  </Button>
+                </Card>
+              ) : (
+                <Card as="div" className="space-y-3">
+                  <form id="comment-form" className="space-y-3" onSubmit={handleCommentSubmit}>
+                    <label className="block space-y-2 text-sm font-medium text-gray-900">
+                      {t("post.addComment")}
+                      <Textarea
+                        className="min-h-28"
+                        value={commentBody}
+                        onChange={(event) => setCommentBody(event.target.value)}
+                        maxLength={2000}
+                        required
+                      />
+                    </label>
+                    <Button
+                      type="submit"
+                      disabled={submittingComment || !commentBody.trim()}
+                    >
+                      {submittingComment ? t("post.commenting") : t("post.comment")}
+                    </Button>
+                  </form>
+                </Card>
+              )}
             </section>
           </>
         )}
@@ -698,7 +713,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                 variant="secondary"
                 type="button"
                 className="min-w-11 gap-2"
-                onClick={() => document.getElementById("comment-form")?.scrollIntoView({ behavior: "smooth", block: "center" })}
+                onClick={() => document.getElementById(quietMode ? "comments-heading" : "comment-form")?.scrollIntoView({ behavior: "smooth", block: "center" })}
               >
                 <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
                   <path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2v-6.5A7.5 7.5 0 1 1 20 11.5Z" />

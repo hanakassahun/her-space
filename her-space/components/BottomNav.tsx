@@ -15,7 +15,7 @@ const BottomNavMoreSheet = dynamic(() => import("@/components/BottomNavMoreSheet
 export default function BottomNav() {
   const pathname = usePathname();
   const { t } = useLanguage();
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, quietMode } = useAuth();
   const userId = user?.id ?? "";
   const [moreOpen, setMoreOpen] = useState(false);
   const [sheetMounted, setSheetMounted] = useState(false);
@@ -121,21 +121,22 @@ export default function BottomNav() {
         <ul className="mx-auto flex max-w-lg items-center justify-around gap-1">
           {mobileNavOrder.map((key) => {
             const item = navConfig[key];
-            const active = isNavItemActive(key, pathname);
             const isWrite = key === "write";
+            const isQuietLearn = isWrite && quietMode;
+            const active = isQuietLearn ? isNavItemActive("learn", pathname) : isNavItemActive(key, pathname);
             return (
               <li className="min-w-0 flex-1" key={key}>
                 <Link
-                  className={isWrite
+                  className={isWrite && !isQuietLearn
                     ? "mx-auto flex h-12 w-12 items-center justify-center rounded-full gradient-aurora text-white shadow-glow"
                     : `flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 text-[11px] font-medium ${active ? "text-deep-plum" : "text-gray-600"}`}
-                  href={resolveNavHref(key, userId)}
-                  aria-label={isWrite ? t("nav.writePost") : t(item.label)}
+                  href={isQuietLearn ? "/learn" : resolveNavHref(key, userId)}
+                  aria-label={isQuietLearn ? t("nav.learn") : isWrite ? t("nav.writePost") : t(item.label)}
                   aria-current={active ? "page" : undefined}
-                  title={isWrite ? t("nav.writePost") : t(item.label)}
+                  title={isQuietLearn ? t("nav.learn") : isWrite ? t("nav.writePost") : t(item.label)}
                 >
-                  <NavIcon icon={item.icon} className={isWrite ? "h-6 w-6" : "h-5 w-5"} />
-                  {!isWrite && <span className="truncate">{t(item.label)}</span>}
+                  <NavIcon icon={isQuietLearn ? "learn" : item.icon} className={isWrite && !isQuietLearn ? "h-6 w-6" : "h-5 w-5"} />
+                  {(!isWrite || isQuietLearn) && <span className="truncate">{t(isQuietLearn ? "nav.learn" : item.label)}</span>}
                 </Link>
               </li>
             );

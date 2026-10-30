@@ -15,7 +15,7 @@ const WelcomeCards = dynamic(() => import("@/components/WelcomeCards"), { ssr: f
 
 export default function Home() {
   const { t } = useLanguage();
-  const { user, displayName, loading } = useAuth();
+  const { user, displayName, loading, quietMode } = useAuth();
   const userId = user?.id ?? null;
   const name = user ? displayName ?? "friend" : null;
   const [greetingKey, setGreetingKey] = useState<"home.greetingMorning" | "home.greetingAfternoon" | "home.greetingEvening" | null>(null);
@@ -38,7 +38,7 @@ export default function Home() {
       {!loading && name && (
         <section className="mt-8 w-full max-w-3xl space-y-4 text-left">
           <p className="text-center text-deep-plum">{greetingKey ? t(greetingKey) : ""} {name} 🌸</p>
-          {userId && <WelcomeCards />}
+          {userId && !quietMode && <WelcomeCards />}
           <InstallBanner />
           <div className="grid grid-cols-2 gap-3">
             {(["feed", "explore", "learn", "journal", "library", "resources"] as const).map((key) => {

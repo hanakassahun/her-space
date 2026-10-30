@@ -29,7 +29,7 @@ function getDisplayName(profiles: BlockRow["profiles"]): string {
 
 export default function SettingsPage() {
   const { t } = useLanguage();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, quietMode, quietModeSaving, quietModeError, setQuietMode } = useAuth();
   const userId = user?.id ?? null;
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -175,6 +175,27 @@ export default function SettingsPage() {
         <h1 className="text-3xl font-bold text-deep-plum">Settings</h1>
         <p className="mt-2 text-gray-700">Account and community information.</p>
       </header>
+
+      <Card as="section" className="space-y-3">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="break-words text-lg font-semibold text-deep-plum">{t("quiet.title")}</h2>
+            <p className="mt-1 break-words text-sm leading-6 text-gray-700">{t("quiet.hint")}</p>
+          </div>
+          <button
+            className={`relative inline-flex h-11 w-16 shrink-0 items-center rounded-full border px-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle ${quietMode ? "gradient-aurora border-transparent" : "border-[#CDBDEB] bg-soft-lilac/40"}`}
+            type="button"
+            role="switch"
+            aria-label={t("quiet.title")}
+            aria-checked={quietMode}
+            disabled={quietModeSaving}
+            onClick={() => void setQuietMode(!quietMode)}
+          >
+            <span className={`h-7 w-7 rounded-full bg-white shadow-sm transition-transform ${quietMode ? "translate-x-7" : "translate-x-0"}`} />
+          </button>
+        </div>
+        {quietModeError && <p className="break-words text-sm text-red-700" role="alert">{quietModeError}</p>}
+      </Card>
 
       <Card as="section" className="space-y-4">
         <div>

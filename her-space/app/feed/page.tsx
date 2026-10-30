@@ -105,7 +105,7 @@ function getAuthorName(profiles: Post["profiles"]) {
 
 export default function FeedPage() {
   const { t } = useLanguage();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, quietMode } = useAuth();
   const currentUserId = user?.id ?? null;
   const userId = currentUserId;
   const isSignedIn = Boolean(currentUserId);
@@ -448,12 +448,12 @@ export default function FeedPage() {
           <div>
             <h1 className="text-3xl font-bold text-deep-plum">{t("feed.title")}</h1>
           </div>
-          <Link
+          {!quietMode && <Link
             className="gradient-aurora shadow-glow inline-flex min-h-11 shrink-0 items-center rounded-full px-5 py-2 font-medium text-white"
             href={navConfig.write.href}
           >
             {t("nav.writePost")}
-          </Link>
+          </Link>}
         </header>
 
         <nav className="flex flex-wrap gap-2" aria-label={t("feed.posts")}>
@@ -476,22 +476,24 @@ export default function FeedPage() {
 
         {loading && <div className="space-y-4">{[0, 1, 2].map((index) => <PostSkeleton key={index} />)}</div>}
         {message && <Card className="text-red-700"><FriendlyErrorMessage message={message} /></Card>}
-        {activeTab === "forYou" && page === 0 && !loading && !message && posts.length > 0 && <SuggestedMembers />}
+        {!quietMode && activeTab === "forYou" && page === 0 && !loading && !message && posts.length > 0 && <SuggestedMembers />}
         {!loading && !message && visiblePosts.length === 0 && (
           <Card className="space-y-3 text-gray-700">
             <p>{activeTab === "following" ? t("feed.noFollowing") : t("feed.noPosts")}</p>
             {activeTab === "following" && (
               <p className="text-sm text-gray-600">{t("empty.followingHint")}</p>
             )}
-            <Button
-              type="button"
-              onClick={() => activeTab === "following" ? setActiveTab("latest") : router.push("/new")}
-            >
-              {activeTab === "following" ? t("empty.browseFeed") : t("empty.writeFirst")}
-            </Button>
+            {(activeTab === "following" || !quietMode) && (
+              <Button
+                type="button"
+                onClick={() => activeTab === "following" ? setActiveTab("latest") : router.push("/new")}
+              >
+                {activeTab === "following" ? t("empty.browseFeed") : t("empty.writeFirst")}
+              </Button>
+            )}
           </Card>
         )}
-        {!loading && !message && activeTab === "following" && visiblePosts.length === 0 && <SuggestedMembers />}
+        {!quietMode && !loading && !message && activeTab === "following" && visiblePosts.length === 0 && <SuggestedMembers />}
 
         <section className="space-y-4" aria-label="Posts">
           {visiblePosts.map((post, index) => (

@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { PointerEvent } from "react";
 import { isNavItemActive, moreNavOrder, navConfig, resolveNavHref } from "@/lib/nav";
 import { useLanguage } from "@/components/LanguageProvider";
+import { useAuth } from "@/components/AuthProvider";
 import NavIcon from "@/components/NavIcon";
 
 type BottomNavMoreSheetProps = {
@@ -34,6 +35,7 @@ export default function BottomNavMoreSheet({
   onLogout,
 }: BottomNavMoreSheetProps) {
   const { t } = useLanguage();
+  const { quietMode, quietModeSaving, quietModeError, setQuietMode } = useAuth();
 
   return (
     <div
@@ -89,6 +91,21 @@ export default function BottomNavMoreSheet({
               </li>
             );
           })}
+          <li className="flex min-h-12 items-center justify-between gap-3 rounded-2xl px-3 py-1 text-sm font-medium text-gray-700">
+            <span className="break-words">{t("quiet.on")}</span>
+            <button
+              className={`relative inline-flex h-11 w-16 shrink-0 items-center rounded-full border px-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle ${quietMode ? "gradient-aurora border-transparent" : "border-[#CDBDEB] bg-soft-lilac/40"}`}
+              type="button"
+              role="switch"
+              aria-label={t("quiet.on")}
+              aria-checked={quietMode}
+              disabled={quietModeSaving}
+              onClick={() => void setQuietMode(!quietMode)}
+            >
+              <span className={`h-7 w-7 rounded-full bg-white shadow-sm transition-transform ${quietMode ? "translate-x-7" : "translate-x-0"}`} />
+            </button>
+          </li>
+          {quietModeError && <li className="px-3 py-1 text-sm text-red-700" role="alert">{quietModeError}</li>}
           <li>
             <button
               className="flex min-h-12 w-full items-center gap-3 rounded-2xl px-3 text-left text-sm font-medium text-rose-900 hover:bg-rose-100/70"

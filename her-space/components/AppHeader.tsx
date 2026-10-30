@@ -17,7 +17,7 @@ const AccountMenu = dynamic(() => import("@/components/AccountMenu"), { ssr: fal
 export default function AppHeader() {
   const pathname = usePathname();
   const { t } = useLanguage();
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, quietMode } = useAuth();
   const userId = user?.id ?? "";
   const showBack = !isTopLevelPath(pathname);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -72,14 +72,14 @@ export default function AppHeader() {
             })}
           </ul>
         </nav>
-        <Link
+        {!quietMode && <Link
           className="gradient-aurora ml-1 hidden min-h-10 shrink-0 items-center gap-1 rounded-full px-3 text-xs font-semibold text-white shadow-glow md:inline-flex"
           href={resolveNavHref("write", userId)}
         >
           <NavIcon icon={navConfig.write.icon} className="h-4 w-4" />
           {t(navConfig.write.label)}
-        </Link>
-        <NotificationBell />
+        </Link>}
+        {!quietMode && <NotificationBell />}
         <LanguageSwitcher className="inline-flex" />
         <div className="relative hidden shrink-0 md:block" ref={accountMenuRef}>
           <button
