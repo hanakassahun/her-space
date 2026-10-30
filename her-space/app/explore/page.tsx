@@ -22,6 +22,7 @@ import TimeAgo from "@/components/TimeAgo";
 import { useAuth } from "@/components/AuthProvider";
 import RepostButton from "@/components/RepostButton";
 import QuotedPostCard from "@/components/QuotedPostCard";
+import type { TranslationKey } from "@/lib/i18n/en";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -48,6 +49,20 @@ type Post = {
 };
 
 type LikeState = { count: number; liked: boolean };
+type SearchContentResult = {
+  kind: "post" | "article" | "resource";
+  id: string;
+  slug: string | null;
+  title: string | null;
+  snippet: string | null;
+  score: number;
+  extra: { category?: string; name?: string } | null;
+};
+type SearchMemberResult = {
+  id: string;
+  display_name: string | null;
+  bio: string | null;
+};
 type ExploreRestoreState = {
   scrollY: number;
   pages: number;
@@ -83,6 +98,14 @@ const typeTranslationKeys = {
 } as const;
 
 const PAGE_SIZE = 20;
+const POST_SELECT =
+  "id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))";
+const searchArticleCategoryKeys: Record<string, TranslationKey> = {
+  health: "explore.health",
+  body_beauty: "explore.bodyBeauty",
+  mind_life: "explore.mindLife",
+  life_stages: "explore.lifeStages",
+};
 
 function mergeUniquePosts(current: Post[], incoming: Post[]) {
   const merged = new Map(current.map((post) => [post.id, post]));
@@ -113,6 +136,10 @@ export default function ExplorePage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [searchContent, setSearchContent] = useState<SearchContentResult[]>([]);
+  const [searchMembers, setSearchMembers] = useState<SearchMemberResult[]>([]);
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [restoreReady, setRestoreReady] = useState(false);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -132,6 +159,8 @@ export default function ExplorePage() {
   const loadMoreSentinel = useRef<HTMLDivElement>(null);
   const likeRequests = useRef(new Set<string>());
   const bookmarkRequests = useRef(new Set<string>());
+  const searchRequestCounter = useRef(0);
+  const isSearchMode = debouncedSearch.trim().length >= 2;
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -177,9 +206,116 @@ export default function ExplorePage() {
   }, [authLoading, currentUserId, router]);
 
   useEffect(() => {
+    searchRequestCounter.current += 1;
     const timeout = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
     return () => window.clearTimeout(timeout);
   }, [search]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      try {
+        const stored = window.localStorage.getItem("recentSearches");
+        if (stored) {
+          const parsed: unknown = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            setRecentSearches(parsed.filter((item): item is string => typeof item === "string").slice(0, 6));
+          }
+        }
+      } catch {
+        setRecentSearches([]);
+      }
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, []);
+
+  function saveRecentSearch(query: string) {
+    const trimmed = query.trim();
+    if (!trimmed || trimmed !== debouncedSearch.trim()) return;
+    const hasResults =
+      posts.length + searchContent.filter((item) => item.kind !== "post").length + searchMembers.length > 0;
+    if (!hasResults) return;
+    const next = [trimmed, ...recentSearches.filter((item) => item.toLocaleLowerCase() !== trimmed.toLocaleLowerCase())].slice(0, 6);
+    setRecentSearches(next);
+    try {
+      window.localStorage.setItem("recentSearches", JSON.stringify(next));
+    } catch {
+      // Recent searches are optional when local storage is unavailable.
+    }
+  }
+
+  function clearRecentSearches() {
+    setRecentSearches([]);
+    try {
+      window.localStorage.removeItem("recentSearches");
+    } catch {
+      // Keep the in-memory list cleared when local storage is unavailable.
+    }
+  }
+
+  const loadPostInteractionState = useCallback(async (incomingPosts: Post[], reset: boolean, requestId?: number) => {
+    const isCurrentRequest = () => requestId === undefined || requestId === searchRequestCounter.current;
+    if (!isCurrentRequest()) return;
+    const postIds = incomingPosts.map((post) => post.id);
+    if (!userId || postIds.length === 0) {
+      if (reset) {
+        setLikeStates({});
+        setCommentCounts({});
+        setSavedPostIds({});
+        setRepostedIds({});
+      }
+      return;
+    }
+
+    const [likesResult, commentsResult, bookmarksResult, repostsResult] = await Promise.all([
+      supabase.from("likes").select("post_id").eq("user_id", userId).in("post_id", postIds),
+      supabase.from("comments").select("post_id").in("post_id", postIds),
+      supabase.from("bookmarks").select("post_id").eq("user_id", userId).in("post_id", postIds),
+      supabase.from("reposts").select("post_id").eq("user_id", userId).in("post_id", postIds),
+    ]);
+    if (!isCurrentRequest()) return;
+
+    setLikeStates((current) => {
+      const next = reset ? {} : { ...current };
+      for (const post of incomingPosts) next[post.id] = { count: post.like_count, liked: false };
+      if (!likesResult.error) {
+        for (const like of likesResult.data ?? []) {
+          const state = next[like.post_id] ?? { count: 0, liked: false };
+          state.liked = true;
+          next[like.post_id] = state;
+        }
+      }
+      return next;
+    });
+    if (likesResult.error) setMessage(friendlyError(likesResult.error, t));
+    if (!commentsResult.error) {
+      setCommentCounts((current) => {
+        const counts = reset ? {} : { ...current };
+        for (const post of incomingPosts) counts[post.id] = 0;
+        for (const comment of commentsResult.data ?? []) {
+          counts[comment.post_id] = (counts[comment.post_id] ?? 0) + 1;
+        }
+        return counts;
+      });
+    }
+    if (bookmarksResult.error) setMessage(friendlyError(bookmarksResult.error, t));
+    else {
+      setSavedPostIds((current) => {
+        const saved = reset ? {} : { ...current };
+        for (const post of incomingPosts) saved[post.id] = false;
+        for (const bookmark of bookmarksResult.data ?? []) saved[bookmark.post_id] = true;
+        return saved;
+      });
+    }
+    if (repostsResult.error) setMessage(friendlyError(repostsResult.error, t));
+    else {
+      setRepostedIds((current) => {
+        const shared = reset ? {} : { ...current };
+        for (const post of incomingPosts) shared[post.id] = false;
+        for (const repost of repostsResult.data ?? []) shared[repost.post_id] = true;
+        return shared;
+      });
+    }
+  }, [t, userId]);
 
   const loadPostsPage = useCallback(async (nextPage: number, reset: boolean) => {
     if (!userId || authLoading) return;
@@ -190,13 +326,11 @@ export default function ExplorePage() {
 
     let query = supabase
       .from("posts")
-      .select(
-        "id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))"
-      )
+      .select(POST_SELECT)
       .order("created_at", { ascending: false })
       .range(nextPage * PAGE_SIZE, nextPage * PAGE_SIZE + PAGE_SIZE - 1);
 
-    if (debouncedSearch) {
+    if (debouncedSearch.trim().length === 1) {
       const safeTerm = debouncedSearch.replace(/[%,()]/g, " ").replace(/\s+/g, " ");
       if (safeTerm.trim()) {
         query = query.or(
@@ -216,68 +350,12 @@ export default function ExplorePage() {
 
     const incomingPosts = await attachQuoted((data ?? []) as Post[]);
     setPosts((current) => (reset ? incomingPosts : mergeUniquePosts(current, incomingPosts)));
-    const postIds = incomingPosts.map((post) => post.id);
-    if (postIds.length > 0 && userId) {
-      const [likesResult, commentsResult, bookmarksResult, repostsResult] = await Promise.all([
-        supabase.from("likes").select("post_id").eq("user_id", userId).in("post_id", postIds),
-        supabase.from("comments").select("post_id").in("post_id", postIds),
-        supabase.from("bookmarks").select("post_id").eq("user_id", userId).in("post_id", postIds),
-        supabase.from("reposts").select("post_id").eq("user_id", userId).in("post_id", postIds),
-      ]);
-
-      setLikeStates((current) => {
-        const next = reset ? {} : { ...current };
-        for (const post of incomingPosts) next[post.id] = { count: post.like_count, liked: false };
-        if (!likesResult.error) {
-          for (const like of likesResult.data ?? []) {
-            const state = next[like.post_id] ?? { count: 0, liked: false };
-            state.liked = true;
-            next[like.post_id] = state;
-          }
-        }
-        return next;
-      });
-      if (likesResult.error) setMessage(friendlyError(likesResult.error, t));
-      if (!commentsResult.error) {
-        setCommentCounts((current) => {
-          const counts = reset ? {} : { ...current };
-          for (const post of incomingPosts) counts[post.id] = 0;
-          for (const comment of commentsResult.data ?? []) {
-            counts[comment.post_id] = (counts[comment.post_id] ?? 0) + 1;
-          }
-          return counts;
-        });
-      }
-      if (bookmarksResult.error) setMessage(friendlyError(bookmarksResult.error, t));
-      else {
-        setSavedPostIds((current) => {
-          const saved = reset ? {} : { ...current };
-          for (const post of incomingPosts) saved[post.id] = false;
-          for (const bookmark of bookmarksResult.data ?? []) saved[bookmark.post_id] = true;
-          return saved;
-        });
-      }
-      if (repostsResult.error) setMessage(friendlyError(repostsResult.error, t));
-      else {
-        setRepostedIds((current) => {
-          const shared = reset ? {} : { ...current };
-          for (const post of incomingPosts) shared[post.id] = false;
-          for (const repost of repostsResult.data ?? []) shared[repost.post_id] = true;
-          return shared;
-        });
-      }
-    } else if (reset) {
-      setLikeStates({});
-      setCommentCounts({});
-      setSavedPostIds({});
-      setRepostedIds({});
-      setRepostedIds({});
-    }
+    await loadPostInteractionState(incomingPosts, reset);
     setHasMore(incomingPosts.length === PAGE_SIZE);
     setPage(nextPage);
     setLoading(false);
     setLoadingMore(false);
-  }, [authLoading, debouncedSearch, selectedTopic, t, userId]);
+  }, [authLoading, debouncedSearch, loadPostInteractionState, selectedTopic, t, userId]);
 
   const loadPostsPageRef = useRef(loadPostsPage);
   useEffect(() => {
@@ -285,15 +363,87 @@ export default function ExplorePage() {
   }, [loadPostsPage]);
 
   useEffect(() => {
-    if (!userId || authLoading || !restoreReady) return;
+    if (!isSearchMode || !userId || authLoading || !restoreReady) return;
+    const requestId = ++searchRequestCounter.current;
+    const query = debouncedSearch.trim();
+    let active = true;
+    const isCurrentRequest = () => active && requestId === searchRequestCounter.current;
+
+    async function searchAllContent() {
+      const [contentResult, membersResult] = await Promise.all([
+        supabase.rpc("search_content", { p_query: query, p_per_kind: 8 }),
+        supabase.rpc("search_members", { p_query: query, p_limit: 8 }),
+      ]);
+      if (!isCurrentRequest()) return;
+
+      if (contentResult.error || membersResult.error) {
+        setMessage(friendlyError(contentResult.error ?? membersResult.error, t));
+        setLoading(false);
+        return;
+      }
+
+      const contentRows = (contentResult.data ?? []) as SearchContentResult[];
+      const memberRows = (membersResult.data ?? []) as SearchMemberResult[];
+      setSearchContent(contentRows);
+      setSearchMembers(memberRows);
+      const postIds = contentRows.filter((item) => item.kind === "post").map((item) => item.id);
+      let matchedPosts: Post[] = [];
+
+      if (postIds.length > 0) {
+        const { data, error } = await supabase
+          .from("posts")
+          .select(POST_SELECT)
+          .in("id", postIds);
+        if (!isCurrentRequest()) return;
+        if (error) {
+          setMessage(friendlyError(error, t));
+          setLoading(false);
+          return;
+        }
+
+        const postsById = new Map(((data ?? []) as Post[]).map((post) => [post.id, post]));
+        const orderedPosts = postIds
+          .map((id) => postsById.get(id))
+          .filter((post): post is Post => post !== undefined);
+        matchedPosts = await attachQuoted(orderedPosts);
+        if (!isCurrentRequest()) return;
+      }
+
+      setPosts(matchedPosts);
+      await loadPostInteractionState(matchedPosts, true, requestId);
+      if (isCurrentRequest()) setLoading(false);
+    }
+
+    const timeout = window.setTimeout(() => {
+      if (!isCurrentRequest()) return;
+      setLoading(true);
+      setLoadingMore(false);
+      setHasMore(false);
+      setPosts([]);
+      setSearchContent([]);
+      setSearchMembers([]);
+      setPage(0);
+      setMessage("");
+      void searchAllContent();
+    }, 0);
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+    };
+  }, [authLoading, debouncedSearch, isSearchMode, loadPostInteractionState, restoreReady, t, userId]);
+
+  useEffect(() => {
+    if (!userId || authLoading || !restoreReady || isSearchMode) return;
     const timeout = window.setTimeout(() => {
       setPosts([]);
       setPage(0);
       setHasMore(true);
+      setSearchContent([]);
+      setSearchMembers([]);
       void loadPostsPageRef.current(0, true);
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, [authLoading, debouncedSearch, restoreReady, selectedTopic, userId]);
+  }, [authLoading, debouncedSearch, isSearchMode, restoreReady, selectedTopic, userId]);
 
   const handleLoadMore = useCallback(async () => {
     if (loadMoreLock.current || loading || loadingMore || !hasMore) return;
@@ -404,10 +554,48 @@ export default function ExplorePage() {
           placeholder={t("explore.searchPlaceholder")}
           value={search}
           onChange={(event) => setSearch(event.target.value)}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => {
+            setSearchFocused(false);
+            saveRecentSearch(search);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") saveRecentSearch(search);
+          }}
           aria-label={t("explore.searchLabel")}
         />
 
-        <div className="space-y-4">
+        {searchFocused && !search.trim() && recentSearches.length > 0 && (
+          <section className="space-y-2" aria-label={t("search.recent")}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-deep-plum">{t("search.recent")}</h2>
+              <Button
+                variant="ghost"
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={clearRecentSearches}
+              >
+                {t("search.clear")}
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {recentSearches.map((recentSearch) => (
+                <Button
+                  key={recentSearch}
+                  variant="secondary"
+                  className="max-w-full break-words"
+                  type="button"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => setSearch(recentSearch)}
+                >
+                  {recentSearch}
+                </Button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {!isSearchMode && <div className="space-y-4">
           {Object.entries(topicGroups).map(([heading, topics]) => (
             <section className="space-y-2" key={heading} aria-label={heading}>
               <h2 className="text-sm font-semibold text-deep-plum">{t(topicGroupTranslationKeys[heading as keyof typeof topicGroupTranslationKeys])}</h2>
@@ -439,15 +627,42 @@ export default function ExplorePage() {
               {t("explore.clearFilter")}
             </Button>
           )}
-        </div>
+        </div>}
 
         {loading && <div className="space-y-4">{[0, 1, 2].map((index) => <PostSkeleton key={index} />)}</div>}
         {message && <Card className="text-red-700"><FriendlyErrorMessage message={message} /></Card>}
-        {!loading && !message && posts.length === 0 && (
+        {!isSearchMode && !loading && !message && posts.length === 0 && (
           <Card className="text-gray-700">{t("explore.noResults")}</Card>
         )}
+        {isSearchMode && !loading && !message &&
+          posts.length + searchContent.filter((item) => item.kind !== "post").length + searchMembers.length === 0 && (
+            <Card className="space-y-3">
+              <h2 className="text-lg font-semibold text-deep-plum">{t("search.noResultsTitle")}</h2>
+              <p className="break-words text-gray-700">{t("search.noResultsBody")}</p>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  type="button"
+                  onClick={() => router.push(`/new?type=question&title=${encodeURIComponent(debouncedSearch.trim())}`)}
+                >
+                  {t("search.ask")}
+                </Button>
+                <Link
+                  className="inline-flex min-h-11 items-center rounded-full px-4 font-semibold text-deep-plum underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
+                  href="/learn"
+                >
+                  {t("search.openLearn")}
+                </Link>
+              </div>
+            </Card>
+          )}
 
-        <section className="space-y-4" aria-label="Explore results">
+        {(!isSearchMode || posts.length > 0) && <section className="space-y-4" aria-label="Explore results">
+          {isSearchMode && (
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-deep-plum">
+              {t("search.sectionPosts")}
+              <span className="rounded-full bg-soft-lilac px-2.5 py-1 text-xs">{posts.length}</span>
+            </h2>
+          )}
           {posts.map((post, index) => {
             const profile = first(post.profiles);
             const professionalTitle = getProfessionalTitle(profile);
@@ -553,11 +768,89 @@ export default function ExplorePage() {
               </Card>
             );
           })}
-        </section>
+        </section>}
 
-        {loadingMore && <div className="space-y-4">{[0, 1, 2].map((index) => <PostSkeleton key={index} />)}</div>}
-        {!loading && hasMore && posts.length > 0 && <div ref={loadMoreSentinel} className="h-px" aria-hidden="true" />}
-        {!loading && !message && hasMore && posts.length > 0 && (
+        {isSearchMode && !loading && !message && searchContent.filter((item) => item.kind === "article").length > 0 && (
+          <section className="space-y-3" aria-labelledby="search-learn-heading">
+            <h2 id="search-learn-heading" className="flex items-center gap-2 text-sm font-semibold text-deep-plum">
+              {t("search.sectionArticles")}
+              <span className="rounded-full bg-soft-lilac px-2.5 py-1 text-xs">
+                {searchContent.filter((item) => item.kind === "article").length}
+              </span>
+            </h2>
+            {searchContent.filter((item) => item.kind === "article").map((item) => {
+              const category = item.extra?.category;
+              const categoryKey = category ? searchArticleCategoryKeys[category] : undefined;
+              return (
+                <Link
+                  key={item.id}
+                  href={`/learn/${encodeURIComponent(item.slug ?? item.id)}`}
+                  className="flex min-h-11 flex-col justify-center gap-1 rounded-2xl border border-[#CDBDEB] bg-white/80 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
+                >
+                  <span className="break-words font-semibold text-deep-plum">{item.title}</span>
+                  {item.snippet && <span className="line-clamp-1 break-words text-sm text-gray-700">{item.snippet}</span>}
+                  {category && (
+                    <span className="pt-1">
+                      <Badge variant="lilac">{categoryKey ? t(categoryKey) : category}</Badge>
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </section>
+        )}
+
+        {isSearchMode && !loading && !message && searchContent.filter((item) => item.kind === "resource").length > 0 && (
+          <section className="space-y-3" aria-labelledby="search-places-heading">
+            <h2 id="search-places-heading" className="flex items-center gap-2 text-sm font-semibold text-deep-plum">
+              {t("search.sectionPlaces")}
+              <span className="rounded-full bg-soft-lilac px-2.5 py-1 text-xs">
+                {searchContent.filter((item) => item.kind === "resource").length}
+              </span>
+            </h2>
+            {searchContent.filter((item) => item.kind === "resource").map((item) => {
+              const name = item.extra?.name ?? item.title ?? "";
+              return (
+                <Link
+                  key={item.id}
+                  href={`/resources?q=${encodeURIComponent(name)}`}
+                  className="flex min-h-11 flex-col justify-center gap-1 rounded-2xl border border-[#CDBDEB] bg-white/80 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
+                >
+                  <span className="break-words font-semibold text-deep-plum">{name}</span>
+                  {item.snippet && <span className="line-clamp-1 break-words text-sm text-gray-700">{item.snippet}</span>}
+                </Link>
+              );
+            })}
+          </section>
+        )}
+
+        {isSearchMode && !loading && !message && searchMembers.length > 0 && (
+          <section className="space-y-3" aria-labelledby="search-members-heading">
+            <h2 id="search-members-heading" className="flex items-center gap-2 text-sm font-semibold text-deep-plum">
+              {t("search.sectionMembers")}
+              <span className="rounded-full bg-soft-lilac px-2.5 py-1 text-xs">{searchMembers.length}</span>
+            </h2>
+            {searchMembers.map((member) => (
+              <Link
+                key={member.id}
+                href={`/u/${member.id}`}
+                className="flex min-h-11 items-center gap-3 rounded-2xl border border-[#CDBDEB] bg-white/80 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
+              >
+                <span className="gradient-aurora flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-semibold text-white" aria-hidden="true">
+                  {(member.display_name?.trim().charAt(0) || "H").toLocaleUpperCase()}
+                </span>
+                <span className="min-w-0 break-words">
+                  <span className="block font-semibold text-deep-plum">{member.display_name || "Her Space member"}</span>
+                  {member.bio && <span className="line-clamp-1 break-words text-sm text-gray-700">{member.bio}</span>}
+                </span>
+              </Link>
+            ))}
+          </section>
+        )}
+
+        {!isSearchMode && loadingMore && <div className="space-y-4">{[0, 1, 2].map((index) => <PostSkeleton key={index} />)}</div>}
+        {!isSearchMode && !loading && hasMore && posts.length > 0 && <div ref={loadMoreSentinel} className="h-px" aria-hidden="true" />}
+        {!isSearchMode && !loading && !message && hasMore && posts.length > 0 && (
           <Button
             variant="secondary"
             className="w-full"

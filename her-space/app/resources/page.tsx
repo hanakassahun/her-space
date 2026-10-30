@@ -65,6 +65,14 @@ export default function ResourcesPage() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      const query = new URLSearchParams(window.location.search).get("q");
+      if (query) setSearch(query);
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, []);
+
+  useEffect(() => {
     async function loadResources() {
       if (authLoading) return;
       if (!userId) {

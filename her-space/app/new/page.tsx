@@ -206,9 +206,17 @@ export default function NewPostPage() {
           setExtraTopics("");
         } else {
           const query = new URLSearchParams(window.location.search);
+          const requestedType = query.get("type");
+          const initialType: PostType =
+            requestedType === "experience" || requestedType === "question" || requestedType === "knowledge"
+              ? requestedType
+              : "experience";
           const sharedTitle = query.get("title");
           const sharedTopics = query.get("topics");
-          if (sharedTitle) setTitle(sharedTitle);
+          setType(initialType);
+          setAllowReposts(defaultAllowReposts(initialType, "personal"));
+          setTitle(sharedTitle?.trim().slice(0, 150) ?? "");
+          setBody("");
           if (sharedTopics) setExtraTopics(sharedTopics);
         }
       }
