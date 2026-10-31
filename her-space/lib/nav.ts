@@ -11,6 +11,7 @@ export type NavIconKey =
   | "resources"
   | "profile"
   | "admin"
+  | "moderation"
   | "settings"
   | "rules"
   | "feedback"
@@ -28,6 +29,7 @@ export type NavKey =
   | "resources"
   | "profile"
   | "admin"
+  | "moderation"
   | "settings"
   | "rules"
   | "feedback"
@@ -38,6 +40,7 @@ export type NavItem = {
   href: string;
   icon: NavIconKey;
   adminOnly?: boolean;
+  moderatorOnly?: boolean;
 };
 
 export const navConfig: Record<NavKey, NavItem> = {
@@ -51,6 +54,7 @@ export const navConfig: Record<NavKey, NavItem> = {
   resources: { label: "nav.resources", href: "/resources", icon: "resources" },
   profile: { label: "nav.profile", href: "/u/{userId}", icon: "profile" },
   admin: { label: "nav.admin", href: "/admin", icon: "admin", adminOnly: true },
+  moderation: { label: "nav.moderation", href: "/moderation", icon: "admin", moderatorOnly: true },
   settings: { label: "nav.settings", href: "/settings", icon: "settings" },
   rules: { label: "nav.rules", href: "/rules", icon: "rules" },
   feedback: { label: "nav.feedback", href: "/feedback", icon: "feedback" },
@@ -82,10 +86,10 @@ export const desktopPrimaryNavOrder: NavKey[] = [
   "resources",
 ];
 
-export const desktopAccountNavOrder: NavKey[] = ["profile", "rules", "settings", "feedback", "notifications", "admin"];
+export const desktopAccountNavOrder: NavKey[] = ["profile", "rules", "settings", "feedback", "notifications", "moderation", "admin"];
 
 export const mobileNavOrder: NavKey[] = ["home", "explore", "write", "journal"];
-export const moreNavOrder: NavKey[] = ["feed", "learn", "library", "resources", "rules", "feedback", "notifications", "settings", "profile", "admin"];
+export const moreNavOrder: NavKey[] = ["feed", "learn", "library", "resources", "rules", "feedback", "notifications", "settings", "profile", "moderation", "admin"];
 
 export function resolveNavHref(key: NavKey, userId: string) {
   return navConfig[key].href.replace("{userId}", userId);

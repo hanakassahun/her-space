@@ -20,6 +20,7 @@ type AuthContextValue = {
   user: User | null;
   displayName: string | null;
   isAdmin: boolean;
+  isModerator: boolean;
   loading: boolean;
   quietMode: boolean;
   quietModeSaving: boolean;
@@ -34,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isModerator, setIsModerator] = useState(false);
   const [loading, setLoading] = useState(true);
   const [quietMode, setQuietModeState] = useState(false);
   const [quietModeSaving, setQuietModeSaving] = useState(false);
@@ -90,6 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!nextUserId) {
         setDisplayName(null);
         setIsAdmin(false);
+        setIsModerator(false);
         setQuietModeState(false);
         setQuietModeSaving(false);
         setQuietModeError("");
@@ -99,19 +102,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setDisplayName(null);
       setIsAdmin(false);
+      setIsModerator(false);
       setQuietModeState(false);
       setQuietModeSaving(false);
       setQuietModeError("");
 
-      const [profileResult, adminResult, prefsResult] = await Promise.all([
+      const [profileResult, adminResult, moderatorResult, prefsResult] = await Promise.all([
         supabase.from("profiles").select("display_name").eq("id", nextUserId).maybeSingle(),
         supabase.from("admins").select("user_id").eq("user_id", nextUserId).maybeSingle(),
+        supabase.rpc("is_moderator"),
         supabase.from("member_prefs").select("quiet_mode").eq("user_id", nextUserId).maybeSingle(),
       ]);
 
       if (!active || currentRequestId !== requestId.current) return;
       setDisplayName(profileResult.data?.display_name ?? null);
       setIsAdmin(Boolean(adminResult.data));
+      setIsModerator(Boolean(moderatorResult.data));
       setQuietModeState(Boolean(prefsResult.data?.quiet_mode));
       if (prefsResult.error) setQuietModeError(friendlyError(prefsResult.error, t));
     }
@@ -144,12 +150,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user: session?.user ?? null,
     displayName,
     isAdmin,
+    isModerator,
     loading,
     quietMode,
     quietModeSaving,
     quietModeError,
     setQuietMode,
-  }), [displayName, isAdmin, loading, quietMode, quietModeError, quietModeSaving, session, setQuietMode]);
+  }), [displayName, isAdmin, isModerator, loading, quietMode, quietModeError, quietModeSaving, session, setQuietMode]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

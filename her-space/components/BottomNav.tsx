@@ -15,7 +15,7 @@ const BottomNavMoreSheet = dynamic(() => import("@/components/BottomNavMoreSheet
 export default function BottomNav() {
   const pathname = usePathname();
   const { t } = useLanguage();
-  const { user, isAdmin, quietMode } = useAuth();
+  const { user, isAdmin, isModerator, quietMode } = useAuth();
   const userId = user?.id ?? "";
   const [moreOpen, setMoreOpen] = useState(false);
   const [sheetMounted, setSheetMounted] = useState(false);
@@ -25,7 +25,7 @@ export default function BottomNav() {
   const dragStartY = useRef<number | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const moreActive = moreNavOrder.some(
-    (key) => (!navConfig[key].adminOnly || isAdmin) && isNavItemActive(key, pathname)
+    (key) => (!navConfig[key].adminOnly || isAdmin) && (!navConfig[key].moderatorOnly || isModerator) && isNavItemActive(key, pathname)
   );
 
   function closeMore() {

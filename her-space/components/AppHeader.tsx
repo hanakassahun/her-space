@@ -17,7 +17,7 @@ const AccountMenu = dynamic(() => import("@/components/AccountMenu"), { ssr: fal
 export default function AppHeader() {
   const pathname = usePathname();
   const { t } = useLanguage();
-  const { user, isAdmin, quietMode } = useAuth();
+  const { user, isAdmin, isModerator, quietMode } = useAuth();
   const userId = user?.id ?? "";
   const showBack = !isTopLevelPath(pathname);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -93,7 +93,7 @@ export default function AppHeader() {
             H
           </button>
           {accountOpen && (
-            <AccountMenu pathname={pathname} userId={userId} isAdmin={isAdmin} onClose={() => setAccountOpen(false)} />
+            <AccountMenu pathname={pathname} userId={userId} isAdmin={isAdmin} isModerator={isModerator} onClose={() => setAccountOpen(false)} />
           )}
         </div>
       </div>

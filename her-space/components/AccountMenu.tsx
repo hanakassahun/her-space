@@ -10,10 +10,11 @@ type AccountMenuProps = {
   pathname: string;
   userId: string;
   isAdmin: boolean;
+  isModerator: boolean;
   onClose: () => void;
 };
 
-export default function AccountMenu({ pathname, userId, isAdmin, onClose }: AccountMenuProps) {
+export default function AccountMenu({ pathname, userId, isAdmin, isModerator, onClose }: AccountMenuProps) {
   const { t } = useLanguage();
 
   async function logOut() {
@@ -25,7 +26,7 @@ export default function AccountMenu({ pathname, userId, isAdmin, onClose }: Acco
     <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-2xl border border-white/70 bg-pearl-white p-2 shadow-xl" role="menu" aria-label="Account menu">
       {desktopAccountNavOrder.map((key) => {
         const item = navConfig[key];
-        if (item.adminOnly && !isAdmin) return null;
+        if ((item.adminOnly && !isAdmin) || (item.moderatorOnly && !isModerator)) return null;
         const active = isNavItemActive(key, pathname);
         return (
           <Link

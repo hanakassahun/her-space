@@ -35,7 +35,7 @@ export default function BottomNavMoreSheet({
   onLogout,
 }: BottomNavMoreSheetProps) {
   const { t } = useLanguage();
-  const { quietMode, quietModeSaving, quietModeError, setQuietMode } = useAuth();
+  const { isModerator, quietMode, quietModeSaving, quietModeError, setQuietMode } = useAuth();
 
   return (
     <div
@@ -75,7 +75,7 @@ export default function BottomNavMoreSheet({
         <ul className="space-y-1">
           {moreNavOrder.map((key) => {
             const item = navConfig[key];
-            if (item.adminOnly && !isAdmin) return null;
+            if ((item.adminOnly && !isAdmin) || (item.moderatorOnly && !isModerator)) return null;
             const active = isNavItemActive(key, pathname);
             return (
               <li key={key}>

@@ -51,6 +51,7 @@ type Post = {
   topics: string[];
   sensitive: boolean;
   created_at: string;
+  hidden_at: string | null;
   profiles: PostProfile | PostProfile[] | null;
 };
 
@@ -68,8 +69,22 @@ type Comment = {
   author_id: string;
   body: string;
   created_at: string;
+  hidden_at: string | null;
   profiles: { display_name: string | null } | { display_name: string | null }[] | null;
 };
+
+const reportCategories = [
+  "self_harm",
+  "abuse",
+  "harassment",
+  "sexual_content",
+  "privacy",
+  "misinformation",
+  "spam",
+  "other",
+] as const;
+
+type ReportCategory = (typeof reportCategories)[number];
 
 const typeVariants: Record<PostType, "rose" | "sky" | "mint"> = {
   experience: "rose",
@@ -128,7 +143,8 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
   const [reposted, setReposted] = useState(false);
   const [commentBody, setCommentBody] = useState("");
   const [activeReportTarget, setActiveReportTarget] = useState<string | null>(null);
-  const [reportReason, setReportReason] = useState("");
+  const [reportCategory, setReportCategory] = useState<ReportCategory | null>(null);
+  const [reportDetails, setReportDetails] = useState("");
   const [reportFeedback, setReportFeedback] = useState<Record<string, string>>({});
   const [submittingReport, setSubmittingReport] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -141,7 +157,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
   async function loadComments(postId: string) {
     const { data, error } = await supabase
       .from("comments")
-      .select("id, author_id, body, created_at, profiles!comments_author_id_fkey(display_name)")
+      .select("id, author_id, body, created_at, hidden_at, profiles!comments_author_id_fkey(display_name)")
       .eq("post_id", postId)
       .order("created_at", { ascending: true });
 
@@ -167,7 +183,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       const [postResult, bookmarkResult, likesResult, commentsResult, repostsResult, helpfulResult] = await Promise.all([
         supabase
           .from("posts")
-          .select("id, author_id, type, provenance, audience, like_count, helpful_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+          .select("id, author_id, type, provenance, audience, like_count, helpful_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, hidden_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
           .eq("id", id)
           .single(),
         supabase
@@ -179,7 +195,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
         supabase.from("likes").select("post_id").eq("user_id", currentUserId).in("post_id", [id]),
         supabase
           .from("comments")
-          .select("id, author_id, body, created_at, profiles!comments_author_id_fkey(display_name)")
+          .select("id, author_id, body, created_at, hidden_at, profiles!comments_author_id_fkey(display_name)")
           .eq("post_id", id)
           .order("created_at", { ascending: true }),
         supabase.from("reposts").select("post_id").eq("user_id", currentUserId).in("post_id", [id]),
@@ -389,21 +405,24 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
     targetId: string
   ) {
     event.preventDefault();
-    const reason = reportReason.trim();
-    if (!reason || submittingReport) return;
+    if (!reportCategory || submittingReport) return;
 
     setSubmittingReport(true);
     setMessage("");
     const { error } = await supabase.from("reports").insert({
-      reason,
+      category: reportCategory,
+      reason: reportDetails.trim() || reportCategory,
       ...(target === "post" ? { post_id: targetId } : { comment_id: targetId }),
     });
 
-    if (error) {
+    if (error && error.code !== "23505") {
       setMessage(friendlyError(error, t));
     } else {
-      setReportFeedback((current) => ({ ...current, [targetId]: t("post.reportThanks") }));
-      setReportReason("");
+      const feedback = error ? t("report.alreadyReported") : t("post.reportThanks");
+      const urgentNote = reportCategory === "self_harm" ? `\n${t("report.urgentNote")}` : "";
+      setReportFeedback((current) => ({ ...current, [targetId]: `${feedback}${urgentNote}` }));
+      setReportCategory(null);
+      setReportDetails("");
       setActiveReportTarget(null);
     }
     setSubmittingReport(false);
@@ -414,25 +433,43 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
     return (
       <div className="space-y-2">
         {reportFeedback[targetId] ? (
-          <p className="text-sm text-rose-800">{reportFeedback[targetId]}</p>
+          <p className="whitespace-pre-line text-sm text-rose-800">{reportFeedback[targetId]}</p>
         ) : activeReportTarget === reportKey ? (
           <form
             className="space-y-2"
             onSubmit={(event) => handleReportSubmit(event, target, targetId)}
           >
-            <Textarea
-              className="min-h-20 text-sm"
-              placeholder="Reason for reporting"
-              value={reportReason}
-              onChange={(event) => setReportReason(event.target.value)}
-              maxLength={500}
-              required
-            />
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium text-deep-plum">{t("report.categoryTitle")}</legend>
+              <div className="flex flex-wrap gap-2">
+                {reportCategories.map((category) => (
+                  <Button
+                    key={category}
+                    className="h-auto min-h-11 whitespace-normal break-words text-left leading-5"
+                    variant={reportCategory === category ? "primary" : "secondary"}
+                    type="button"
+                    aria-pressed={reportCategory === category}
+                    onClick={() => setReportCategory(category)}
+                  >
+                    {t(`report.cat.${category}`)}
+                  </Button>
+                ))}
+              </div>
+            </fieldset>
+            <label className="block space-y-2 text-sm font-medium text-deep-plum">
+              {t("report.optional")}
+              <Textarea
+                className="min-h-20 text-sm font-normal"
+                value={reportDetails}
+                onChange={(event) => setReportDetails(event.target.value)}
+                maxLength={500}
+              />
+            </label>
             <div className="flex gap-3">
               <Button
                 className="text-sm"
                 type="submit"
-                disabled={submittingReport || !reportReason.trim()}
+                disabled={submittingReport || !reportCategory}
               >
                 {submittingReport ? t("post.submittingReport") : t("post.submitReport")}
               </Button>
@@ -452,7 +489,8 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
             className="text-sm"
             type="button"
             onClick={() => {
-              setReportReason("");
+              setReportCategory(null);
+              setReportDetails("");
               setActiveReportTarget(reportKey);
             }}
           >
@@ -478,6 +516,17 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
 
         {post && (
           <>
+            {post.hidden_at && post.author_id === userId && (
+              <Card className="space-y-3">
+                <p className="break-words text-gray-700">{t("post.underReview")}</p>
+                <Link
+                  className="inline-flex min-h-11 items-center text-sm font-medium text-deep-plum underline"
+                  href="/feedback"
+                >
+                  {t("feedback.title")}
+                </Link>
+              </Card>
+            )}
             <Card as="article" className="post-card space-y-5">
               {editingPost ? (
                 <form className="space-y-4" onSubmit={savePostEdit}>
@@ -624,6 +673,9 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                         <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-gray-900">
                           {getAuthorName(comment.profiles)}
                           {comment.author_id === post.author_id && <Badge variant="sky">{t("read.author")}</Badge>}
+                          {comment.author_id === userId && comment.hidden_at && (
+                            <span className="text-xs font-normal text-gray-500">{t("post.underReviewShort")}</span>
+                          )}
                         </p>
                         <div className="flex items-center gap-1">
                           <TimeAgo className="text-xs text-gray-500" date={comment.created_at} />

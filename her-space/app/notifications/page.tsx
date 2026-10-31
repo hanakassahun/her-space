@@ -14,7 +14,7 @@ import { friendlyError } from "@/lib/errors";
 import FriendlyErrorMessage from "@/components/FriendlyErrorMessage";
 import { supabase } from "@/lib/supabase";
 
-type NotificationKind = "comment" | "follow" | "repost" | "quote";
+type NotificationKind = "comment" | "follow" | "repost" | "quote" | "review" | "notice";
 type NotificationRow = {
   id: string;
   actor_id: string | null;
@@ -22,6 +22,7 @@ type NotificationRow = {
   post_id: string | null;
   read_at: string | null;
   created_at: string;
+  message: string | null;
   profiles: { display_name: string | null } | { display_name: string | null }[] | null;
   posts: { title: string } | { title: string }[] | null;
 };
@@ -90,7 +91,7 @@ export default function NotificationsPage() {
 
     const { data, error } = await supabase
       .from("notifications")
-      .select("id, actor_id, kind, post_id, read_at, created_at, profiles!notifications_actor_id_fkey(display_name), posts!notifications_post_id_fkey(title)")
+      .select("id, actor_id, kind, post_id, read_at, created_at, message, profiles!notifications_actor_id_fkey(display_name), posts!notifications_post_id_fkey(title)")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .range(offset, offset + PAGE_SIZE - 1);
@@ -213,34 +214,57 @@ export default function NotificationsPage() {
           const post = first(notification.posts);
           const actorName = actor?.display_name?.trim() || t("notif.unknown");
           const href = notificationHref(notification);
+          const content = (
+            <>
+              <span className="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/80 text-deep-plum" aria-hidden="true">
+                <NotificationKindIcon kind={notification.kind} />
+              </span>
+              <span className="min-w-0 flex-1 space-y-1">
+                {notification.kind === "review" ? (
+                  <>
+                    <span className="block break-words font-medium text-deep-plum">{t("notif.review")}</span>
+                    <span className="block break-words text-sm text-gray-600">{t("notif.reviewBody")}</span>
+                  </>
+                ) : notification.kind === "notice" ? (
+                  <>
+                    <span className="block break-words font-medium text-deep-plum">{t("notif.notice")}</span>
+                    <span className="block whitespace-pre-wrap break-words text-sm text-gray-600">{notification.message ?? ""}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="break-words font-medium text-deep-plum">{actorName}</span>
+                      <span className="break-words text-sm text-gray-700">{t(actionKeys[notification.kind])}</span>
+                    </span>
+                    {notification.kind !== "follow" && (
+                      <span className="block line-clamp-1 break-words text-sm text-gray-600">
+                        {post?.title || t("notif.postUnavailable")}
+                      </span>
+                    )}
+                  </>
+                )}
+                <TimeAgo className="block text-xs text-gray-500" date={notification.created_at} />
+              </span>
+              {!notification.read_at && <span className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-periwinkle" aria-hidden="true" />}
+            </>
+          );
           return (
             <Card
               as="article"
               key={notification.id}
               className={`flex items-start gap-3 p-3 sm:p-4 ${notification.read_at ? "" : "bg-soft-lilac/45"}`}
             >
-              <Link
-                className="flex min-h-11 min-w-0 flex-1 items-start gap-3 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
-                href={href}
-                onClick={() => void markRead(notification)}
-              >
-                <span className="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/80 text-deep-plum" aria-hidden="true">
-                  <NotificationKindIcon kind={notification.kind} />
-                </span>
-                <span className="min-w-0 flex-1 space-y-1">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="break-words font-medium text-deep-plum">{actorName}</span>
-                    <span className="break-words text-sm text-gray-700">{t(actionKeys[notification.kind])}</span>
-                  </span>
-                  {notification.kind !== "follow" && (
-                    <span className="block line-clamp-1 break-words text-sm text-gray-600">
-                      {post?.title || t("notif.postUnavailable")}
-                    </span>
-                  )}
-                  <TimeAgo className="block text-xs text-gray-500" date={notification.created_at} />
-                </span>
-                {!notification.read_at && <span className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-periwinkle" aria-hidden="true" />}
-              </Link>
+              {notification.kind === "notice" ? (
+                <div className="flex min-h-11 min-w-0 flex-1 items-start gap-3">{content}</div>
+              ) : (
+                <Link
+                  className="flex min-h-11 min-w-0 flex-1 items-start gap-3 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
+                  href={href}
+                  onClick={() => void markRead(notification)}
+                >
+                  {content}
+                </Link>
+              )}
               <button
                 className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-white/70 hover:text-rose-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
                 type="button"
