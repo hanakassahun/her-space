@@ -24,6 +24,9 @@ import { useAuth } from "@/components/AuthProvider";
 import RepostButton from "@/components/RepostButton";
 import QuotedPostCard from "@/components/QuotedPostCard";
 import HelpfulButton from "@/components/HelpfulButton";
+import Avatar from "@/components/Avatar";
+import PollCard from "@/components/PollCard";
+import { loadPollResults, type PollResult } from "@/lib/polls";
 
 const MemberActionsMenu = dynamic(() => import("@/components/MemberActionsMenu"), { ssr: false });
 
@@ -31,6 +34,7 @@ type PostType = "experience" | "question" | "knowledge";
 type Professional = { title: string } | { title: string }[] | null;
 type PostProfile = {
   display_name: string | null;
+  avatar: string | null;
   verified_professionals: Professional;
 };
 
@@ -50,6 +54,9 @@ type Post = {
   body: string;
   topics: string[];
   sensitive: boolean;
+  is_quick: boolean;
+  has_poll: boolean;
+  poll_closes_at: string | null;
   created_at: string;
   hidden_at: string | null;
   profiles: PostProfile | PostProfile[] | null;
@@ -70,7 +77,7 @@ type Comment = {
   body: string;
   created_at: string;
   hidden_at: string | null;
-  profiles: { display_name: string | null } | { display_name: string | null }[] | null;
+  profiles: { display_name: string | null; avatar: string | null } | { display_name: string | null; avatar: string | null }[] | null;
 };
 
 const reportCategories = [
@@ -103,6 +110,11 @@ function getAuthorName(profiles: Post["profiles"] | Comment["profiles"]) {
   return profile?.display_name || "Her Space member";
 }
 
+function getAuthorAvatar(profiles: Post["profiles"] | Comment["profiles"]) {
+  const profile = Array.isArray(profiles) ? profiles[0] : profiles;
+  return profile?.avatar ?? null;
+}
+
 function getProfessionalTitle(profiles: Post["profiles"]) {
   const profile = Array.isArray(profiles) ? profiles[0] : profiles;
   const professional = profile?.verified_professionals;
@@ -123,6 +135,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
   const currentUserId = user?.id ?? null;
   const router = useRouter();
   const [post, setPost] = useState<Post | null>(null);
+  const [pollResults, setPollResults] = useState<PollResult[]>([]);
   const [relatedArticle, setRelatedArticle] = useState<RelatedArticle | null>(null);
   const [revealedPostId, setRevealedPostId] = useState<string | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -157,7 +170,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
   async function loadComments(postId: string) {
     const { data, error } = await supabase
       .from("comments")
-      .select("id, author_id, body, created_at, hidden_at, profiles!comments_author_id_fkey(display_name)")
+      .select("id, author_id, body, created_at, hidden_at, profiles!comments_author_id_fkey(display_name, avatar)")
       .eq("post_id", postId)
       .order("created_at", { ascending: true });
 
@@ -183,7 +196,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       const [postResult, bookmarkResult, likesResult, commentsResult, repostsResult, helpfulResult] = await Promise.all([
         supabase
           .from("posts")
-          .select("id, author_id, type, provenance, audience, like_count, helpful_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, hidden_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+          .select("id, author_id, type, provenance, audience, like_count, helpful_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, hidden_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))")
           .eq("id", id)
           .single(),
         supabase
@@ -195,7 +208,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
         supabase.from("likes").select("post_id").eq("user_id", currentUserId).in("post_id", [id]),
         supabase
           .from("comments")
-          .select("id, author_id, body, created_at, hidden_at, profiles!comments_author_id_fkey(display_name)")
+          .select("id, author_id, body, created_at, hidden_at, profiles!comments_author_id_fkey(display_name, avatar)")
           .eq("post_id", id)
           .order("created_at", { ascending: true }),
         supabase.from("reposts").select("post_id").eq("user_id", currentUserId).in("post_id", [id]),
@@ -210,6 +223,11 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
         const [loadedPost] = await attachQuoted([postResult.data as Post]);
         setPost(loadedPost);
         setLikeCount(loadedPost.like_count);
+        if (loadedPost.has_poll) {
+          const { rowsByPostId, error: pollsError } = await loadPollResults([loadedPost.id]);
+          if (pollsError) setMessage(friendlyError(pollsError, t));
+          else setPollResults(rowsByPostId[loadedPost.id] ?? []);
+        }
         if (loadedPost.topics?.length) {
           const overlapTerms = [...new Set(loadedPost.topics.flatMap((topic) => [topic, topic.toLowerCase(), topic.toUpperCase()]))];
           const { data: articleCandidates } = await supabase
@@ -350,14 +368,14 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
     const { data, error } = await supabase
       .from("posts")
       .update({
-        title: editTitle.trim(),
+        title: post.is_quick ? "" : editTitle.trim(),
         body: editBody.trim(),
         topics: editTopics.split(/[,،፣]/).map((topic) => topic.trim()).filter(Boolean),
         ...(post.provenance === "evidence" ? { sources } : {}),
         allow_reposts: editAllowReposts && !post.sensitive && post.audience !== "adult",
       })
       .eq("id", post.id)
-      .select("id, author_id, type, provenance, audience, like_count, helpful_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+      .select("id, author_id, type, provenance, audience, like_count, helpful_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))")
       .single();
 
     if (error) {
@@ -530,13 +548,15 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
             <Card as="article" className="post-card space-y-5">
               {editingPost ? (
                 <form className="space-y-4" onSubmit={savePostEdit}>
-                  <label className="block space-y-2 text-sm font-medium text-deep-plum">
-                    {t("common.title")}
-                    <Input value={editTitle} onChange={(event) => setEditTitle(event.target.value)} required />
-                  </label>
+                  {!post.is_quick && (
+                    <label className="block space-y-2 text-sm font-medium text-deep-plum">
+                      {t("common.title")}
+                      <Input value={editTitle} onChange={(event) => setEditTitle(event.target.value)} required />
+                    </label>
+                  )}
                   <label className="block space-y-2 text-sm font-medium text-deep-plum">
                     {t("common.body")}
-                    <Textarea className="min-h-40" value={editBody} onChange={(event) => setEditBody(event.target.value)} required />
+                    <Textarea className="min-h-40" maxLength={post.is_quick ? 280 : 5000} value={editBody} onChange={(event) => setEditBody(event.target.value)} required />
                   </label>
                   <label className="block space-y-2 text-sm font-medium text-deep-plum">
                     {t("post.topicsInput")}
@@ -575,7 +595,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                 </form>
               ) : (
                 <div className="space-y-4">
-                  <h1 className="break-words text-2xl font-bold text-gray-900">{post.title}</h1>
+                  {!post.is_quick && <h1 className="break-words text-2xl font-bold text-gray-900">{post.title}</h1>}
                   <QuotedPostCard quotedPostId={post.quoted_post_id} quoted={post.quoted} />
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant={typeVariants[post.type]}>{t(typeTranslationKeys[post.type])}</Badge>
@@ -583,9 +603,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                     <ProvenanceBadge provenance={post.provenance} sources={post.sources} />
                   </div>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-gray-600">
-                    <span className="gradient-aurora flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white" aria-hidden="true">
-                      {getAuthorName(post.profiles).trim().charAt(0).toLocaleUpperCase() || "H"}
-                    </span>
+                    <Avatar name={getAuthorName(post.profiles)} avatar={getAuthorAvatar(post.profiles)} size={36} />
                     <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
                       <Link className="font-medium text-deep-plum underline" href={`/u/${post.author_id}`}>
                         {getAuthorName(post.profiles)}
@@ -624,8 +642,11 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                           ))}
                         </ul>
                       )}
-                      <UserText text={post.body} className="max-w-[65ch] text-[17px] text-gray-800" />
+                      <UserText text={post.body} className={`max-w-[65ch] ${post.is_quick ? "text-lg" : "text-[17px]"} text-gray-800`} />
                     </>
+                  )}
+                  {(!post.sensitive || revealedPostId === post.id) && post.has_poll && (
+                    <PollCard postId={post.id} rows={pollResults} closesAt={post.poll_closes_at} />
                   )}
                   <HelpfulButton
                     key={post.id}
@@ -671,6 +692,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                     <Card as="article" key={comment.id} className="space-y-2">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-gray-900">
+                          <Avatar name={getAuthorName(comment.profiles)} avatar={getAuthorAvatar(comment.profiles)} size={32} />
                           {getAuthorName(comment.profiles)}
                           {comment.author_id === post.author_id && <Badge variant="sky">{t("read.author")}</Badge>}
                           {comment.author_id === userId && comment.hidden_at && (

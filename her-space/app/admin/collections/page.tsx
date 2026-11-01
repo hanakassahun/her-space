@@ -32,7 +32,7 @@ type CollectionItem = {
   article_id: string | null;
   post_id: string | null;
   articles: Related<{ title: string; slug: string }>;
-  posts: Related<{ title: string }>;
+  posts: Related<{ title: string; is_quick: boolean }>;
 };
 type CollectionForm = { title: string; slug: string; description: string };
 
@@ -113,7 +113,7 @@ export default function AdminCollectionsPage() {
     setLoadingItems(true);
     const { data, error } = await supabase
       .from("collection_items")
-      .select("id, collection_id, position, article_id, post_id, articles!collection_items_article_id_fkey(title, slug), posts!collection_items_post_id_fkey(title)")
+      .select("id, collection_id, position, article_id, post_id, articles!collection_items_article_id_fkey(title, slug), posts!collection_items_post_id_fkey(title, is_quick)")
       .eq("collection_id", collectionId)
       .order("position", { ascending: true });
 
@@ -366,7 +366,7 @@ export default function AdminCollectionsPage() {
                   <li key={item.id}>
                     <Card as="div" className="flex flex-wrap items-center justify-between gap-3 !p-3">
                       <span className="min-w-0 flex-1 break-words text-sm text-deep-plum">
-                        {article ? `Article: ${article.title}` : post ? `Post: ${post.title}` : `Hidden item (${item.id})`}
+                        {article ? `Article: ${article.title}` : post ? `Post: ${post.is_quick ? "Quick post" : post.title}` : `Hidden item (${item.id})`}
                       </span>
                       <div className="flex flex-wrap gap-1">
                         <Button variant="secondary" type="button" className="!min-h-11 !px-3" disabled={index === 0 || busyItemId !== null} onClick={() => void moveItem(item, -1)} aria-label="Move item up">↑</Button>

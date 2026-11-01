@@ -8,11 +8,13 @@ import { useLanguage } from "@/components/LanguageProvider";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import Avatar from "@/components/Avatar";
 
 type SuggestedMember = {
   id: string;
   display_name: string | null;
   bio: string | null;
+  avatar: string | null;
   shared_topics: string[] | null;
 };
 
@@ -113,9 +115,7 @@ export default function SuggestedMembers() {
               className="w-64 shrink-0 snap-start space-y-3 p-4"
             >
               <div className="flex min-w-0 items-center gap-2">
-                <span className="gradient-aurora flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white" aria-hidden="true">
-                  {displayName.trim().charAt(0).toLocaleUpperCase() || "H"}
-                </span>
+                <Avatar name={displayName} avatar={member.avatar} size={36} />
                 <Link className="min-w-0 break-words font-medium text-deep-plum underline" href={`/u/${member.id}`}>
                   {displayName}
                 </Link>

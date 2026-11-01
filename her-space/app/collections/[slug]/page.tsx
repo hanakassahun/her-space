@@ -11,6 +11,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/components/AuthProvider";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
+import Avatar from "@/components/Avatar";
 
 type Collection = {
   id: string;
@@ -35,9 +36,11 @@ type ArticleItem = {
 type PostItem = {
   id: string;
   title: string;
+  body: string;
+  is_quick: boolean;
   type: "experience" | "question" | "knowledge";
   provenance: "personal" | "community" | "evidence";
-  profiles: Related<{ display_name: string | null }>;
+  profiles: Related<{ display_name: string | null; avatar: string | null }>;
 };
 
 type CollectionItem = {
@@ -93,7 +96,7 @@ export default function CollectionPage({ params }: { params: Promise<{ slug: str
       setCollection(collectionData as Collection);
       const { data: itemData, error: itemError } = await supabase
         .from("collection_items")
-        .select("id, position, articles!collection_items_article_id_fkey(id, slug, title, title_am, summary, summary_am, category), posts!collection_items_post_id_fkey(id, title, type, provenance, profiles!posts_author_id_fkey(display_name))")
+        .select("id, position, articles!collection_items_article_id_fkey(id, slug, title, title_am, summary, summary_am, category), posts!collection_items_post_id_fkey(id, title, body, is_quick, type, provenance, profiles!posts_author_id_fkey(display_name, avatar))")
         .eq("collection_id", collectionData.id)
         .order("position", { ascending: true });
 
@@ -181,10 +184,12 @@ export default function CollectionPage({ params }: { params: Promise<{ slug: str
               >
                 <Card as="article" className="space-y-2">
                   <span className="text-xs font-semibold text-gray-600">{t("collections.memberStory")}</span>
-                  <h2 className="break-words text-lg font-semibold text-deep-plum">{post.title}</h2>
+                  {!post.is_quick && <h2 className="break-words text-lg font-semibold text-deep-plum">{post.title}</h2>}
+                  {post.is_quick && <p className="break-words text-lg leading-7 text-gray-800">{post.body}</p>}
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <ProvenanceBadge provenance={post.provenance} short />
-                    <span className="break-words text-sm text-gray-600">
+                    <span className="flex items-center gap-2 break-words text-sm text-gray-600">
+                      <Avatar name={profile?.display_name || t("common.herSpaceMember")} avatar={profile?.avatar ?? null} size={32} />
                       {profile?.display_name || t("common.herSpaceMember")}
                     </span>
                   </div>

@@ -23,10 +23,14 @@ import TimeAgo from "@/components/TimeAgo";
 import { useAuth } from "@/components/AuthProvider";
 import RepostButton from "@/components/RepostButton";
 import QuotedPostCard from "@/components/QuotedPostCard";
+import Avatar from "@/components/Avatar";
+import PollCard from "@/components/PollCard";
+import { loadPollResults, type PollResult } from "@/lib/polls";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
   display_name: string | null;
+  avatar: string | null;
   verified_professionals: Professional;
 };
 
@@ -45,6 +49,9 @@ type Post = {
   body: string;
   topics: string[];
   sensitive: boolean;
+  is_quick: boolean;
+  has_poll: boolean;
+  poll_closes_at: string | null;
   created_at: string;
   profiles: Profile | Profile[] | null;
 };
@@ -111,6 +118,7 @@ export default function FeedPage() {
   const isSignedIn = Boolean(currentUserId);
   const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
+  const [pollResults, setPollResults] = useState<Record<string, PollResult[]>>({});
   const [reasonsByPostId, setReasonsByPostId] = useState<Record<string, RecommendationReason>>({});
   const [followingIds, setFollowingIds] = useState<string[]>([]);
   const [likeStates, setLikeStates] = useState<Record<string, LikeState>>({});
@@ -194,7 +202,7 @@ export default function FeedPage() {
       if (postIds.length > 0) {
         const { data: postsData, error: postsError } = await supabase
           .from("posts")
-          .select("id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+          .select("id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))")
           .in("id", postIds);
         if (postsError) {
           setMessage(friendlyError(postsError, t));
@@ -218,7 +226,7 @@ export default function FeedPage() {
     } else {
       const postsResult = await supabase
         .from("posts")
-        .select("id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+        .select("id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))")
         .order("created_at", { ascending: false })
         .range(from, to);
 
@@ -235,6 +243,11 @@ export default function FeedPage() {
     }
 
     incomingPosts = await attachQuoted(incomingPosts);
+    const { rowsByPostId, error: pollsError } = await loadPollResults(
+      incomingPosts.filter((post) => post.has_poll).map((post) => post.id)
+    );
+    if (pollsError) setMessage(friendlyError(pollsError, t));
+    else setPollResults((current) => reset ? rowsByPostId : { ...current, ...rowsByPostId });
     const nextPosts = reset ? incomingPosts : mergeUniquePosts(posts, incomingPosts);
     setPosts(nextPosts);
     setHasMore(pageHasMore);
@@ -518,9 +531,9 @@ export default function FeedPage() {
               )}
 
               <div className="space-y-2">
-                <h2 className="text-xl font-semibold text-gray-900">
+                {!post.is_quick && <h2 className="text-xl font-semibold text-gray-900">
                   <Link href={`/post/${post.id}`} onClick={saveScrollForPost}>{post.title}</Link>
-                </h2>
+                </h2>}
                 <QuotedPostCard quotedPostId={post.quoted_post_id} quoted={post.quoted} />
                 {post.sensitive && !revealedPostIds[post.id] ? (
                   <div className="space-y-3 rounded-2xl border border-rose-200 bg-rose-50/70 p-4" role="note">
@@ -530,9 +543,12 @@ export default function FeedPage() {
                     </Button>
                   </div>
                 ) : (
-                  <PostBody body={post.body} href={`/post/${post.id}`} onNavigate={saveScrollForPost} />
+                  <PostBody body={post.body} href={`/post/${post.id}`} onNavigate={saveScrollForPost} clamp={!post.is_quick} className={post.is_quick ? "text-lg" : ""} />
                 )}
               </div>
+              {(!post.sensitive || revealedPostIds[post.id]) && post.has_poll && (
+                <PollCard postId={post.id} rows={pollResults[post.id] ?? []} closesAt={post.poll_closes_at} />
+              )}
 
               {(!post.sensitive || revealedPostIds[post.id]) && post.topics?.length > 0 && (
                 <ul className="flex flex-wrap gap-2" aria-label={t("common.topics")}>
@@ -549,9 +565,7 @@ export default function FeedPage() {
 
               <div className="flex flex-col gap-3 border-t border-rose-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex min-w-0 items-center gap-2 text-sm text-gray-600">
-                  <span className="gradient-aurora flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white" aria-hidden="true">
-                    {getAuthorName(post.profiles).trim().charAt(0).toLocaleUpperCase() || "H"}
-                  </span>
+                  <Avatar name={getAuthorName(post.profiles)} avatar={getAuthorProfile(post.profiles)?.avatar ?? null} size={32} />
                   <span className="min-w-0 break-words">
                     {t("common.by")} <Link className="underline" href={`/u/${post.author_id}`}>{getAuthorName(post.profiles)}</Link>
                   {getProfessionalTitle(getAuthorProfile(post.profiles)) && (

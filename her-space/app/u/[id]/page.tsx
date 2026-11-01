@@ -21,6 +21,9 @@ import TimeAgo from "@/components/TimeAgo";
 import { useAuth } from "@/components/AuthProvider";
 import RepostButton from "@/components/RepostButton";
 import QuotedPostCard from "@/components/QuotedPostCard";
+import Avatar from "@/components/Avatar";
+import PollCard from "@/components/PollCard";
+import { loadPollResults, type PollResult } from "@/lib/polls";
 
 const MemberActionsMenu = dynamic(() => import("@/components/MemberActionsMenu"), { ssr: false });
 
@@ -29,9 +32,11 @@ type Profile = {
   id: string;
   display_name: string | null;
   bio: string;
+  avatar: string | null;
 };
 type PostProfile = {
   display_name: string | null;
+  avatar: string | null;
   verified_professionals?: Professional;
 };
 type Post = {
@@ -49,6 +54,9 @@ type Post = {
   body: string;
   topics: string[];
   sensitive: boolean;
+  is_quick: boolean;
+  has_poll: boolean;
+  poll_closes_at: string | null;
   created_at: string;
   profiles: PostProfile | PostProfile[] | null;
 };
@@ -91,6 +99,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
   const [profile, setProfile] = useState<Profile | null>(null);
   const [bioDraft, setBioDraft] = useState("");
   const [posts, setPosts] = useState<Post[]>([]);
+  const [pollResults, setPollResults] = useState<Record<string, PollResult[]>>({});
   const [reposts, setReposts] = useState<RepostRow[]>([]);
   const [repostedIds, setRepostedIds] = useState<Record<string, boolean>>({});
   const [revealedPostIds, setRevealedPostIds] = useState<Record<string, boolean>>({});
@@ -123,7 +132,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
 
       const [profileResult, followersResult, followingResult, followResult, postsResult, repostsResult] =
         await Promise.all([
-          supabase.from("profiles").select("id, display_name, bio").eq("id", id).single(),
+          supabase.from("profiles").select("id, display_name, bio, avatar").eq("id", id).single(),
           supabase
             .from("follows")
             .select("follower_id", { count: "exact", head: true })
@@ -143,13 +152,13 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
           supabase
             .from("posts")
             .select(
-              "id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))"
+              "id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))"
             )
             .eq("author_id", id)
             .order("created_at", { ascending: false }),
           supabase
             .from("reposts")
-            .select("created_at, posts!reposts_post_id_fkey(id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name))")
+            .select("created_at, posts!reposts_post_id_fkey(id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar))")
             .eq("user_id", id)
             .order("created_at", { ascending: false }),
         ]);
@@ -162,6 +171,19 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
         ? null
         : await attachQuotedToReposts((repostsResult.data ?? []) as RepostRow[]);
       if (cancelled) return;
+      const loadedPostBatch = [
+        ...(loadedPosts ?? []),
+        ...(loadedReposts ?? []).flatMap((row) => {
+          const repost = first(row.posts);
+          return repost ? [repost] : [];
+        }),
+      ];
+      const { rowsByPostId, error: pollsError } = await loadPollResults(
+        [...new Set(loadedPostBatch.filter((post) => post.has_poll).map((post) => post.id))]
+      );
+      if (cancelled) return;
+      if (pollsError) setMessage(friendlyError(pollsError, t));
+      else setPollResults(rowsByPostId);
 
       if (profileResult.error) {
         setMessage(friendlyError(profileResult.error, t));
@@ -269,13 +291,13 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
     const { data, error } = await supabase
       .from("posts")
       .update({
-        title: postTitleDraft.trim(),
+        title: post.is_quick ? "" : postTitleDraft.trim(),
         body: postBodyDraft.trim(),
         topics: postTopicsDraft.split(/[,،፣]/).map((topic) => topic.trim()).filter(Boolean),
         ...(post.provenance === "evidence" ? { sources } : {}),
       })
       .eq("id", post.id)
-      .select("id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+      .select("id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))")
       .single();
 
     if (error) setMessage(friendlyError(error, t));
@@ -311,9 +333,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
             {profile && (
               <>
                 <div className="mt-4 flex items-center gap-4">
-                  <div className="gradient-aurora shadow-glow flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-2xl font-semibold text-white" aria-hidden="true">
-                    {(profile.display_name || "H").trim().charAt(0).toUpperCase()}
-                  </div>
+                  <Avatar name={profile.display_name || "Her Space member"} avatar={profile.avatar} size={64} />
                   <div>
                     <h1 className="text-3xl font-bold text-deep-plum">
                       {profile.display_name || "Her Space member"}
@@ -327,6 +347,14 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
               </>
             )}
           </div>
+          {userId === id && profile && (
+            <Link
+              href="/settings/profile"
+              className="mt-7 inline-flex min-h-11 items-center rounded-full border border-[#CDBDEB] bg-white px-4 text-sm font-semibold text-deep-plum underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
+            >
+              {t("profile.edit")}
+            </Link>
+          )}
           {userId && userId !== id && profile && (
             <div className="mt-7 flex items-center gap-2">
               {blockState == null && (
@@ -350,12 +378,12 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                       const [postsResult, repostsResult] = await Promise.all([
                         supabase
                           .from("posts")
-                          .select("id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))")
+                          .select("id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))")
                           .eq("author_id", id)
                           .order("created_at", { ascending: false }),
                         supabase
                           .from("reposts")
-                          .select("created_at, posts!reposts_post_id_fkey(id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name))")
+                          .select("created_at, posts!reposts_post_id_fkey(id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar))")
                           .eq("user_id", id)
                           .order("created_at", { ascending: false }),
                       ]);
@@ -363,10 +391,11 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                         ? await attachQuoted(postsResult.data as Post[])
                         : null;
                       if (loadedPosts) setPosts(loadedPosts);
+                      let repostedPosts: Post[] = [];
                       if (repostsResult.data) {
                         const repostRows = await attachQuotedToReposts(repostsResult.data as RepostRow[]);
                         setReposts(repostRows);
-                        const repostedPosts = repostRows.map((row) => first(row.posts)).filter((post): post is Post => Boolean(post));
+                        repostedPosts = repostRows.map((row) => first(row.posts)).filter((post): post is Post => Boolean(post));
                         const allPostIds = [...new Set([
                           ...(loadedPosts ?? []).map((post) => post.id),
                           ...repostedPosts.map((post) => post.id),
@@ -380,6 +409,12 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                           if (sharedRows) setRepostedIds(Object.fromEntries(sharedRows.map(({ post_id }) => [post_id, true])));
                         }
                       }
+                      const pollBatch = [...(loadedPosts ?? []), ...repostedPosts];
+                      const { rowsByPostId, error: pollsError } = await loadPollResults(
+                        [...new Set(pollBatch.filter((post) => post.has_poll).map((post) => post.id))]
+                      );
+                      if (pollsError) setMessage(friendlyError(pollsError, t));
+                      else setPollResults(rowsByPostId);
                     })();
                   }
                 }}
@@ -442,13 +477,13 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
               </div>
               {editingPostId === post.id ? (
                 <form className="space-y-3" onSubmit={(event) => savePostEdit(event, post)}>
-                  <label className="block space-y-2 text-sm font-medium text-deep-plum">
-                    Title
-                    <Input value={postTitleDraft} onChange={(event) => setPostTitleDraft(event.target.value)} required />
-                  </label>
+                  {!post.is_quick && <label className="block space-y-2 text-sm font-medium text-deep-plum">
+                      Title
+                      <Input value={postTitleDraft} onChange={(event) => setPostTitleDraft(event.target.value)} required />
+                  </label>}
                   <label className="block space-y-2 text-sm font-medium text-deep-plum">
                     Body
-                    <Textarea className="min-h-36" value={postBodyDraft} onChange={(event) => setPostBodyDraft(event.target.value)} required />
+                    <Textarea className="min-h-36" maxLength={post.is_quick ? 280 : 5000} value={postBodyDraft} onChange={(event) => setPostBodyDraft(event.target.value)} required />
                   </label>
                   <label className="block space-y-2 text-sm font-medium text-deep-plum">
                     Topics (comma-separated)
@@ -467,9 +502,9 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                 </form>
               ) : (
                 <div className="space-y-2">
-                  <h3 className="text-xl font-semibold text-gray-900">
+                  {!post.is_quick && <h3 className="text-xl font-semibold text-gray-900">
                     <Link href={`/post/${post.id}`}>{post.title}</Link>
-                  </h3>
+                  </h3>}
                   <QuotedPostCard quotedPostId={post.quoted_post_id} quoted={post.quoted} />
                   {post.sensitive && !revealedPostIds[post.id] ? (
                     <div className="space-y-3 rounded-2xl border border-rose-200 bg-rose-50/70 p-4" role="note">
@@ -479,7 +514,14 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                       </Button>
                     </div>
                   ) : (
-                    <UserText text={post.body} className="text-gray-800" />
+                    post.is_quick ? (
+                      <Link className="block rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle" href={`/post/${post.id}`}>
+                        <UserText text={post.body} className="text-lg text-gray-800" />
+                      </Link>
+                    ) : <UserText text={post.body} className="text-gray-800" />
+                  )}
+                  {(!post.sensitive || revealedPostIds[post.id]) && post.has_poll && (
+                    <PollCard postId={post.id} rows={pollResults[post.id] ?? []} closesAt={post.poll_closes_at} />
                   )}
                   {userId === id && (
                     <div className="flex flex-wrap gap-2 pt-1">
@@ -535,9 +577,9 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                     <TimeAgo className="text-sm text-gray-500" date={sharedAt} />
                   </div>
                   <div className="space-y-2">
-                    <h3 className="text-xl font-semibold text-gray-900">
+                    {!post.is_quick && <h3 className="text-xl font-semibold text-gray-900">
                       <Link href={`/post/${post.id}`}>{post.title}</Link>
-                    </h3>
+                    </h3>}
                     <QuotedPostCard quotedPostId={post.quoted_post_id} quoted={post.quoted} />
                     {post.sensitive && !revealedPostIds[post.id] ? (
                       <div className="space-y-3 rounded-2xl border border-rose-200 bg-rose-50/70 p-4" role="note">
@@ -547,8 +589,13 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                         </Button>
                       </div>
                     ) : (
-                      <UserText text={post.body} className="text-gray-800" />
+                      post.is_quick ? (
+                        <Link className="block rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle" href={`/post/${post.id}`}>
+                          <UserText text={post.body} className="text-lg text-gray-800" />
+                        </Link>
+                      ) : <UserText text={post.body} className="text-gray-800" />
                     )}
+                    {post.has_poll && <PollCard postId={post.id} rows={pollResults[post.id] ?? []} closesAt={post.poll_closes_at} />}
                   </div>
                   <p className="text-sm text-gray-600">{t("common.by")} {postProfile?.display_name || "Her Space member"}</p>
                   <ProvenanceBadge provenance={post.provenance} sources={post.sources} short />

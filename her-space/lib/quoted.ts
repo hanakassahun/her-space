@@ -4,7 +4,8 @@ export type QuotedPost = {
   id: string;
   title: string;
   body: string;
-  profiles: { display_name: string | null } | { display_name: string | null }[] | null;
+  is_quick: boolean;
+  profiles: { display_name: string | null; avatar: string | null } | { display_name: string | null; avatar: string | null }[] | null;
 };
 
 export async function attachQuoted<T extends { quoted_post_id: string | null }>(
@@ -15,7 +16,7 @@ export async function attachQuoted<T extends { quoted_post_id: string | null }>(
 
   const { data, error } = await supabase
     .from("posts")
-    .select("id, title, body, profiles!posts_author_id_fkey(display_name)")
+    .select("id, title, body, is_quick, profiles!posts_author_id_fkey(display_name, avatar)")
     .in("id", ids);
 
   if (error) {

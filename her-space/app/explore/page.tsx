@@ -23,10 +23,14 @@ import { useAuth } from "@/components/AuthProvider";
 import RepostButton from "@/components/RepostButton";
 import QuotedPostCard from "@/components/QuotedPostCard";
 import type { TranslationKey } from "@/lib/i18n/en";
+import Avatar from "@/components/Avatar";
+import PollCard from "@/components/PollCard";
+import { loadPollResults, type PollResult } from "@/lib/polls";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
   display_name: string | null;
+  avatar: string | null;
   verified_professionals: Professional;
 };
 type Post = {
@@ -44,6 +48,9 @@ type Post = {
   body: string;
   topics: string[];
   sensitive: boolean;
+  is_quick: boolean;
+  has_poll: boolean;
+  poll_closes_at: string | null;
   created_at: string;
   profiles: Profile | Profile[] | null;
 };
@@ -62,6 +69,7 @@ type SearchMemberResult = {
   id: string;
   display_name: string | null;
   bio: string | null;
+  avatar: string | null;
 };
 type ExploreRestoreState = {
   scrollY: number;
@@ -99,7 +107,7 @@ const typeTranslationKeys = {
 
 const PAGE_SIZE = 20;
 const POST_SELECT =
-  "id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title))";
+  "id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))";
 const searchArticleCategoryKeys: Record<string, TranslationKey> = {
   health: "explore.health",
   body_beauty: "explore.bodyBeauty",
@@ -143,6 +151,7 @@ export default function ExplorePage() {
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [restoreReady, setRestoreReady] = useState(false);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [pollResults, setPollResults] = useState<Record<string, PollResult[]>>({});
   const [likeStates, setLikeStates] = useState<Record<string, LikeState>>({});
   const [repostedIds, setRepostedIds] = useState<Record<string, boolean>>({});
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
@@ -350,6 +359,11 @@ export default function ExplorePage() {
 
     const incomingPosts = await attachQuoted((data ?? []) as Post[]);
     setPosts((current) => (reset ? incomingPosts : mergeUniquePosts(current, incomingPosts)));
+    const { rowsByPostId, error: pollsError } = await loadPollResults(
+      incomingPosts.filter((post) => post.has_poll).map((post) => post.id)
+    );
+    if (pollsError) setMessage(friendlyError(pollsError, t));
+    else setPollResults((current) => reset ? rowsByPostId : { ...current, ...rowsByPostId });
     await loadPostInteractionState(incomingPosts, reset);
     setHasMore(incomingPosts.length === PAGE_SIZE);
     setPage(nextPage);
@@ -410,6 +424,12 @@ export default function ExplorePage() {
       }
 
       setPosts(matchedPosts);
+      const { rowsByPostId, error: pollsError } = await loadPollResults(
+        matchedPosts.filter((post) => post.has_poll).map((post) => post.id)
+      );
+      if (!isCurrentRequest()) return;
+      if (pollsError) setMessage(friendlyError(pollsError, t));
+      else setPollResults(rowsByPostId);
       await loadPostInteractionState(matchedPosts, true, requestId);
       if (isCurrentRequest()) setLoading(false);
     }
@@ -685,9 +705,9 @@ export default function ExplorePage() {
                   <TimeAgo className="text-sm text-gray-500" date={post.created_at} />
                 </div>
                 <div className="space-y-2">
-                  <h2 className="text-xl font-semibold text-gray-900">
+                  {!post.is_quick && <h2 className="text-xl font-semibold text-gray-900">
                     <Link href={`/post/${post.id}`} onClick={saveScrollForPost}>{post.title}</Link>
-                  </h2>
+                  </h2>}
                   <QuotedPostCard quotedPostId={post.quoted_post_id} quoted={post.quoted} />
                   {post.sensitive && !revealedPostIds[post.id] ? (
                     <div className="space-y-3 rounded-2xl border border-rose-200 bg-rose-50/70 p-4" role="note">
@@ -697,9 +717,12 @@ export default function ExplorePage() {
                       </Button>
                     </div>
                   ) : (
-                    <PostBody body={post.body} href={`/post/${post.id}`} onNavigate={saveScrollForPost} />
+                    <PostBody body={post.body} href={`/post/${post.id}`} onNavigate={saveScrollForPost} clamp={!post.is_quick} className={post.is_quick ? "text-lg" : ""} />
                   )}
                 </div>
+                {(!post.sensitive || revealedPostIds[post.id]) && post.has_poll && (
+                  <PollCard postId={post.id} rows={pollResults[post.id] ?? []} closesAt={post.poll_closes_at} />
+                )}
                 {(!post.sensitive || revealedPostIds[post.id]) && post.topics?.length > 0 && (
                   <ul className="flex flex-wrap gap-2" aria-label={t("common.topics")}>
                     {post.topics.map((topic, index) => (
@@ -714,9 +737,7 @@ export default function ExplorePage() {
                 )}
                 <div className="flex flex-col gap-3 border-t border-rose-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex min-w-0 items-center gap-2 text-sm text-gray-600">
-                    <span className="gradient-aurora flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white" aria-hidden="true">
-                      {(profile?.display_name || "Her Space member").trim().charAt(0).toLocaleUpperCase() || "H"}
-                    </span>
+                    <Avatar name={profile?.display_name || "Her Space member"} avatar={profile?.avatar ?? null} size={32} />
                     <span className="min-w-0 break-words">
                       {t("common.by")} {" "}
                       <Link className="underline" href={`/u/${post.author_id}`}>
@@ -836,9 +857,7 @@ export default function ExplorePage() {
                 href={`/u/${member.id}`}
                 className="flex min-h-11 items-center gap-3 rounded-2xl border border-[#CDBDEB] bg-white/80 px-4 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
               >
-                <span className="gradient-aurora flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-semibold text-white" aria-hidden="true">
-                  {(member.display_name?.trim().charAt(0) || "H").toLocaleUpperCase()}
-                </span>
+                <Avatar name={member.display_name || "Her Space member"} avatar={member.avatar} size={40} />
                 <span className="min-w-0 break-words">
                   <span className="block font-semibold text-deep-plum">{member.display_name || "Her Space member"}</span>
                   {member.bio && <span className="line-clamp-1 break-words text-sm text-gray-700">{member.bio}</span>}

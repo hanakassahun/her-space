@@ -16,6 +16,7 @@ import SuccessCheck from "@/components/ui/SuccessCheck";
 import { useLanguage } from "@/components/LanguageProvider";
 import type { TranslationKey } from "@/lib/i18n/en";
 import { useAuth } from "@/components/AuthProvider";
+import { getPollClosingTime } from "@/lib/polls";
 
 type PostType = "experience" | "question" | "knowledge";
 type Provenance = "personal" | "community" | "evidence";
@@ -24,10 +25,11 @@ type QuotedSource = {
   id: string;
   title: string;
   body: string;
+  is_quick: boolean;
   type: PostType;
   provenance: Provenance;
   allow_reposts: boolean;
-  profiles: { display_name: string | null } | { display_name: string | null }[] | null;
+  profiles: { display_name: string | null; avatar: string | null } | { display_name: string | null; avatar: string | null }[] | null;
 };
 
 function defaultAllowReposts(postType: PostType, postProvenance: Provenance) {
@@ -37,6 +39,10 @@ function defaultAllowReposts(postType: PostType, postProvenance: Provenance) {
 type Draft = {
   title: string;
   body: string;
+  quickPost?: boolean;
+  pollEnabled?: boolean;
+  pollOptions?: string[];
+  pollDuration?: string;
   type: PostType;
   provenance: Provenance;
   topics: string[];
@@ -75,8 +81,9 @@ function hasDraftContent(draft: Draft) {
   );
 }
 
-function draftStorageKey(userId: string, quoteId: string | null) {
-  return quoteId ? `draft:${userId}:quote:${quoteId}` : `draft:${userId}`;
+function draftStorageKey(userId: string, quoteId: string | null, quickPost = false) {
+  const base = quoteId ? `draft:${userId}:quote:${quoteId}` : `draft:${userId}`;
+  return quickPost ? `${base}:quick` : base;
 }
 
 export default function NewPostPage() {
@@ -89,6 +96,12 @@ export default function NewPostPage() {
   const [sources, setSources] = useState("");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [quickPost, setQuickPost] = useState(false);
+  const [pollEnabled, setPollEnabled] = useState(false);
+  const [pollOptions, setPollOptions] = useState(["", ""]);
+  const [pollDuration, setPollDuration] = useState("never");
+  const [pendingPoll, setPendingPoll] = useState<{ postId: string; userId: string; options: string[]; closesAt: string | null } | null>(null);
+  const [pollFailed, setPollFailed] = useState(false);
   const [topics, setTopics] = useState<string[]>([]);
   const [extraTopics, setExtraTopics] = useState("");
   const [topicsExpanded, setTopicsExpanded] = useState(false);
@@ -110,9 +123,9 @@ export default function NewPostPage() {
   const userIdRef = useRef<string | null>(null);
   const ageGroup = ageSetting?.userId === currentUserId ? ageSetting.ageGroup : null;
 
-  function clearDraftFor(id: string, draftQuoteId: string | null = null) {
+  function clearDraftFor(id: string, draftQuoteId: string | null = null, quickPost = false) {
     try {
-      window.localStorage.removeItem(draftStorageKey(id, draftQuoteId));
+      window.localStorage.removeItem(draftStorageKey(id, draftQuoteId, quickPost));
     } catch {
       // Ignore local storage errors.
     }
@@ -131,7 +144,7 @@ export default function NewPostPage() {
       if (requestedQuoteId) {
         const { data, error } = await supabase
           .from("posts")
-          .select("id, title, body, type, provenance, allow_reposts, profiles!posts_author_id_fkey(display_name)")
+          .select("id, title, body, is_quick, type, provenance, allow_reposts, profiles!posts_author_id_fkey(display_name, avatar)")
           .eq("id", requestedQuoteId)
           .maybeSingle();
         if (!active) return;
@@ -149,7 +162,10 @@ export default function NewPostPage() {
       }
       setQuoteChecked(true);
       const previousUserId = userIdRef.current;
-      if (previousUserId && !currentUserId) clearDraftFor(previousUserId, requestedQuoteId);
+      if (previousUserId && !currentUserId) {
+        clearDraftFor(previousUserId, requestedQuoteId);
+        clearDraftFor(previousUserId, requestedQuoteId, true);
+      }
       userIdRef.current = currentUserId;
       setUserId(currentUserId);
       setAdultsOnly(false);
@@ -175,12 +191,18 @@ export default function NewPostPage() {
       let restored = false;
       if (currentUserId) {
         try {
-          const stored = window.localStorage.getItem(draftStorageKey(currentUserId, requestedQuoteId));
+          const quickStored = window.localStorage.getItem(draftStorageKey(currentUserId, requestedQuoteId, true));
+          const stored = quickStored ?? window.localStorage.getItem(draftStorageKey(currentUserId, requestedQuoteId));
           if (stored) {
             const draft = JSON.parse(stored) as Draft;
             if (draft && hasDraftContent(draft)) {
+              const restoredQuickPost = Boolean(draft.quickPost) || quickStored !== null;
+              setQuickPost(restoredQuickPost);
               setTitle(draft.title ?? "");
               setBody(draft.body ?? "");
+              setPollEnabled(Boolean(draft.pollEnabled));
+              setPollOptions(Array.isArray(draft.pollOptions) && draft.pollOptions.length >= 2 && draft.pollOptions.length <= 4 ? draft.pollOptions : ["", ""]);
+              setPollDuration(draft.pollDuration ?? "never");
               setType(draft.type ?? "experience");
               setProvenance(draft.provenance ?? "personal");
               setTopics(Array.isArray(draft.topics) ? draft.topics : []);
@@ -227,14 +249,14 @@ export default function NewPostPage() {
     return () => {
       active = false;
     };
-  }, [authLoading, currentUserId]);
+  }, [authLoading, currentUserId, t]);
 
   useEffect(() => {
     if (!draftReady || !userId) return;
-    const draft: Draft = { title, body, type, provenance, topics, extraTopics, sources, sensitive };
+    const draft: Draft = { title, body, quickPost, pollEnabled, pollOptions, pollDuration, type, provenance, topics, extraTopics, sources, sensitive };
     const timeout = window.setTimeout(() => {
       try {
-        const key = draftStorageKey(userId, quoteId);
+        const key = draftStorageKey(userId, quoteId, quickPost);
         if (hasDraftContent(draft)) window.localStorage.setItem(key, JSON.stringify(draft));
         else window.localStorage.removeItem(key);
       } catch {
@@ -242,13 +264,18 @@ export default function NewPostPage() {
       }
     }, 800);
     return () => window.clearTimeout(timeout);
-  }, [body, draftReady, extraTopics, provenance, quoteId, sensitive, sources, title, topics, type, userId]);
+  }, [body, draftReady, extraTopics, pollDuration, pollEnabled, pollOptions, provenance, quickPost, quoteId, sensitive, sources, title, topics, type, userId]);
 
   function discardDraft() {
     if (userId) clearDraftFor(userId, quoteId);
+    if (userId) clearDraftFor(userId, quoteId, true);
     setDraftRestored(false);
     setTitle("");
     setBody("");
+    setQuickPost(false);
+    setPollEnabled(false);
+    setPollOptions(["", ""]);
+    setPollDuration("never");
     setType("experience");
     setProvenance("personal");
     setTopics([]);
@@ -279,6 +306,7 @@ export default function NewPostPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pendingPoll || (quickPost ? !body.trim() : !title.trim() || !body.trim())) return;
     setLoading(true);
     setMessage("");
     setPublished(false);
@@ -294,24 +322,41 @@ export default function NewPostPage() {
       .split("\n")
       .map((source) => source.trim())
       .filter(Boolean);
-    if (provenance === "evidence" && sourceList.length === 0) {
+    if (!quickPost && provenance === "evidence" && sourceList.length === 0) {
       setMessage(t("new.evidenceNeedsSource"));
       setLoading(false);
       return;
     }
+    const cleanedOptions = pollOptions.map((option) => option.trim());
+    if (pollEnabled && !quickPost && (
+      cleanedOptions.some((option) => !option)
+      || new Set(cleanedOptions.map((option) => option.toLocaleLowerCase())).size !== cleanedOptions.length
+    )) {
+      setLoading(false);
+      return;
+    }
+    try {
+      window.localStorage.setItem(
+        draftStorageKey(currentUserId, quoteId, quickPost),
+        JSON.stringify({ title, body, quickPost, pollEnabled, pollOptions, pollDuration, type, provenance, topics, extraTopics, sources, sensitive } satisfies Draft)
+      );
+    } catch {
+      // Keep publishing available when local storage is unavailable.
+    }
 
-    const { error } = await supabase.from("posts").insert({
+    const { data: createdPost, error } = await supabase.from("posts").insert({
       type,
       provenance,
-      sources: provenance === "evidence" ? sourceList : [],
-      title: title.trim(),
+      sources: !quickPost && provenance === "evidence" ? sourceList : [],
+      title: quickPost ? "" : title.trim(),
       body: body.trim(),
       topics: mergedTopics,
       sensitive,
       audience: ageGroup === "adult" && adultsOnly ? "adult" : "all",
       allow_reposts: allowReposts && !sensitive && !adultsOnly,
+      is_quick: quickPost,
       ...(quoteId ? { quoted_post_id: quoteId } : {}),
-    });
+    }).select("id").single();
 
     if (error) {
       setMessage(friendlyError(error, t));
@@ -319,13 +364,51 @@ export default function NewPostPage() {
       return;
     }
 
+    if (pollEnabled && !quickPost) {
+      const closesAt = getPollClosingTime(pollDuration);
+      const newPendingPoll = { postId: createdPost.id, userId: currentUserId, options: cleanedOptions, closesAt };
+      const { error: pollError } = await supabase.rpc("create_poll", {
+        p_post: newPendingPoll.postId,
+        p_options: newPendingPoll.options,
+        p_closes_at: newPendingPoll.closesAt,
+      });
+      if (pollError) {
+        setPendingPoll(newPendingPoll);
+        setPollFailed(true);
+        setLoading(false);
+        return;
+      }
+    }
+
+    finishPublish(currentUserId);
+  }
+
+  function finishPublish(currentUserId: string) {
     setDraftReady(false);
     clearDraftFor(currentUserId, quoteId);
+    clearDraftFor(currentUserId, quoteId, true);
     setDraftRestored(false);
     setPublished(true);
     setMessage(t("new.published"));
-    await new Promise((resolve) => window.setTimeout(resolve, 600));
-    router.push("/feed");
+    window.setTimeout(() => router.push("/feed"), 600);
+  }
+
+  async function retryCreatePoll() {
+    if (!pendingPoll || loading) return;
+    setLoading(true);
+    const { error } = await supabase.rpc("create_poll", {
+      p_post: pendingPoll.postId,
+      p_options: pendingPoll.options,
+      p_closes_at: pendingPoll.closesAt,
+    });
+    if (error) {
+      setPollFailed(true);
+      setLoading(false);
+      return;
+    }
+    setPollFailed(false);
+    setPendingPoll(null);
+    finishPublish(pendingPoll.userId);
   }
 
   const quoteProfile = quotedPost
@@ -379,15 +462,37 @@ export default function NewPostPage() {
         )}
 
         <form className="space-y-5" onSubmit={handleSubmit}>
+          <div className="flex items-start justify-between gap-4 rounded-2xl border border-[#CDBDEB] bg-white p-3">
+            <span className="min-w-0">
+              <span className="block break-words text-sm font-medium text-deep-plum">{t("write.quickToggle")}</span>
+              <span className="mt-1 block break-words text-xs leading-5 text-gray-600">{t("write.quickHint")}</span>
+            </span>
+            <button
+              className={`relative inline-flex h-11 w-16 shrink-0 items-center rounded-full border px-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle ${quickPost ? "gradient-aurora border-transparent" : "border-[#CDBDEB] bg-soft-lilac/40"}`}
+              type="button"
+              role="switch"
+              aria-checked={quickPost}
+              aria-label={t("write.quickToggle")}
+              onClick={() => {
+                setQuickPost((current) => !current);
+                setPreview(false);
+                setProvenance((current) => current === "evidence" ? "personal" : current);
+                setSources("");
+                if (!quickPost) setPollEnabled(false);
+              }}
+            >
+              <span className={`h-7 w-7 rounded-full bg-white shadow-sm transition-transform ${quickPost ? "translate-x-7" : "translate-x-0"}`} />
+            </button>
+          </div>
           {quotedPost && (
             <div className="space-y-2 rounded-xl border border-soft-lilac/70 bg-white/70 p-4">
               <h2 className="text-xs font-semibold text-gray-600">{t("quote.heading")}</h2>
               <p className="break-words text-sm font-medium text-deep-plum">{quoteProfile?.display_name || "Her Space member"}</p>
-              <p className="line-clamp-2 break-words font-semibold text-gray-900">{quotedPost.title}</p>
+              {!quotedPost.is_quick && <p className="line-clamp-2 break-words font-semibold text-gray-900">{quotedPost.title}</p>}
               <p className="line-clamp-4 break-words text-sm leading-6 text-gray-700">{quotedPost.body}</p>
             </div>
           )}
-          {preview ? (
+          {preview && !quickPost ? (
             <PostPreview
               type={type}
               provenance={provenance}
@@ -435,7 +540,7 @@ export default function NewPostPage() {
                 </p>
               </fieldset>
 
-              <label className="block text-sm font-medium text-deep-plum">
+              {!quickPost && <label className="block text-sm font-medium text-deep-plum">
                 {t("common.title")}
                 <Input
                   className="write-title-input mt-1 !rounded-none !border-x-0 !border-t-0 !border-b-2 !border-b-[#CDBDEB] !bg-transparent !px-1 !pb-2 !pt-1 !text-[22px] !font-medium placeholder:text-[#9d8fad] focus:!border-b-[#8F72BE] focus:!ring-0"
@@ -446,9 +551,9 @@ export default function NewPostPage() {
                   required
                 />
                 {title.length > 120 && <span className="block text-right text-xs font-normal text-gray-600">{title.length}/150</span>}
-              </label>
+              </label>}
 
-              {!body.trim() && (
+              {!quickPost && !body.trim() && (
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-deep-plum">{t("write.starters")}</p>
                   <div className="hide-scrollbar flex snap-x gap-2 overflow-x-auto pb-1 pr-3">
@@ -464,16 +569,83 @@ export default function NewPostPage() {
               <label className="block space-y-2 text-sm font-medium text-deep-plum">
                 {t("common.body")}
                 <Textarea
-                  className="min-h-40 resize-y"
-                  rows={6}
-                  maxLength={5000}
-                  placeholder={t(quotedPost ? "quote.bodyPlaceholder" : "write.bodyPlaceholder")}
+                  className={quickPost ? "min-h-32 resize-y text-lg" : "min-h-40 resize-y"}
+                  rows={quickPost ? 4 : 6}
+                  maxLength={quickPost ? 280 : 5000}
+                  placeholder={t(quickPost ? "write.quickPlaceholder" : quotedPost ? "quote.bodyPlaceholder" : "write.bodyPlaceholder")}
                   value={body}
                   onChange={(event) => setBody(event.target.value)}
                   required
                 />
-                {body.length > 4000 && <span className="block text-right text-xs font-normal text-gray-600">{body.length}/5000</span>}
+                {(quickPost || body.length > 4000) && <span className="block text-right text-xs font-normal text-gray-600">{body.length}/{quickPost ? 280 : 5000}</span>}
               </label>
+
+              {!quickPost && !quoteId && (
+                <section className="space-y-3 rounded-2xl border border-[#CDBDEB] bg-white p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium text-deep-plum">{t("poll.add")}</span>
+                    <button
+                      className={`relative inline-flex h-11 w-16 shrink-0 items-center rounded-full border px-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle ${pollEnabled ? "gradient-aurora border-transparent" : "border-[#CDBDEB] bg-soft-lilac/40"}`}
+                      type="button"
+                      role="switch"
+                      aria-checked={pollEnabled}
+                      aria-label={t("poll.add")}
+                      onClick={() => setPollEnabled((current) => !current)}
+                    >
+                      <span className={`h-7 w-7 rounded-full bg-white shadow-sm transition-transform ${pollEnabled ? "translate-x-7" : "translate-x-0"}`} />
+                    </button>
+                  </div>
+                  {pollEnabled && (
+                    <>
+                      <div className="space-y-2">
+                        {pollOptions.map((option, index) => (
+                          <div key={index} className="flex items-center gap-2">
+                            <Input
+                              className="min-w-0"
+                              value={option}
+                              maxLength={80}
+                              required
+                              aria-label={`${t("poll.option")} ${index + 1}`}
+                              placeholder={`${t("poll.option")} ${index + 1}`}
+                              onChange={(event) => setPollOptions((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))}
+                            />
+                            {pollOptions.length > 2 && (
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                className="shrink-0 px-3"
+                                aria-label={`${t("poll.removeOption")} ${index + 1}`}
+                                onClick={() => setPollOptions((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                              >
+                                ×
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      {pollOptions.length < 4 && (
+                        <Button type="button" variant="secondary" onClick={() => setPollOptions((current) => [...current, ""])}>
+                          {t("poll.addOption")}
+                        </Button>
+                      )}
+                      <label className="block space-y-2 text-sm font-medium text-deep-plum">
+                        {t("poll.closes")}
+                        <select
+                          className="min-h-11 w-full rounded-2xl border border-[#CDBDEB] bg-white px-4 py-2.5 text-deep-plum focus:border-[#8F72BE] focus:outline-none focus:ring-2 focus:ring-[#B49AD8]"
+                          value={pollDuration}
+                          onChange={(event) => setPollDuration(event.target.value)}
+                        >
+                          <option value="never">{t("poll.never")}</option>
+                          <option value="1">{t("poll.day1")}</option>
+                          <option value="3">{t("poll.day3")}</option>
+                          <option value="7">{t("poll.day7")}</option>
+                          <option value="30">{t("poll.day30")}</option>
+                        </select>
+                      </label>
+                    </>
+                  )}
+                </section>
+              )}
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-2">
@@ -548,7 +720,7 @@ export default function NewPostPage() {
                 >
                   <option value="personal">{t("new.personal")}</option>
                   <option value="community">{t("new.community")}</option>
-                  <option value="evidence">{t("new.evidence")}</option>
+                  {!quickPost && <option value="evidence">{t("new.evidence")}</option>}
                 </select>
               </label>
 
@@ -650,16 +822,22 @@ export default function NewPostPage() {
             </div>
           )}
           <div className="flex flex-wrap gap-3">
-            {!preview && (
+            {!preview && !quickPost && (
               <Button variant="secondary" className="flex-1" type="button" onClick={() => setPreview(true)}>
                 {t("write.preview")}
               </Button>
             )}
-            <Button className="publish-submit flex-1" type="submit" disabled={loading || !title.trim() || !body.trim()}>
+            <Button className="publish-submit flex-1" type="submit" disabled={loading || pendingPoll !== null || (!quickPost && !title.trim()) || !body.trim() || (pollEnabled && !quickPost && (pollOptions.some((option) => !option.trim()) || new Set(pollOptions.map((option) => option.trim().toLocaleLowerCase())).size !== pollOptions.length))}>
               {loading ? t("new.publishing") : t("new.publish")}
             </Button>
           </div>
-          {(!title.trim() || !body.trim()) && (
+          {pollFailed && pendingPoll && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-rose-50 px-3 py-2">
+              <p className="break-words text-sm text-red-700" role="alert">{t("poll.failed")}</p>
+              <Button type="button" variant="secondary" disabled={loading} onClick={() => void retryCreatePoll()}>{t("error.retry")}</Button>
+            </div>
+          )}
+          {((!quickPost && !title.trim()) || !body.trim()) && (
             <p className="text-center text-xs text-gray-600">{t("write.publishHint")}</p>
           )}
         </form>

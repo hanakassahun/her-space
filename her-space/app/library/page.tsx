@@ -20,10 +20,14 @@ import TimeAgo from "@/components/TimeAgo";
 import { useAuth } from "@/components/AuthProvider";
 import RepostButton from "@/components/RepostButton";
 import QuotedPostCard from "@/components/QuotedPostCard";
+import Avatar from "@/components/Avatar";
+import PollCard from "@/components/PollCard";
+import { loadPollResults, type PollResult } from "@/lib/polls";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
   display_name: string | null;
+  avatar: string | null;
   verified_professionals: Professional;
 };
 
@@ -42,6 +46,9 @@ type Post = {
   body: string;
   topics: string[];
   sensitive: boolean;
+  is_quick: boolean;
+  has_poll: boolean;
+  poll_closes_at: string | null;
   created_at: string;
   profiles: Profile | Profile[] | null;
 };
@@ -82,6 +89,7 @@ export default function LibraryPage() {
   const userId = user?.id ?? null;
   const router = useRouter();
   const [savedPosts, setSavedPosts] = useState<SavedPost[]>([]);
+  const [pollResults, setPollResults] = useState<Record<string, PollResult[]>>({});
   const [repostedIds, setRepostedIds] = useState<Record<string, boolean>>({});
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -101,7 +109,7 @@ export default function LibraryPage() {
       const { data, error } = await supabase
         .from("bookmarks")
         .select(
-          "created_at, posts!bookmarks_post_id_fkey(id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, created_at, profiles!posts_author_id_fkey(display_name, verified_professionals!verified_professionals_user_id_fkey(title)))"  )
+          "created_at, posts!bookmarks_post_id_fkey(id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title)))")
         .eq("user_id", userId)
         .order("created_at", { ascending: false });
 
@@ -114,6 +122,11 @@ export default function LibraryPage() {
           return post ? [{ savedAt: row.created_at, post }] : [];
         });
         const postsWithQuotes = await attachQuoted(loadedPosts.map(({ post }) => post));
+        const { rowsByPostId, error: pollsError } = await loadPollResults(
+          loadedPosts.filter(({ post }) => post.has_poll).map(({ post }) => post.id)
+        );
+        if (pollsError) setMessage(friendlyError(pollsError, t));
+        else setPollResults(rowsByPostId);
         const attachedPostsById = new Map(postsWithQuotes.map((post) => [post.id, post]));
         setSavedPosts(loadedPosts.map(({ savedAt, post }) => ({
           savedAt,
@@ -247,9 +260,9 @@ export default function LibraryPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <h2 className="text-xl font-semibold text-gray-900">
+                  {!post.is_quick && <h2 className="text-xl font-semibold text-gray-900">
                     <Link href={`/post/${post.id}`}>{post.title}</Link>
-                  </h2>
+                  </h2>}
                   <QuotedPostCard quotedPostId={post.quoted_post_id} quoted={post.quoted} />
                   {post.sensitive && !revealedPostIds[post.id] ? (
                     <div className="space-y-3 rounded-2xl border border-rose-200 bg-rose-50/70 p-4" role="note">
@@ -259,9 +272,16 @@ export default function LibraryPage() {
                       </Button>
                     </div>
                   ) : (
-                    <UserText text={post.body} className="text-gray-800" />
+                    post.is_quick ? (
+                      <Link className="block rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle" href={`/post/${post.id}`}>
+                        <UserText text={post.body} className="text-lg text-gray-800" />
+                      </Link>
+                    ) : <UserText text={post.body} className="text-gray-800" />
                   )}
                 </div>
+                {(!post.sensitive || revealedPostIds[post.id]) && post.has_poll && (
+                  <PollCard postId={post.id} rows={pollResults[post.id] ?? []} closesAt={post.poll_closes_at} />
+                )}
 
                 <ProvenanceBadge provenance={post.provenance} sources={post.sources} short />
 
@@ -280,6 +300,7 @@ export default function LibraryPage() {
 
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rose-100 pt-3">
                   <p className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                    <Avatar name={profile?.display_name || "Her Space member"} avatar={profile?.avatar ?? null} size={32} />
                     {t("common.by")} {profile?.display_name || "Her Space member"}
                     {professionalTitle && (
                       <span className="rounded bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-800">

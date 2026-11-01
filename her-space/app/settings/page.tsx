@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -43,6 +43,11 @@ export default function SettingsPage() {
   const [savedInterests, setSavedInterests] = useState<string[]>([]);
   const [savingInterests, setSavingInterests] = useState(false);
   const [interestMessage, setInterestMessage] = useState("");
+  const [showEmail, setShowEmail] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordMessage, setPasswordMessage] = useState("");
+  const [passwordSaving, setPasswordSaving] = useState(false);
 
   useEffect(() => {
     async function checkSession() {
@@ -132,6 +137,36 @@ export default function SettingsPage() {
     router.replace("/");
   }
 
+  function maskedEmail(email: string) {
+    const [localPart, ...domainParts] = email.split("@");
+    const domain = domainParts.join("@");
+    const maskedLocal = `${localPart.charAt(0)}•••${localPart.charAt(localPart.length - 1)}`;
+    return `${maskedLocal}@${domain}`;
+  }
+
+  async function changePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (passwordSaving) return;
+    if (newPassword.length < 8) {
+      setPasswordMessage(t("reset.minLength"));
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordMessage(t("reset.noMatch"));
+      return;
+    }
+    setPasswordSaving(true);
+    setPasswordMessage("");
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) setPasswordMessage(friendlyError(error, t));
+    else {
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordMessage(t("account.passwordChanged"));
+    }
+    setPasswordSaving(false);
+  }
+
   async function deleteAccount() {
     if (confirmation !== "DELETE" || deleting) return;
 
@@ -198,6 +233,38 @@ export default function SettingsPage() {
       </Card>
 
       <Card as="section" className="space-y-4">
+          <h2 className="text-xl font-semibold text-deep-plum">{t("account.title")}</h2>
+          <Link
+            href="/settings/profile"
+            className="inline-flex min-h-11 items-center rounded-full border border-[#CDBDEB] bg-white px-4 text-sm font-semibold text-deep-plum underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
+          >
+            {t("profile.edit")}
+          </Link>
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="break-all text-sm text-gray-800">{user?.email ? showEmail ? user.email : maskedEmail(user.email) : ""}</span>
+              <Button type="button" variant="secondary" className="px-3" onClick={() => setShowEmail((current) => !current)}>
+                {showEmail ? t("account.hide") : t("account.show")}
+              </Button>
+            </div>
+            <p className="text-xs text-gray-600">{t("account.emailHidden")}</p>
+          </div>
+          <form className="space-y-3 border-t border-soft-lilac pt-4" onSubmit={changePassword}>
+            <h3 className="font-semibold text-deep-plum">{t("account.changePassword")}</h3>
+            <label className="block space-y-2 text-sm font-medium text-deep-plum">
+              {t("reset.newPassword")}
+              <Input type="password" autoComplete="new-password" minLength={8} required value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
+            </label>
+            <label className="block space-y-2 text-sm font-medium text-deep-plum">
+              {t("reset.confirmPassword")}
+              <Input type="password" autoComplete="new-password" minLength={8} required value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
+            </label>
+            {passwordMessage && <p className={`break-words text-sm ${passwordMessage === t("account.passwordChanged") ? "text-emerald-800" : "text-red-700"}`} role="status"><FriendlyErrorMessage message={passwordMessage} /></p>}
+            <Button type="submit" disabled={passwordSaving}>{passwordSaving ? t("reset.saving") : t("reset.update")}</Button>
+          </form>
+        </Card>
+
+        <Card as="section" className="space-y-4">
         <div>
           <h2 className="text-xl font-semibold text-deep-plum">{t("settings.interests")}</h2>
           <p className="mt-1 text-sm text-gray-700">{t("onb.interestsBody")}</p>

@@ -24,7 +24,7 @@ type NotificationRow = {
   created_at: string;
   message: string | null;
   profiles: { display_name: string | null } | { display_name: string | null }[] | null;
-  posts: { title: string } | { title: string }[] | null;
+  posts: { title: string; is_quick: boolean } | { title: string; is_quick: boolean }[] | null;
 };
 
 const PAGE_SIZE = 30;
@@ -91,7 +91,7 @@ export default function NotificationsPage() {
 
     const { data, error } = await supabase
       .from("notifications")
-      .select("id, actor_id, kind, post_id, read_at, created_at, message, profiles!notifications_actor_id_fkey(display_name), posts!notifications_post_id_fkey(title)")
+      .select("id, actor_id, kind, post_id, read_at, created_at, message, profiles!notifications_actor_id_fkey(display_name), posts!notifications_post_id_fkey(title, is_quick)")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .range(offset, offset + PAGE_SIZE - 1);
@@ -238,7 +238,7 @@ export default function NotificationsPage() {
                     </span>
                     {notification.kind !== "follow" && (
                       <span className="block line-clamp-1 break-words text-sm text-gray-600">
-                        {post?.title || t("notif.postUnavailable")}
+                        {post?.is_quick ? t("write.quickToggle") : post?.title || t("notif.postUnavailable")}
                       </span>
                     )}
                   </>

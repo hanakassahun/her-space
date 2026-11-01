@@ -36,6 +36,7 @@ type ModerationContent = {
   id: string;
   title?: string | null;
   body: string;
+  is_quick?: boolean;
   type?: string;
   post_id?: string | null;
   hidden_at?: string | null;
@@ -308,7 +309,7 @@ export default function ModerationPage() {
     setContentLoading((current) => [...current, key]);
     setErrorMessage("");
     const result = item.target_kind === "post"
-      ? await supabase.from("posts").select("id, title, body, type, hidden_at").eq("id", id).maybeSingle()
+      ? await supabase.from("posts").select("id, title, body, is_quick, type, hidden_at").eq("id", id).maybeSingle()
       : await supabase.from("comments").select("id, body, post_id, hidden_at").eq("id", id).maybeSingle();
     if (result.error) {
       setErrorMessage(friendlyError(result.error, translateError));
@@ -539,7 +540,7 @@ export default function ModerationPage() {
                 <p className="rounded-xl bg-gray-50 p-3 text-sm text-gray-600">Already removed</p>
               ) : (
                 <div className="space-y-2 rounded-2xl bg-gray-50 p-4">
-                  {item.target_kind === "post" && content.title && <h2 className="font-semibold text-deep-plum">{content.title}</h2>}
+                  {item.target_kind === "post" && content.title && !content.is_quick && <h2 className="font-semibold text-deep-plum">{content.title}</h2>}
                   <p className="whitespace-pre-wrap break-words text-gray-800">{skimmed}</p>
                   {body.length > 200 && (
                     <div className="flex gap-2">
