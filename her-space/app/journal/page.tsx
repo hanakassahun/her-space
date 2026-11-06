@@ -15,6 +15,8 @@ import Badge from "@/components/ui/Badge";
 import SuccessCheck from "@/components/ui/SuccessCheck";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/components/AuthProvider";
+import JournalTabs from "@/components/journal/JournalTabs";
+import { isValidDateString } from "@/lib/cycle";
 import type { TranslationKey } from "@/lib/i18n/en";
 
 type PeriodStatus = "none" | "spotting" | "light" | "medium" | "heavy";
@@ -124,16 +126,35 @@ async function fetchJournalEntries(userId: string) {
 }
 
 export default function JournalPage() {
-  const { t } = useLanguage();
   const { user, loading: authLoading } = useAuth();
-  const currentUserId = user?.id ?? null;
   const router = useRouter();
-  const [userId, setUserId] = useState<string | null>(null);
+  const { t } = useLanguage();
+
+  useEffect(() => {
+    if (!authLoading && !user) router.replace("/login");
+  }, [authLoading, router, user]);
+
+  if (authLoading || !user) {
+    return (
+      <PageShell className="max-w-3xl px-4 py-6 md:px-6 md:py-10">
+        <p className="text-gray-700">{t("journal.loading")}</p>
+      </PageShell>
+    );
+  }
+
+  return <JournalContent key={user.id} userId={user.id} />;
+}
+
+function JournalContent({ userId }: { userId: string }) {
+  const { t } = useLanguage();
+  const router = useRouter();
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [draft, setDraft] = useState<EntryDraft>(emptyDraft);
   const [customSymptom, setCustomSymptom] = useState("");
   const [entryDate, setEntryDate] = useState(getLocalDate);
   const [editingPastDate, setEditingPastDate] = useState<string | null>(null);
+  const [selectedQueryDate, setSelectedQueryDate] = useState<string | null>(null);
+  const [returnToCalendar, setReturnToCalendar] = useState(false);
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -141,27 +162,34 @@ export default function JournalPage() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
+    let active = true;
     async function initializeJournal() {
-      if (authLoading) return;
-      if (!currentUserId) {
-        router.replace("/login");
-        return;
-      }
-
-      setUserId(currentUserId);
-      const { data, error } = await fetchJournalEntries(currentUserId);
+      const params = new URLSearchParams(window.location.search);
+      const requestedDate = params.get("date");
+      const queryDate = requestedDate && isValidDateString(requestedDate) && requestedDate <= getLocalDate()
+        ? requestedDate
+        : null;
+      const fromCalendar = queryDate !== null && params.get("from") === "calendar";
+      setSelectedQueryDate(queryDate);
+      setReturnToCalendar(fromCalendar);
+      setEntryDate(queryDate ?? getLocalDate());
+      const { data, error } = await fetchJournalEntries(userId);
+      if (!active) return;
       if (error) {
         setMessage(friendlyError(error, t));
       } else {
         setEntries(data);
-        const todayEntry = data.find((entry) => entry.entry_date === getLocalDate());
-        if (todayEntry) setDraft(draftFromEntry(todayEntry));
+        const selectedEntry = data.find((entry) => entry.entry_date === (queryDate ?? getLocalDate()));
+        setDraft(selectedEntry ? draftFromEntry(selectedEntry) : emptyDraft);
       }
       setLoading(false);
     }
 
     void initializeJournal();
-  }, [authLoading, currentUserId, router, t]);
+    return () => {
+      active = false;
+    };
+  }, [router, t, userId]);
 
   function toggleSymptom(symptom: string) {
     setDraft((current) => ({
@@ -191,6 +219,8 @@ export default function JournalPage() {
   }
 
   function editEntry(entry: JournalEntry) {
+    setSelectedQueryDate(null);
+    setReturnToCalendar(false);
     setEntryDate(entry.entry_date);
     setEditingPastDate(entry.entry_date === getLocalDate() ? null : entry.entry_date);
     setDraft(draftFromEntry(entry));
@@ -199,6 +229,8 @@ export default function JournalPage() {
   }
 
   function cancelPastEdit() {
+    setSelectedQueryDate(null);
+    setReturnToCalendar(false);
     setEditingPastDate(null);
     setEntryDate(getLocalDate());
     const todayEntry = entries.find((entry) => entry.entry_date === getLocalDate());
@@ -231,33 +263,26 @@ export default function JournalPage() {
     } else {
       setMessage(t("journal.saved"));
       setSaveSucceeded(true);
-      setEditingPastDate(null);
-      setEntryDate(getLocalDate());
+      if (!selectedQueryDate) {
+        setEditingPastDate(null);
+        setEntryDate(getLocalDate());
+      }
       const { data, error: refreshError } = await fetchJournalEntries(userId);
       if (refreshError) {
         setSaveSucceeded(false);
         setMessage(friendlyError(refreshError, t));
       } else {
         setEntries(data);
-        const todayEntry = data.find((entry) => entry.entry_date === getLocalDate());
-        setDraft(todayEntry ? draftFromEntry(todayEntry) : emptyDraft);
+        const currentEntry = data.find((entry) => entry.entry_date === (selectedQueryDate ?? getLocalDate()));
+        setDraft(currentEntry ? draftFromEntry(currentEntry) : emptyDraft);
       }
     }
     setSaving(false);
   }
 
-  function getShareHref(entry: JournalEntry) {
-    const query = new URLSearchParams({
-      title: `Body journal · ${formatDate(entry.entry_date)}`,
-      topics: entry.symptoms.join(", "),
-    });
-    return `/new?${query.toString()}`;
-  }
-
   const today = getLocalDate();
   const thisMonth = today.slice(0, 7);
   const thisMonthEntryCount = entries.filter((entry) => entry.entry_date.startsWith(thisMonth)).length;
-  const todayEntry = entries.find((entry) => entry.entry_date === today);
   const pastEntries = entries.filter((entry) => entry.entry_date < today);
 
   return (
@@ -287,17 +312,23 @@ export default function JournalPage() {
         </p>
       </header>
 
+      <JournalTabs />
+
       <Card as="section" id="journal-today" className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-sm font-medium text-deep-plum">
-              {editingPastDate ? `${t("journal.editingDate")} ${formatDate(editingPastDate)}` : t("journal.today")}
+              {selectedQueryDate
+                ? t("journal.editingDate")
+                : editingPastDate
+                  ? `${t("journal.editingDate")} ${formatDate(editingPastDate)}`
+                  : t("journal.today")}
             </p>
             <h2 className="text-xl font-semibold text-deep-plum">
-              {formatDate(editingPastDate ?? today)}
+              {formatDate(selectedQueryDate ?? editingPastDate ?? today)}
             </h2>
           </div>
-          {editingPastDate && (
+          {editingPastDate && !selectedQueryDate && (
             <Button variant="ghost" className="text-sm" type="button" onClick={cancelPastEdit}>
               {t("journal.cancelEdit")}
             </Button>
@@ -450,15 +481,12 @@ export default function JournalPage() {
             </div>
           )}
           <Button className="w-full" type="submit" disabled={saving || loading}>
-            {saving ? t("journal.saving") : editingPastDate ? t("journal.saveChanges") : t("journal.saveToday")}
+            {saving ? t("journal.saving") : editingPastDate || selectedQueryDate ? t("journal.saveChanges") : t("journal.saveToday")}
           </Button>
         </form>
-        {todayEntry && !editingPastDate && (
-          <Link
-            className="gradient-aurora shadow-glow inline-flex min-h-11 w-full items-center justify-center rounded-full px-5 py-2 text-sm font-semibold text-white"
-            href={getShareHref(todayEntry)}
-          >
-            {t("journal.sharePost")}
+        {returnToCalendar && saveSucceeded && (
+          <Link className="inline-flex min-h-11 items-center text-sm font-semibold text-deep-plum underline underline-offset-4" href="/journal/calendar">
+            {t("cal.backToCalendar")}
           </Link>
         )}
       </Card>
@@ -516,12 +544,6 @@ export default function JournalPage() {
                     <Button variant="secondary" type="button" onClick={() => editEntry(entry)}>
                       {t("journal.editEntry")}
                     </Button>
-                    <Link
-                      className="gradient-aurora shadow-glow inline-flex min-h-11 items-center justify-center rounded-full px-5 py-2 text-sm font-semibold text-white"
-                      href={getShareHref(entry)}
-                    >
-                      {t("journal.sharePost")}
-                    </Link>
                   </div>
                 </div>
               )}

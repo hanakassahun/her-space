@@ -29,7 +29,22 @@ function getDisplayName(profiles: BlockRow["profiles"]): string {
 
 export default function SettingsPage() {
   const { t } = useLanguage();
-  const { user, loading: authLoading, quietMode, quietModeSaving, quietModeError, setQuietMode } = useAuth();
+  const {
+    user,
+    loading: authLoading,
+    quietMode,
+    quietModeSaving,
+    quietModeError,
+    setQuietMode,
+    remindLog,
+    remindLogSaving,
+    remindLogError,
+    setRemindLog,
+    remindPeriod,
+    remindPeriodSaving,
+    remindPeriodError,
+    setRemindPeriod,
+  } = useAuth();
   const userId = user?.id ?? null;
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -230,6 +245,47 @@ export default function SettingsPage() {
           </button>
         </div>
         {quietModeError && <p className="break-words text-sm text-red-700" role="alert">{quietModeError}</p>}
+      </Card>
+
+      <Card as="section" className="space-y-4">
+        <h2 className="text-xl font-semibold text-deep-plum">{t("remind.title")}</h2>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p id="remind-log-label" className="break-words font-medium text-deep-plum">{t("remind.log")}</p>
+            <p className="mt-1 break-words text-sm leading-6 text-gray-700">{t("remind.logHint")}</p>
+          </div>
+          <button
+            className={`relative inline-flex h-11 w-16 shrink-0 items-center rounded-full border px-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle ${remindLog ? "gradient-aurora border-transparent" : "border-[#CDBDEB] bg-soft-lilac/40"}`}
+            type="button"
+            role="switch"
+            aria-labelledby="remind-log-label"
+            aria-checked={remindLog}
+            disabled={remindLogSaving}
+            onClick={() => void setRemindLog(!remindLog)}
+          >
+            <span className={`h-7 w-7 rounded-full bg-white shadow-sm transition-transform ${remindLog ? "translate-x-7" : "translate-x-0"}`} />
+          </button>
+        </div>
+        {remindLogError && <p className="break-words text-sm text-red-700" role="alert">{remindLogError}</p>}
+
+        <div className="flex items-start justify-between gap-4 border-t border-soft-lilac/70 pt-4">
+          <div className="min-w-0">
+            <p id="remind-period-label" className="break-words font-medium text-deep-plum">{t("remind.period")}</p>
+            <p className="mt-1 break-words text-sm leading-6 text-gray-700">{t("remind.periodHint")}</p>
+          </div>
+          <button
+            className={`relative inline-flex h-11 w-16 shrink-0 items-center rounded-full border px-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle ${remindPeriod ? "gradient-aurora border-transparent" : "border-[#CDBDEB] bg-soft-lilac/40"}`}
+            type="button"
+            role="switch"
+            aria-labelledby="remind-period-label"
+            aria-checked={remindPeriod}
+            disabled={remindPeriodSaving}
+            onClick={() => void setRemindPeriod(!remindPeriod)}
+          >
+            <span className={`h-7 w-7 rounded-full bg-white shadow-sm transition-transform ${remindPeriod ? "translate-x-7" : "translate-x-0"}`} />
+          </button>
+        </div>
+        {remindPeriodError && <p className="break-words text-sm text-red-700" role="alert">{remindPeriodError}</p>}
       </Card>
 
       <Card as="section" className="space-y-4">

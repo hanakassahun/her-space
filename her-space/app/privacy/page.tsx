@@ -19,6 +19,7 @@ export default function PrivacyPage() {
         <p className="leading-7 text-gray-800">To provide the service, we store your email address, display name, posts, comments, saves, likes, follows, and journal entries. If you submit reports or suggestions, we store those too so they can be reviewed.</p>
         <ul className="list-disc space-y-2 pl-5 leading-7 text-gray-800">
           <li className="break-words">{t("privacy.ageInterests")}</li>
+          <li className="break-words">{t("privacy.cycle")}</li>
         </ul>
       </Card>
 

@@ -6,5 +6,5 @@ type CardProps = HTMLAttributes<HTMLElement> & {
 
 export default function Card({ as = "section", className = "", ...props }: CardProps) {
   const Component = as;
-  return <Component className={`glass animate-fade-up p-5 ${className}`} {...props} />;
+  return <Component className={`glass motion-safe:animate-fade-up p-5 ${className}`} {...props} />;
 }

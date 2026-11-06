@@ -26,6 +26,14 @@ type AuthContextValue = {
   quietModeSaving: boolean;
   quietModeError: string;
   setQuietMode: (next: boolean) => Promise<void>;
+  remindLog: boolean;
+  remindLogSaving: boolean;
+  remindLogError: string;
+  setRemindLog: (next: boolean) => Promise<void>;
+  remindPeriod: boolean;
+  remindPeriodSaving: boolean;
+  remindPeriodError: string;
+  setRemindPeriod: (next: boolean) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -40,6 +48,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [quietMode, setQuietModeState] = useState(false);
   const [quietModeSaving, setQuietModeSaving] = useState(false);
   const [quietModeError, setQuietModeError] = useState("");
+  const [remindLog, setRemindLogState] = useState(false);
+  const [remindLogSaving, setRemindLogSaving] = useState(false);
+  const [remindLogError, setRemindLogError] = useState("");
+  const [remindPeriod, setRemindPeriodState] = useState(false);
+  const [remindPeriodSaving, setRemindPeriodSaving] = useState(false);
+  const [remindPeriodError, setRemindPeriodError] = useState("");
   const activeUserId = useRef<string | null>(null);
   const requestId = useRef(0);
 
@@ -72,6 +86,64 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [quietMode, quietModeSaving, t]);
 
+  const setRemindLog = useCallback(async (next: boolean) => {
+    const userId = activeUserId.current;
+    if (!userId || remindLogSaving) return;
+
+    const previous = remindLog;
+    const currentRequestId = requestId.current;
+    setRemindLogState(next);
+    setRemindLogSaving(true);
+    setRemindLogError("");
+    try {
+      const { error } = await supabase
+        .from("member_prefs")
+        .upsert(
+          { remind_log: next, updated_at: new Date().toISOString() },
+          { onConflict: "user_id" }
+        );
+      if (error) throw error;
+    } catch (error) {
+      if (activeUserId.current === userId && currentRequestId === requestId.current) {
+        setRemindLogState(previous);
+        setRemindLogError(friendlyError(error, t));
+      }
+    } finally {
+      if (activeUserId.current === userId && currentRequestId === requestId.current) {
+        setRemindLogSaving(false);
+      }
+    }
+  }, [remindLog, remindLogSaving, t]);
+
+  const setRemindPeriod = useCallback(async (next: boolean) => {
+    const userId = activeUserId.current;
+    if (!userId || remindPeriodSaving) return;
+
+    const previous = remindPeriod;
+    const currentRequestId = requestId.current;
+    setRemindPeriodState(next);
+    setRemindPeriodSaving(true);
+    setRemindPeriodError("");
+    try {
+      const { error } = await supabase
+        .from("member_prefs")
+        .upsert(
+          { remind_period: next, updated_at: new Date().toISOString() },
+          { onConflict: "user_id" }
+        );
+      if (error) throw error;
+    } catch (error) {
+      if (activeUserId.current === userId && currentRequestId === requestId.current) {
+        setRemindPeriodState(previous);
+        setRemindPeriodError(friendlyError(error, t));
+      }
+    } finally {
+      if (activeUserId.current === userId && currentRequestId === requestId.current) {
+        setRemindPeriodSaving(false);
+      }
+    }
+  }, [remindPeriod, remindPeriodSaving, t]);
+
   useEffect(() => {
     let active = true;
     let authEventReceived = false;
@@ -96,6 +168,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setQuietModeState(false);
         setQuietModeSaving(false);
         setQuietModeError("");
+        setRemindLogState(false);
+        setRemindLogSaving(false);
+        setRemindLogError("");
+        setRemindPeriodState(false);
+        setRemindPeriodSaving(false);
+        setRemindPeriodError("");
         setLoading(false);
         return;
       }
@@ -106,12 +184,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setQuietModeState(false);
       setQuietModeSaving(false);
       setQuietModeError("");
+      setRemindLogState(false);
+      setRemindLogSaving(false);
+      setRemindLogError("");
+      setRemindPeriodState(false);
+      setRemindPeriodSaving(false);
+      setRemindPeriodError("");
 
       const [profileResult, adminResult, moderatorResult, prefsResult] = await Promise.all([
         supabase.from("profiles").select("display_name").eq("id", nextUserId).maybeSingle(),
         supabase.from("admins").select("user_id").eq("user_id", nextUserId).maybeSingle(),
         supabase.rpc("is_moderator"),
-        supabase.from("member_prefs").select("quiet_mode").eq("user_id", nextUserId).maybeSingle(),
+        supabase.from("member_prefs").select("quiet_mode, remind_log, remind_period").eq("user_id", nextUserId).maybeSingle(),
       ]);
 
       if (!active || currentRequestId !== requestId.current) return;
@@ -119,6 +203,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsAdmin(Boolean(adminResult.data));
       setIsModerator(Boolean(moderatorResult.data));
       setQuietModeState(Boolean(prefsResult.data?.quiet_mode));
+      setRemindLogState(Boolean(prefsResult.data?.remind_log));
+      setRemindPeriodState(Boolean(prefsResult.data?.remind_period));
       if (prefsResult.error) setQuietModeError(friendlyError(prefsResult.error, t));
     }
 
@@ -156,7 +242,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     quietModeSaving,
     quietModeError,
     setQuietMode,
-  }), [displayName, isAdmin, isModerator, loading, quietMode, quietModeError, quietModeSaving, session, setQuietMode]);
+    remindLog,
+    remindLogSaving,
+    remindLogError,
+    setRemindLog,
+    remindPeriod,
+    remindPeriodSaving,
+    remindPeriodError,
+    setRemindPeriod,
+  }), [displayName, isAdmin, isModerator, loading, quietMode, quietModeError, quietModeSaving, remindLog, remindLogSaving, remindLogError, remindPeriod, remindPeriodSaving, remindPeriodError, session, setQuietMode, setRemindLog, setRemindPeriod]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
