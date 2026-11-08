@@ -63,7 +63,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `var r=document.documentElement,s=null;try{s=localStorage.getItem("calm")}catch(e){}try{var m=window.matchMedia("(prefers-reduced-motion: reduce)").matches,d=typeof navigator.deviceMemory==="number"&&navigator.deviceMemory<=2,c=!!(navigator.connection&&navigator.connection.saveData);r.dataset.lowend=d?"true":"false";r.dataset.calm=s===null?(m||d||c?"true":"false"):(s==="1"?"true":"false")}catch(e){}`,
+            __html: `var r=document.documentElement,s=null,o=null,h=new Date().getHours(),a=h>=5&&h<10?"morning":h>=10&&h<17?"day":h>=17&&h<21?"evening":"night";try{o=localStorage.getItem("moodOverride")}catch(e){}r.dataset.tod=o==="morning"||o==="day"||o==="evening"||o==="night"?o:a;try{s=localStorage.getItem("calm")}catch(e){}try{var m=window.matchMedia("(prefers-reduced-motion: reduce)").matches,d=typeof navigator.deviceMemory==="number"&&navigator.deviceMemory<=2,c=!!(navigator.connection&&navigator.connection.saveData);r.dataset.lowend=d?"true":"false";r.dataset.calm=s===null?(m||d||c?"true":"false"):(s==="1"?"true":"false")}catch(e){}`,
           }}
         />
       </head>

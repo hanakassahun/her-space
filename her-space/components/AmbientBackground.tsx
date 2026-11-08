@@ -7,18 +7,29 @@ export default function AmbientBackground() {
     const root = document.documentElement;
     const setMood = () => {
       const hour = new Date().getHours();
-      root.dataset.tod = hour >= 5 && hour < 10
+      const automaticMood = hour >= 5 && hour < 10
         ? "morning"
         : hour >= 10 && hour < 17
           ? "day"
           : hour >= 17 && hour < 21
             ? "evening"
             : "night";
+      let moodOverride: string | null = null;
+      try {
+        moodOverride = window.localStorage.getItem("moodOverride");
+      } catch {
+        // The automatic mood remains available when storage is disabled.
+      }
+      root.dataset.tod = moodOverride === "morning" || moodOverride === "day"
+        || moodOverride === "evening" || moodOverride === "night"
+        ? moodOverride
+        : automaticMood;
     };
     const setVisibility = () => {
-      root.classList.toggle("tab-hidden", document.visibilityState === "hidden");
+      const hidden = document.visibilityState === "hidden";
+      root.classList.toggle("tab-hidden", hidden);
+      if (!hidden) setMood();
     };
-    setMood();
     const interval = window.setInterval(setMood, 15 * 60 * 1000);
     document.addEventListener("visibilitychange", setVisibility);
     setVisibility();

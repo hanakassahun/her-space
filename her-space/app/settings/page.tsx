@@ -17,6 +17,23 @@ import InterestPicker from "@/components/InterestPicker";
 import { maskEmail } from "@/lib/maskEmail";
 
 const RECENT_ACCOUNTS_KEY = "recentAccounts";
+type MoodOverride = "auto" | "morning" | "day" | "evening" | "night";
+
+function isMoodOverride(value: string | null): value is MoodOverride {
+  return value === "auto" || value === "morning" || value === "day"
+    || value === "evening" || value === "night";
+}
+
+function getAutomaticMood(): Exclude<MoodOverride, "auto"> {
+  const hour = new Date().getHours();
+  return hour >= 5 && hour < 10
+    ? "morning"
+    : hour >= 10 && hour < 17
+      ? "day"
+      : hour >= 17 && hour < 21
+        ? "evening"
+        : "night";
+}
 
 type BlockRow = {
   blocked_id: string;
@@ -69,6 +86,7 @@ export default function SettingsPage() {
   const [showEmail, setShowEmail] = useState(false);
   const [recentAccountsMessage, setRecentAccountsMessage] = useState("");
   const [calmMode, setCalmMode] = useState(false);
+  const [moodOverride, setMoodOverride] = useState<MoodOverride>("auto");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordMessage, setPasswordMessage] = useState("");
@@ -80,6 +98,25 @@ export default function SettingsPage() {
     }, 0);
     return () => window.clearTimeout(timeout);
   }, []);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("moodOverride");
+      if (isMoodOverride(saved)) setMoodOverride(saved);
+    } catch {
+      // The automatic mood remains available when storage is disabled.
+    }
+  }, []);
+
+  function setBackgroundMood(next: MoodOverride) {
+    setMoodOverride(next);
+    document.documentElement.dataset.tod = next === "auto" ? getAutomaticMood() : next;
+    try {
+      window.localStorage.setItem("moodOverride", next);
+    } catch {
+      // The selected mood remains active for this page session.
+    }
+  }
 
   function setVisualEffectsCalm(next: boolean) {
     setCalmMode(next);
@@ -272,6 +309,26 @@ export default function SettingsPage() {
           >
             <span className={`h-7 w-7 rounded-full bg-white shadow-sm transition-transform ${calmMode ? "translate-x-7" : "translate-x-0"}`} />
           </button>
+        </div>
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-deep-plum" htmlFor="background-mood">
+            {t("effects.mood")}
+          </label>
+          <select
+            id="background-mood"
+            className="min-h-11 w-full rounded-2xl border border-[#CDBDEB] bg-white px-4 py-2.5 text-deep-plum focus:border-[#8F72BE] focus:outline-none focus:ring-2 focus:ring-[#B49AD8]"
+            value={moodOverride}
+            onChange={(event) => {
+              const next = event.target.value;
+              if (isMoodOverride(next)) setBackgroundMood(next);
+            }}
+          >
+            <option value="auto">{t("effects.moodAuto")}</option>
+            <option value="morning">{t("effects.morning")}</option>
+            <option value="day">{t("effects.day")}</option>
+            <option value="evening">{t("effects.evening")}</option>
+            <option value="night">{t("effects.night")}</option>
+          </select>
         </div>
       </Card>
 

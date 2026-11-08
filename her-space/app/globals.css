@@ -31,9 +31,9 @@
 }
 
 html[data-tod="morning"] {
-  --mood-rose: #f3d0c4;
-  --mood-lilac: #eed9ac;
-  --mood-periwinkle: #d8c8ed;
+  --mood-rose: #f0b49d;
+  --mood-lilac: #f1d28d;
+  --mood-periwinkle: #ecc4ad;
 }
 
 html[data-tod="day"] {
@@ -43,15 +43,15 @@ html[data-tod="day"] {
 }
 
 html[data-tod="evening"] {
-  --mood-rose: #e8c1d8;
-  --mood-lilac: #d2c1e8;
-  --mood-periwinkle: #b7c5ed;
+  --mood-rose: #d9b2d1;
+  --mood-lilac: #cfbce9;
+  --mood-periwinkle: #b7c7f0;
 }
 
 html[data-tod="night"] {
-  --mood-rose: #e2d0e8;
-  --mood-lilac: #d5d1ef;
-  --mood-periwinkle: #c7d0f0;
+  --mood-rose: #c9b8e4;
+  --mood-lilac: #c1b6e2;
+  --mood-periwinkle: #b4bee9;
 }
 
 html {
@@ -256,16 +256,16 @@ select:focus-visible {
   }
 
   @keyframes ambient-drift-one {
-    from { transform: translate3d(-3%, 2%, 0) scale(.96); }
-    to { transform: translate3d(4%, -3%, 0) scale(1.05); }
+    from { transform: translate3d(-7vw, 4vw, 0) scale(.96); }
+    to { transform: translate3d(7vw, -4vw, 0) scale(1.05); }
   }
   @keyframes ambient-drift-two {
-    from { transform: translate3d(3%, -2%, 0) scale(1.04); }
-    to { transform: translate3d(-4%, 3%, 0) scale(.97); }
+    from { transform: translate3d(7vw, -4vw, 0) scale(1.04); }
+    to { transform: translate3d(-7vw, 4vw, 0) scale(.97); }
   }
   @keyframes ambient-drift-three {
-    from { transform: translate3d(-2%, -3%, 0) scale(.97); }
-    to { transform: translate3d(3%, 2%, 0) scale(1.04); }
+    from { transform: translate3d(-8vw, -4vw, 0) scale(.97); }
+    to { transform: translate3d(8vw, 4vw, 0) scale(1.04); }
   }
   @keyframes floating-dot {
     0%, 100% { opacity: .25; transform: translateY(8px); }
@@ -309,9 +309,9 @@ select:focus-visible {
     animation: fade-up 420ms ease-out both;
   }
   .ambient-disc { transition: background-color 2s ease; }
-  .ambient-disc-one { animation: ambient-drift-one 72s ease-in-out -28s infinite alternate; }
-  .ambient-disc-two { animation: ambient-drift-two 84s ease-in-out -51s infinite alternate; }
-  .ambient-disc-three { animation: ambient-drift-three 66s ease-in-out -39s infinite alternate; }
+  .ambient-disc-one { animation: ambient-drift-one 48s ease-in-out -28s infinite alternate; }
+  .ambient-disc-two { animation: ambient-drift-two 54s ease-in-out -36s infinite alternate; }
+  .ambient-disc-three { animation: ambient-drift-three 42s ease-in-out -24s infinite alternate; }
   .floating-dot { animation: floating-dot 18s ease-in-out infinite; }
   .wordmark-alive { background-size: 200% 100%; animation: wordmark-shift 12s ease-in-out infinite; }
   .burst-shape { animation: burst-shape var(--burst-duration, 900ms) ease-out both; }
@@ -398,7 +398,7 @@ select:focus-visible {
   width: min(78vw, 880px);
   aspect-ratio: 1;
   border-radius: 9999px;
-  opacity: .38;
+  opacity: .43;
   mask-image: radial-gradient(circle, #000 0%, rgb(0 0 0 / 45%) 48%, transparent 72%);
 }
 .ambient-disc-one { top: -34%; left: -26%; background-color: var(--mood-rose); }
@@ -453,9 +453,9 @@ body {
   min-height: 100%;
   background-color: var(--background);
   background-image:
-    radial-gradient(ellipse at 8% 8%, rgb(242 200 220 / 32%), transparent 38%),
-    radial-gradient(ellipse at 92% 18%, rgb(185 200 245 / 30%), transparent 40%),
-    radial-gradient(ellipse at 55% 96%, rgb(217 201 243 / 28%), transparent 42%);
+    radial-gradient(ellipse at 8% 8%, color-mix(in srgb, var(--mood-rose) 32%, transparent), transparent 38%),
+    radial-gradient(ellipse at 92% 18%, color-mix(in srgb, var(--mood-periwinkle) 30%, transparent), transparent 40%),
+    radial-gradient(ellipse at 55% 96%, color-mix(in srgb, var(--mood-lilac) 28%, transparent), transparent 42%);
   background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-dm-sans), var(--font-noto-ethiopic), sans-serif;
