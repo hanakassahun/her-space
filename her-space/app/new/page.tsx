@@ -69,6 +69,12 @@ const typeDescriptionKeys: Record<PostType, TranslationKey> = {
   knowledge: "write.typeKnowledgeDesc",
 };
 
+const guidedQuestionKeys: readonly TranslationKey[] = [
+  "write.guidedQ1",
+  "write.guidedQ2",
+  "write.guidedQ3",
+];
+
 const PostPreview = dynamic(() => import("@/components/PostPreview"), { ssr: false });
 
 function parseTopicText(value: string) {
@@ -96,6 +102,9 @@ export default function NewPostPage() {
   const [sources, setSources] = useState("");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [guidedOpen, setGuidedOpen] = useState(false);
+  const [guidedStep, setGuidedStep] = useState(0);
+  const [guidedAnswers, setGuidedAnswers] = useState(["", "", ""]);
   const [quickPost, setQuickPost] = useState(false);
   const [pollEnabled, setPollEnabled] = useState(false);
   const [pollOptions, setPollOptions] = useState(["", ""]);
@@ -418,6 +427,17 @@ export default function NewPostPage() {
     ? ["quote.starter1", "quote.starter2", "quote.starter3"]
     : starterKeys[type];
 
+  function buildGuidedBody(skipCurrentStep = false) {
+    const answers = guidedAnswers
+      .map((answer, index) => skipCurrentStep && index === guidedStep ? "" : answer.trim())
+      .filter(Boolean)
+      .join("\n\n");
+    if (answers) setBody((current) => current.trim() ? `${current.trim()}\n\n${answers}` : answers);
+    setGuidedOpen(false);
+    setGuidedStep(0);
+    setGuidedAnswers(["", "", ""]);
+  }
+
   if (!quoteChecked) {
     return (
       <PageShell className="max-w-3xl space-y-6">
@@ -563,6 +583,66 @@ export default function NewPostPage() {
                       </Button>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {!quickPost && (
+                <div className="space-y-3">
+                  {!guidedOpen ? (
+                    <Button variant="secondary" type="button" onClick={() => setGuidedOpen(true)}>
+                      {t("write.guided")}
+                    </Button>
+                  ) : (
+                    <Card as="section" className="space-y-4 border border-soft-lilac/70" aria-label={t("write.guided")}>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-3 text-sm text-gray-600">
+                          <span>{guidedStep + 1} / {guidedQuestionKeys.length}</span>
+                          <button
+                            className="inline-flex min-h-11 items-center rounded-full px-3 font-medium text-deep-plum underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
+                            type="button"
+                            onClick={() => {
+                              setGuidedOpen(false);
+                              setGuidedStep(0);
+                              setGuidedAnswers(["", "", ""]);
+                            }}
+                          >
+                            {t("common.cancel")}
+                          </button>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-soft-lilac/50" role="progressbar" aria-valuemin={1} aria-valuemax={guidedQuestionKeys.length} aria-valuenow={guidedStep + 1}>
+                          <div className="h-full rounded-full bg-periwinkle transition-[width] motion-reduce:transition-none" style={{ width: `${((guidedStep + 1) / guidedQuestionKeys.length) * 100}%` }} />
+                        </div>
+                      </div>
+                      <p className="break-words text-sm leading-6 text-gray-700">{t("write.guidedHint")}</p>
+                      <label className="block space-y-2 text-sm font-medium text-deep-plum">
+                        {t(guidedQuestionKeys[guidedStep])}
+                        <Textarea
+                          className="min-h-28 resize-y"
+                          maxLength={600}
+                          value={guidedAnswers[guidedStep]}
+                          onChange={(event) => setGuidedAnswers((current) => current.map((answer, index) => index === guidedStep ? event.target.value : answer))}
+                        />
+                        <span className="block text-right text-xs font-normal text-gray-600">{guidedAnswers[guidedStep].length}/600</span>
+                      </label>
+                      <div className="flex flex-wrap gap-3">
+                        {guidedStep < guidedQuestionKeys.length - 1 ? (
+                          <Button type="button" onClick={() => setGuidedStep((current) => current + 1)}>
+                            {t("onb.continue")}
+                          </Button>
+                        ) : (
+                          <Button type="button" onClick={() => buildGuidedBody()}>
+                            {t("write.guidedBuild")}
+                          </Button>
+                        )}
+                        <Button variant="secondary" type="button" onClick={() => {
+                          if (guidedStep < guidedQuestionKeys.length - 1) setGuidedStep((current) => current + 1);
+                          else buildGuidedBody(true);
+                        }}>
+                          {t("write.guidedSkip")}
+                        </Button>
+                      </div>
+                    </Card>
+                  )}
                 </div>
               )}
 

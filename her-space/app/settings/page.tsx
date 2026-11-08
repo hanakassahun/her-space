@@ -14,6 +14,9 @@ import Input from "@/components/ui/Input";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/components/AuthProvider";
 import InterestPicker from "@/components/InterestPicker";
+import { maskEmail } from "@/lib/maskEmail";
+
+const RECENT_ACCOUNTS_KEY = "recentAccounts";
 
 type BlockRow = {
   blocked_id: string;
@@ -44,6 +47,11 @@ export default function SettingsPage() {
     remindPeriodSaving,
     remindPeriodError,
     setRemindPeriod,
+    notificationPrefs,
+    notificationsPausedUntil,
+    notificationPrefsSaving,
+    notificationPrefsError,
+    setNotificationPreference,
   } = useAuth();
   const userId = user?.id ?? null;
   const router = useRouter();
@@ -59,6 +67,7 @@ export default function SettingsPage() {
   const [savingInterests, setSavingInterests] = useState(false);
   const [interestMessage, setInterestMessage] = useState("");
   const [showEmail, setShowEmail] = useState(false);
+  const [recentAccountsMessage, setRecentAccountsMessage] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordMessage, setPasswordMessage] = useState("");
@@ -152,11 +161,13 @@ export default function SettingsPage() {
     router.replace("/");
   }
 
-  function maskedEmail(email: string) {
-    const [localPart, ...domainParts] = email.split("@");
-    const domain = domainParts.join("@");
-    const maskedLocal = `${localPart.charAt(0)}•••${localPart.charAt(localPart.length - 1)}`;
-    return `${maskedLocal}@${domain}`;
+  function forgetAllAccounts() {
+    setRecentAccountsMessage("");
+    try {
+      window.localStorage.removeItem(RECENT_ACCOUNTS_KEY);
+    } catch (error) {
+      setRecentAccountsMessage(friendlyError(error, t));
+    }
   }
 
   async function changePassword(event: FormEvent<HTMLFormElement>) {
@@ -248,6 +259,64 @@ export default function SettingsPage() {
       </Card>
 
       <Card as="section" className="space-y-4">
+        <h2 className="break-words text-xl font-semibold text-deep-plum">{t("notif.settingsTitle")}</h2>
+        {([
+          ["notif_comments", "notif.setComments"],
+          ["notif_follows", "notif.setFollows"],
+          ["notif_shares", "notif.setShares"],
+          ["notif_milestones", "notif.setMilestones"],
+        ] as const).map(([key, label]) => (
+          <div className="flex items-start justify-between gap-4 border-t border-soft-lilac/70 pt-4" key={key}>
+            <p className="min-w-0 break-words font-medium text-deep-plum">{t(label)}</p>
+            <button
+              className={`relative inline-flex h-11 w-16 shrink-0 items-center rounded-full border px-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle ${notificationPrefs[key] ? "gradient-aurora border-transparent" : "border-[#CDBDEB] bg-soft-lilac/40"}`}
+              type="button"
+              role="switch"
+              aria-label={t(label)}
+              aria-checked={notificationPrefs[key]}
+              disabled={notificationPrefsSaving}
+              onClick={() => void setNotificationPreference(key, !notificationPrefs[key])}
+            >
+              <span className={`h-7 w-7 rounded-full bg-white shadow-sm transition-transform ${notificationPrefs[key] ? "translate-x-7" : "translate-x-0"}`} />
+            </button>
+          </div>
+        ))}
+        <p className="break-words text-sm leading-6 text-gray-600">{t("notif.moderationAlways")}</p>
+        {notificationsPausedUntil && (
+          <p className="break-words text-sm text-gray-600">
+            {t("notif.pausedUntil")} <time dateTime={notificationsPausedUntil}>{new Date(notificationsPausedUntil).toLocaleString()}</time>
+          </p>
+        )}
+        <div className="flex flex-wrap gap-3">
+          <Button
+            variant="secondary"
+            type="button"
+            disabled={notificationPrefsSaving}
+            onClick={() => void setNotificationPreference("notifications_paused_until", new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString())}
+          >
+            {t("notif.pause1d")}
+          </Button>
+          <Button
+            variant="secondary"
+            type="button"
+            disabled={notificationPrefsSaving}
+            onClick={() => void setNotificationPreference("notifications_paused_until", new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString())}
+          >
+            {t("notif.pause7d")}
+          </Button>
+          <Button
+            variant="ghost"
+            type="button"
+            disabled={notificationPrefsSaving || !notificationsPausedUntil}
+            onClick={() => void setNotificationPreference("notifications_paused_until", null)}
+          >
+            {t("notif.resume")}
+          </Button>
+        </div>
+        {notificationPrefsError && <p className="break-words text-sm text-red-700" role="alert">{notificationPrefsError}</p>}
+      </Card>
+
+      <Card as="section" className="space-y-4">
         <h2 className="text-xl font-semibold text-deep-plum">{t("remind.title")}</h2>
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -298,12 +367,18 @@ export default function SettingsPage() {
           </Link>
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="break-all text-sm text-gray-800">{user?.email ? showEmail ? user.email : maskedEmail(user.email) : ""}</span>
+              <span className="break-all text-sm text-gray-800">{user?.email ? showEmail ? user.email : maskEmail(user.email) : ""}</span>
               <Button type="button" variant="secondary" className="px-3" onClick={() => setShowEmail((current) => !current)}>
                 {showEmail ? t("account.hide") : t("account.show")}
               </Button>
             </div>
             <p className="text-xs text-gray-600">{t("account.emailHidden")}</p>
+          </div>
+          <div className="space-y-2 border-t border-soft-lilac pt-4">
+            <Button variant="secondary" type="button" onClick={forgetAllAccounts}>
+              {t("login.forgetAll")}
+            </Button>
+            {recentAccountsMessage && <p className="break-words text-sm text-red-700" role="alert">{recentAccountsMessage}</p>}
           </div>
           <form className="space-y-3 border-t border-soft-lilac pt-4" onSubmit={changePassword}>
             <h3 className="font-semibold text-deep-plum">{t("account.changePassword")}</h3>

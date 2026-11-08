@@ -23,7 +23,10 @@ import QuotedPostCard from "@/components/QuotedPostCard";
 import Avatar from "@/components/Avatar";
 import PollCard from "@/components/PollCard";
 import { loadPollResults, type PollResult } from "@/lib/polls";
+import DoubleTapLikeArea from "@/components/DoubleTapLikeArea";
+import PostBody from "@/components/PostBody";
 
+type LikeState = { count: number; liked: boolean };
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
   display_name: string | null;
@@ -91,12 +94,14 @@ export default function LibraryPage() {
   const [savedPosts, setSavedPosts] = useState<SavedPost[]>([]);
   const [pollResults, setPollResults] = useState<Record<string, PollResult[]>>({});
   const [repostedIds, setRepostedIds] = useState<Record<string, boolean>>({});
+  const [likeStates, setLikeStates] = useState<Record<string, LikeState>>({});
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [busyPostIds, setBusyPostIds] = useState<Record<string, boolean>>({});
   const [revealedPostIds, setRevealedPostIds] = useState<Record<string, boolean>>({});
   const bookmarkRequests = useRef(new Set<string>());
+  const likeRequests = useRef(new Set<string>());
 
   useEffect(() => {
     async function loadLibrary() {
@@ -134,15 +139,23 @@ export default function LibraryPage() {
         })));
         const postIds = loadedPosts.map(({ post }) => post.id);
         if (postIds.length > 0) {
-          const { data: reposts, error: repostError } = await supabase
-            .from("reposts")
-            .select("post_id")
-            .eq("user_id", userId)
-            .in("post_id", postIds);
-          if (repostError) setMessage(friendlyError(repostError, t));
-          else setRepostedIds(Object.fromEntries((reposts ?? []).map(({ post_id }) => [post_id, true])));
+          const [repostsResult, likesResult] = await Promise.all([
+            supabase.from("reposts").select("post_id").eq("user_id", userId).in("post_id", postIds),
+            supabase.from("likes").select("post_id").eq("user_id", userId).in("post_id", postIds),
+          ]);
+          if (repostsResult.error) setMessage(friendlyError(repostsResult.error, t));
+          else setRepostedIds(Object.fromEntries((repostsResult.data ?? []).map(({ post_id }) => [post_id, true])));
+          if (likesResult.error) setMessage(friendlyError(likesResult.error, t));
+          else {
+            const likedIds = new Set((likesResult.data ?? []).map(({ post_id }) => post_id));
+            setLikeStates(Object.fromEntries(loadedPosts.map(({ post }) => [
+              post.id,
+              { count: post.like_count, liked: likedIds.has(post.id) },
+            ])));
+          }
         } else {
           setRepostedIds({});
+          setLikeStates({});
         }
       }
       setLoading(false);
@@ -157,6 +170,32 @@ export default function LibraryPage() {
   const visiblePosts = selectedTopic
     ? savedPosts.filter(({ post }) => post.topics?.includes(selectedTopic))
     : savedPosts;
+
+  async function toggleLike(postId: string) {
+    if (!userId) {
+      router.push("/login");
+      return;
+    }
+    if (likeRequests.current.has(postId)) return;
+    likeRequests.current.add(postId);
+    const current = likeStates[postId] ?? {
+      count: savedPosts.find(({ post }) => post.id === postId)?.post.like_count ?? 0,
+      liked: false,
+    };
+    const optimistic = { count: current.count + (current.liked ? -1 : 1), liked: !current.liked };
+    setLikeStates((states) => ({ ...states, [postId]: optimistic }));
+    try {
+      const result = current.liked
+        ? await supabase.from("likes").delete().eq("user_id", userId).eq("post_id", postId)
+        : await supabase.from("likes").insert({ post_id: postId });
+      if (result.error) throw result.error;
+    } catch (error) {
+      setLikeStates((states) => ({ ...states, [postId]: current }));
+      setMessage(friendlyError(error, t));
+    } finally {
+      likeRequests.current.delete(postId);
+    }
+  }
 
   async function unsavePost(postId: string) {
     if (!userId || bookmarkRequests.current.has(postId)) return;
@@ -250,19 +289,28 @@ export default function LibraryPage() {
 
             return (
               <Card as="article" key={post.id} className="post-card space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <DoubleTapLikeArea
+                  liked={Boolean(likeStates[post.id]?.liked)}
+                  onLike={() => { if (!likeStates[post.id]?.liked) void toggleLike(post.id); }}
+                  className="flex flex-wrap items-center justify-between gap-3"
+                >
                   <Badge variant={typeVariants[post.type]}>
                     {t(typeTranslationKeys[post.type])}
                   </Badge>
                   {post.audience === "adult" && <Badge variant="lilac">{t("audience.badge")}</Badge>}
-                  <span className="text-xs text-gray-500">{post.like_count} {t("like.likes")}</span>
+                  <span className="text-xs text-gray-500">{likeStates[post.id]?.count ?? post.like_count} {t("like.likes")}</span>
                   <TimeAgo className="text-sm text-gray-500" date={savedAt} prefix={t("library.saved")} />
-                </div>
+                </DoubleTapLikeArea>
 
                 <div className="space-y-2">
-                  {!post.is_quick && <h2 className="text-xl font-semibold text-gray-900">
-                    <Link href={`/post/${post.id}`}>{post.title}</Link>
-                  </h2>}
+                  {!post.is_quick && <DoubleTapLikeArea
+                    liked={Boolean(likeStates[post.id]?.liked)}
+                    onLike={() => { if (!likeStates[post.id]?.liked) void toggleLike(post.id); }}
+                  >
+                    <h2 className="text-xl font-semibold text-gray-900">
+                      <Link href={`/post/${post.id}`}>{post.title}</Link>
+                    </h2>
+                  </DoubleTapLikeArea>}
                   <QuotedPostCard quotedPostId={post.quoted_post_id} quoted={post.quoted} />
                   {post.sensitive && !revealedPostIds[post.id] ? (
                     <div className="space-y-3 rounded-2xl border border-rose-200 bg-rose-50/70 p-4" role="note">
@@ -273,9 +321,12 @@ export default function LibraryPage() {
                     </div>
                   ) : (
                     post.is_quick ? (
-                      <Link className="block rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle" href={`/post/${post.id}`}>
-                        <UserText text={post.body} className="text-lg text-gray-800" />
-                      </Link>
+                      <DoubleTapLikeArea
+                        liked={Boolean(likeStates[post.id]?.liked)}
+                        onLike={() => { if (!likeStates[post.id]?.liked) void toggleLike(post.id); }}
+                      >
+                        <PostBody body={post.body} href={`/post/${post.id}`} clamp={false} linkBody={false} className="text-lg" />
+                      </DoubleTapLikeArea>
                     ) : <UserText text={post.body} className="text-gray-800" />
                   )}
                 </div>

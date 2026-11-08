@@ -34,6 +34,19 @@ type AuthContextValue = {
   remindPeriodSaving: boolean;
   remindPeriodError: string;
   setRemindPeriod: (next: boolean) => Promise<void>;
+  notificationPrefs: {
+    notif_comments: boolean;
+    notif_follows: boolean;
+    notif_shares: boolean;
+    notif_milestones: boolean;
+  };
+  notificationsPausedUntil: string | null;
+  notificationPrefsSaving: boolean;
+  notificationPrefsError: string;
+  setNotificationPreference: (
+    key: "notif_comments" | "notif_follows" | "notif_shares" | "notif_milestones" | "notifications_paused_until",
+    value: boolean | string | null
+  ) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -54,8 +67,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [remindPeriod, setRemindPeriodState] = useState(false);
   const [remindPeriodSaving, setRemindPeriodSaving] = useState(false);
   const [remindPeriodError, setRemindPeriodError] = useState("");
+  const [notificationPrefs, setNotificationPrefs] = useState({
+    notif_comments: true,
+    notif_follows: true,
+    notif_shares: true,
+    notif_milestones: true,
+  });
+  const [notificationsPausedUntil, setNotificationsPausedUntilState] = useState<string | null>(null);
+  const [notificationPrefsSaving, setNotificationPrefsSaving] = useState(false);
+  const [notificationPrefsError, setNotificationPrefsError] = useState("");
   const activeUserId = useRef<string | null>(null);
   const requestId = useRef(0);
+  const savingNotificationPrefs = useRef(new Set<string>());
 
   const setQuietMode = useCallback(async (next: boolean) => {
     const userId = activeUserId.current;
@@ -144,6 +167,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [remindPeriod, remindPeriodSaving, t]);
 
+  const setNotificationPreference = useCallback(async (
+    key: "notif_comments" | "notif_follows" | "notif_shares" | "notif_milestones" | "notifications_paused_until",
+    value: boolean | string | null
+  ) => {
+    const userId = activeUserId.current;
+    if (!userId || savingNotificationPrefs.current.has(key)) return;
+
+    const previous = key === "notifications_paused_until"
+      ? notificationsPausedUntil
+      : notificationPrefs[key];
+    const currentRequestId = requestId.current;
+    if (key === "notifications_paused_until") setNotificationsPausedUntilState(value as string | null);
+    else setNotificationPrefs((current) => ({ ...current, [key]: value as boolean }));
+    savingNotificationPrefs.current.add(key);
+    setNotificationPrefsSaving(true);
+    setNotificationPrefsError("");
+    try {
+      const { error } = await supabase
+        .from("member_prefs")
+        .upsert(
+          { [key]: value, updated_at: new Date().toISOString() },
+          { onConflict: "user_id" }
+        );
+      if (error) throw error;
+    } catch (error) {
+      if (activeUserId.current === userId && currentRequestId === requestId.current) {
+        if (key === "notifications_paused_until") setNotificationsPausedUntilState(previous as string | null);
+        else setNotificationPrefs((current) => ({ ...current, [key]: previous as boolean }));
+        setNotificationPrefsError(friendlyError(error, t));
+      }
+    } finally {
+      if (currentRequestId === requestId.current) {
+        savingNotificationPrefs.current.delete(key);
+      }
+      if (activeUserId.current === userId && currentRequestId === requestId.current) {
+        setNotificationPrefsSaving(savingNotificationPrefs.current.size > 0);
+      }
+    }
+  }, [notificationPrefs, notificationsPausedUntil, t]);
+
   useEffect(() => {
     let active = true;
     let authEventReceived = false;
@@ -174,6 +237,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRemindPeriodState(false);
         setRemindPeriodSaving(false);
         setRemindPeriodError("");
+        setNotificationPrefs({ notif_comments: true, notif_follows: true, notif_shares: true, notif_milestones: true });
+        setNotificationsPausedUntilState(null);
+        setNotificationPrefsSaving(false);
+        setNotificationPrefsError("");
+        savingNotificationPrefs.current.clear();
         setLoading(false);
         return;
       }
@@ -190,12 +258,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setRemindPeriodState(false);
       setRemindPeriodSaving(false);
       setRemindPeriodError("");
+      setNotificationPrefs({ notif_comments: true, notif_follows: true, notif_shares: true, notif_milestones: true });
+      setNotificationsPausedUntilState(null);
+      setNotificationPrefsSaving(false);
+      setNotificationPrefsError("");
+      savingNotificationPrefs.current.clear();
 
       const [profileResult, adminResult, moderatorResult, prefsResult] = await Promise.all([
         supabase.from("profiles").select("display_name").eq("id", nextUserId).maybeSingle(),
         supabase.from("admins").select("user_id").eq("user_id", nextUserId).maybeSingle(),
         supabase.rpc("is_moderator"),
-        supabase.from("member_prefs").select("quiet_mode, remind_log, remind_period").eq("user_id", nextUserId).maybeSingle(),
+        supabase.from("member_prefs").select("quiet_mode, remind_log, remind_period, notif_comments, notif_follows, notif_shares, notif_milestones, notifications_paused_until").eq("user_id", nextUserId).maybeSingle(),
       ]);
 
       if (!active || currentRequestId !== requestId.current) return;
@@ -205,7 +278,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setQuietModeState(Boolean(prefsResult.data?.quiet_mode));
       setRemindLogState(Boolean(prefsResult.data?.remind_log));
       setRemindPeriodState(Boolean(prefsResult.data?.remind_period));
-      if (prefsResult.error) setQuietModeError(friendlyError(prefsResult.error, t));
+      setNotificationPrefs({
+        notif_comments: prefsResult.data?.notif_comments ?? true,
+        notif_follows: prefsResult.data?.notif_follows ?? true,
+        notif_shares: prefsResult.data?.notif_shares ?? true,
+        notif_milestones: prefsResult.data?.notif_milestones ?? true,
+      });
+      setNotificationsPausedUntilState(prefsResult.data?.notifications_paused_until ?? null);
+      if (prefsResult.error) {
+        const errorMessage = friendlyError(prefsResult.error, t);
+        setQuietModeError(errorMessage);
+        setNotificationPrefsError(errorMessage);
+      }
     }
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
@@ -250,7 +334,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     remindPeriodSaving,
     remindPeriodError,
     setRemindPeriod,
-  }), [displayName, isAdmin, isModerator, loading, quietMode, quietModeError, quietModeSaving, remindLog, remindLogSaving, remindLogError, remindPeriod, remindPeriodSaving, remindPeriodError, session, setQuietMode, setRemindLog, setRemindPeriod]);
+    notificationPrefs,
+    notificationsPausedUntil,
+    notificationPrefsSaving,
+    notificationPrefsError,
+    setNotificationPreference,
+  }), [displayName, isAdmin, isModerator, loading, quietMode, quietModeError, quietModeSaving, remindLog, remindLogSaving, remindLogError, remindPeriod, remindPeriodSaving, remindPeriodError, session, setQuietMode, setRemindLog, setRemindPeriod, notificationPrefs, notificationsPausedUntil, notificationPrefsSaving, notificationPrefsError, setNotificationPreference]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

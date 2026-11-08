@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, use, useEffect, useState } from "react";
+import { FormEvent, use, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -24,6 +24,8 @@ import QuotedPostCard from "@/components/QuotedPostCard";
 import Avatar from "@/components/Avatar";
 import PollCard from "@/components/PollCard";
 import { loadPollResults, type PollResult } from "@/lib/polls";
+import DoubleTapLikeArea from "@/components/DoubleTapLikeArea";
+import PostBody from "@/components/PostBody";
 
 const MemberActionsMenu = dynamic(() => import("@/components/MemberActionsMenu"), { ssr: false });
 
@@ -61,6 +63,7 @@ type Post = {
   profiles: PostProfile | PostProfile[] | null;
 };
 type RepostRow = { created_at: string; posts: Post | Post[] | null };
+type LikeState = { count: number; liked: boolean };
 
 const typeVariants: Record<Post["type"], "rose" | "sky" | "mint"> = {
   experience: "rose",
@@ -102,6 +105,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
   const [pollResults, setPollResults] = useState<Record<string, PollResult[]>>({});
   const [reposts, setReposts] = useState<RepostRow[]>([]);
   const [repostedIds, setRepostedIds] = useState<Record<string, boolean>>({});
+  const [likeStates, setLikeStates] = useState<Record<string, LikeState>>({});
   const [revealedPostIds, setRevealedPostIds] = useState<Record<string, boolean>>({});
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [postTitleDraft, setPostTitleDraft] = useState("");
@@ -118,6 +122,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
   const [updatingFollow, setUpdatingFollow] = useState(false);
   const [message, setMessage] = useState("");
   const [blockState, setBlockState] = useState<"mute" | "block" | null>(null);
+  const likeRequests = useRef(new Set<string>());
 
   useEffect(() => {
     let cancelled = false;
@@ -178,6 +183,25 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
           return repost ? [repost] : [];
         }),
       ];
+      const loadedPostIds = [...new Set(loadedPostBatch.map((post) => post.id))];
+      if (loadedPostIds.length > 0) {
+        const { data: likes, error: likesError } = await supabase
+          .from("likes")
+          .select("post_id")
+          .eq("user_id", currentUserId)
+          .in("post_id", loadedPostIds);
+        if (cancelled) return;
+        if (likesError) setMessage(friendlyError(likesError, t));
+        else {
+          const likedIds = new Set((likes ?? []).map(({ post_id }) => post_id));
+          setLikeStates(Object.fromEntries(loadedPostBatch.map((post) => [
+            post.id,
+            { count: post.like_count, liked: likedIds.has(post.id) },
+          ])));
+        }
+      } else {
+        setLikeStates({});
+      }
       const { rowsByPostId, error: pollsError } = await loadPollResults(
         [...new Set(loadedPostBatch.filter((post) => post.has_poll).map((post) => post.id))]
       );
@@ -267,6 +291,29 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
       setFollowerCount((count) => count + (isFollowing ? -1 : 1));
     }
     setUpdatingFollow(false);
+  }
+
+  async function toggleLike(postId: string) {
+    if (!userId) {
+      router.push("/login");
+      return;
+    }
+    if (likeRequests.current.has(postId)) return;
+    likeRequests.current.add(postId);
+    const current = likeStates[postId] ?? { count: 0, liked: false };
+    const optimistic = { count: current.count + (current.liked ? -1 : 1), liked: !current.liked };
+    setLikeStates((states) => ({ ...states, [postId]: optimistic }));
+    try {
+      const result = current.liked
+        ? await supabase.from("likes").delete().eq("user_id", userId).eq("post_id", postId)
+        : await supabase.from("likes").insert({ post_id: postId });
+      if (result.error) throw result.error;
+    } catch (error) {
+      setLikeStates((states) => ({ ...states, [postId]: current }));
+      setMessage(friendlyError(error, t));
+    } finally {
+      likeRequests.current.delete(postId);
+    }
   }
 
   function beginPostEdit(post: Post) {
@@ -467,14 +514,18 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
               )}
           {posts.map((post) => (
             <Card as="article" key={post.id} className="post-card space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+              <DoubleTapLikeArea
+                liked={Boolean(likeStates[post.id]?.liked)}
+                onLike={() => { if (!likeStates[post.id]?.liked) void toggleLike(post.id); }}
+                className="flex flex-wrap items-center justify-between gap-3"
+              >
                 <Badge variant={typeVariants[post.type]}>
                   {t(typeTranslationKeys[post.type])}
                 </Badge>
                 {post.audience === "adult" && <Badge variant="lilac">{t("audience.badge")}</Badge>}
-                <span className="text-xs text-gray-500">{post.like_count} {t("like.likes")}</span>
+                <span className="text-xs text-gray-500">{likeStates[post.id]?.count ?? post.like_count} {t("like.likes")}</span>
                 <TimeAgo className="text-sm text-gray-500" date={post.created_at} />
-              </div>
+              </DoubleTapLikeArea>
               {editingPostId === post.id ? (
                 <form className="space-y-3" onSubmit={(event) => savePostEdit(event, post)}>
                   {!post.is_quick && <label className="block space-y-2 text-sm font-medium text-deep-plum">
@@ -502,9 +553,14 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                 </form>
               ) : (
                 <div className="space-y-2">
-                  {!post.is_quick && <h3 className="text-xl font-semibold text-gray-900">
-                    <Link href={`/post/${post.id}`}>{post.title}</Link>
-                  </h3>}
+                  {!post.is_quick && <DoubleTapLikeArea
+                    liked={Boolean(likeStates[post.id]?.liked)}
+                    onLike={() => { if (!likeStates[post.id]?.liked) void toggleLike(post.id); }}
+                  >
+                    <h3 className="text-xl font-semibold text-gray-900">
+                      <Link href={`/post/${post.id}`}>{post.title}</Link>
+                    </h3>
+                  </DoubleTapLikeArea>}
                   <QuotedPostCard quotedPostId={post.quoted_post_id} quoted={post.quoted} />
                   {post.sensitive && !revealedPostIds[post.id] ? (
                     <div className="space-y-3 rounded-2xl border border-rose-200 bg-rose-50/70 p-4" role="note">
@@ -515,9 +571,12 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                     </div>
                   ) : (
                     post.is_quick ? (
-                      <Link className="block rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle" href={`/post/${post.id}`}>
-                        <UserText text={post.body} className="text-lg text-gray-800" />
-                      </Link>
+                      <DoubleTapLikeArea
+                        liked={Boolean(likeStates[post.id]?.liked)}
+                        onLike={() => { if (!likeStates[post.id]?.liked) void toggleLike(post.id); }}
+                      >
+                        <PostBody body={post.body} href={`/post/${post.id}`} clamp={false} linkBody={false} className="text-lg" />
+                      </DoubleTapLikeArea>
                     ) : <UserText text={post.body} className="text-gray-800" />
                   )}
                   {(!post.sensitive || revealedPostIds[post.id]) && post.has_poll && (
@@ -570,16 +629,25 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
               return (
                 <Card as="article" key={`${post.id}-${sharedAt}`} className="post-card space-y-4">
                   <p className="text-xs font-medium text-gray-500">{t("repost.shared")}</p>
-                  <div className="flex flex-wrap items-center gap-2">
+                  <DoubleTapLikeArea
+                    liked={Boolean(likeStates[post.id]?.liked)}
+                    onLike={() => { if (!likeStates[post.id]?.liked) void toggleLike(post.id); }}
+                    className="flex flex-wrap items-center gap-2"
+                  >
                     <Badge variant={typeVariants[post.type]}>{t(typeTranslationKeys[post.type])}</Badge>
                     {post.audience === "adult" && <Badge variant="lilac">{t("audience.badge")}</Badge>}
-                    <span className="text-xs text-gray-500">{post.like_count} {t("like.likes")}</span>
+                    <span className="text-xs text-gray-500">{likeStates[post.id]?.count ?? post.like_count} {t("like.likes")}</span>
                     <TimeAgo className="text-sm text-gray-500" date={sharedAt} />
-                  </div>
+                  </DoubleTapLikeArea>
                   <div className="space-y-2">
-                    {!post.is_quick && <h3 className="text-xl font-semibold text-gray-900">
-                      <Link href={`/post/${post.id}`}>{post.title}</Link>
-                    </h3>}
+                    {!post.is_quick && <DoubleTapLikeArea
+                      liked={Boolean(likeStates[post.id]?.liked)}
+                      onLike={() => { if (!likeStates[post.id]?.liked) void toggleLike(post.id); }}
+                    >
+                      <h3 className="text-xl font-semibold text-gray-900">
+                        <Link href={`/post/${post.id}`}>{post.title}</Link>
+                      </h3>
+                    </DoubleTapLikeArea>}
                     <QuotedPostCard quotedPostId={post.quoted_post_id} quoted={post.quoted} />
                     {post.sensitive && !revealedPostIds[post.id] ? (
                       <div className="space-y-3 rounded-2xl border border-rose-200 bg-rose-50/70 p-4" role="note">
@@ -590,9 +658,12 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                       </div>
                     ) : (
                       post.is_quick ? (
-                        <Link className="block rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle" href={`/post/${post.id}`}>
-                          <UserText text={post.body} className="text-lg text-gray-800" />
-                        </Link>
+                        <DoubleTapLikeArea
+                          liked={Boolean(likeStates[post.id]?.liked)}
+                          onLike={() => { if (!likeStates[post.id]?.liked) void toggleLike(post.id); }}
+                        >
+                          <PostBody body={post.body} href={`/post/${post.id}`} clamp={false} linkBody={false} className="text-lg" />
+                        </DoubleTapLikeArea>
                       ) : <UserText text={post.body} className="text-gray-800" />
                     )}
                     {post.has_poll && <PollCard postId={post.id} rows={pollResults[post.id] ?? []} closesAt={post.poll_closes_at} />}

@@ -26,6 +26,7 @@ import type { TranslationKey } from "@/lib/i18n/en";
 import Avatar from "@/components/Avatar";
 import PollCard from "@/components/PollCard";
 import { loadPollResults, type PollResult } from "@/lib/polls";
+import DoubleTapLikeArea from "@/components/DoubleTapLikeArea";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -694,7 +695,11 @@ export default function ExplorePage() {
                 className={`post-card space-y-4 ${page === 0 && index < 8 ? "post-entry" : ""}`}
                 style={page === 0 && index < 8 ? { animationDelay: `${index * 40}ms` } : undefined}
               >
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <DoubleTapLikeArea
+                  liked={Boolean(likeStates[post.id]?.liked)}
+                  onLike={() => { if (!likeStates[post.id]?.liked) void toggleLike(post.id); }}
+                  className="flex flex-wrap items-center justify-between gap-3"
+                >
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <Badge variant={typeVariants[post.type]}>
                       {t(typeTranslationKeys[post.type])}
@@ -703,11 +708,16 @@ export default function ExplorePage() {
                     <ProvenanceBadge provenance={post.provenance} sources={post.sources} short />
                   </div>
                   <TimeAgo className="text-sm text-gray-500" date={post.created_at} />
-                </div>
+                </DoubleTapLikeArea>
                 <div className="space-y-2">
-                  {!post.is_quick && <h2 className="text-xl font-semibold text-gray-900">
-                    <Link href={`/post/${post.id}`} onClick={saveScrollForPost}>{post.title}</Link>
-                  </h2>}
+                  {!post.is_quick && <DoubleTapLikeArea
+                    liked={Boolean(likeStates[post.id]?.liked)}
+                    onLike={() => { if (!likeStates[post.id]?.liked) void toggleLike(post.id); }}
+                  >
+                    <h2 className="text-xl font-semibold text-gray-900">
+                      <Link href={`/post/${post.id}`} onClick={saveScrollForPost}>{post.title}</Link>
+                    </h2>
+                  </DoubleTapLikeArea>}
                   <QuotedPostCard quotedPostId={post.quoted_post_id} quoted={post.quoted} />
                   {post.sensitive && !revealedPostIds[post.id] ? (
                     <div className="space-y-3 rounded-2xl border border-rose-200 bg-rose-50/70 p-4" role="note">
@@ -717,7 +727,12 @@ export default function ExplorePage() {
                       </Button>
                     </div>
                   ) : (
-                    <PostBody body={post.body} href={`/post/${post.id}`} onNavigate={saveScrollForPost} clamp={!post.is_quick} className={post.is_quick ? "text-lg" : ""} />
+                    <DoubleTapLikeArea
+                      liked={Boolean(likeStates[post.id]?.liked)}
+                      onLike={() => { if (!likeStates[post.id]?.liked) void toggleLike(post.id); }}
+                    >
+                      <PostBody body={post.body} href={`/post/${post.id}`} onNavigate={saveScrollForPost} clamp={!post.is_quick} linkBody={!post.is_quick} className={post.is_quick ? "text-lg" : ""} />
+                    </DoubleTapLikeArea>
                   )}
                 </div>
                 {(!post.sensitive || revealedPostIds[post.id]) && post.has_poll && (

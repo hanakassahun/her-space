@@ -131,7 +131,7 @@ function getProfessionalTitle(profiles: Post["profiles"]) {
 export default function PostPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { lang, t } = useLanguage();
-  const { user, loading: authLoading, quietMode, quietModeSaving, quietModeError, setQuietMode } = useAuth();
+  const { user, loading: authLoading, isAdmin, quietMode, quietModeSaving, quietModeError, setQuietMode } = useAuth();
   const currentUserId = user?.id ?? null;
   const router = useRouter();
   const [post, setPost] = useState<Post | null>(null);
@@ -163,6 +163,8 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
   const [loading, setLoading] = useState(true);
   const [bookmarking, setBookmarking] = useState(false);
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const [pinSaving, setPinSaving] = useState(false);
   const [message, setMessage] = useState("");
   const likeRequest = useRef(false);
   const bookmarkRequest = useRef(false);
@@ -265,11 +267,36 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
         else setComments((commentsResult.data ?? []) as Comment[]);
       }
 
+      if (isAdmin) {
+        const { data: pinResult, error: pinError } = await supabase
+          .from("pinned_posts")
+          .select("post_id")
+          .eq("post_id", id)
+          .maybeSingle();
+        if (pinError) setMessage(friendlyError(pinError, t));
+        else setPinned(Boolean(pinResult));
+      }
+
       setLoading(false);
     }
 
     void loadPost();
-  }, [authLoading, currentUserId, id, router, t]);
+  }, [authLoading, currentUserId, id, isAdmin, router, t]);
+
+  async function togglePinned() {
+    if (!isAdmin || pinSaving) return;
+    setPinSaving(true);
+    setMessage("");
+    const result = pinned
+      ? await supabase.from("pinned_posts").delete().eq("post_id", id)
+      : await supabase.from("pinned_posts").insert({ post_id: id });
+    if (result.error) {
+      setMessage(friendlyError(result.error, t));
+    } else {
+      setPinned(!pinned);
+    }
+    setPinSaving(false);
+  }
 
   async function toggleBookmark() {
     if (!userId || bookmarkRequest.current) return;
@@ -624,6 +651,11 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                       />
                     )}
                   </div>
+                  {isAdmin && (
+                    <Button variant="secondary" type="button" disabled={pinSaving} onClick={() => void togglePinned()}>
+                      {pinned ? "Unpin" : "Pin as this week's question"}
+                    </Button>
+                  )}
                   <p className="text-sm text-gray-600">{getReadingMinutes(post.body)} {t("read.minRead")}</p>
 
                   {post.sensitive && revealedPostId !== post.id ? (

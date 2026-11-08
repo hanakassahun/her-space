@@ -26,6 +26,7 @@ import QuotedPostCard from "@/components/QuotedPostCard";
 import Avatar from "@/components/Avatar";
 import PollCard from "@/components/PollCard";
 import { loadPollResults, type PollResult } from "@/lib/polls";
+import DoubleTapLikeArea from "@/components/DoubleTapLikeArea";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -60,6 +61,9 @@ type LikeState = { count: number; liked: boolean };
 type FeedTab = "forYou" | "latest" | "following";
 type RecommendationReason = "follow" | "interest" | "popular" | "recent";
 type FeedRestoreState = { scrollY: number; pages: number; tab: FeedTab };
+type FollowingFeedRow = { kind: "post" | "repost"; post_id: string; reposter_id: string | null; happened_at: string };
+type FollowingItem = FollowingFeedRow & { key: string };
+type ReposterProfile = { id: string; display_name: string | null; avatar: string | null };
 
 const feedTabLabels = {
   forYou: "feed.forYou",
@@ -87,6 +91,7 @@ const typeTranslationKeys = {
 } as const;
 
 const PAGE_SIZE = 20;
+const POST_SELECT = "id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))";
 
 const SuggestedMembers = dynamic(() => import("@/components/SuggestedMembers"), { ssr: false });
 
@@ -118,9 +123,11 @@ export default function FeedPage() {
   const isSignedIn = Boolean(currentUserId);
   const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
+  const [pinnedPosts, setPinnedPosts] = useState<Post[]>([]);
+  const [followingItems, setFollowingItems] = useState<FollowingItem[]>([]);
+  const [reposterProfiles, setReposterProfiles] = useState<Record<string, ReposterProfile>>({});
   const [pollResults, setPollResults] = useState<Record<string, PollResult[]>>({});
   const [reasonsByPostId, setReasonsByPostId] = useState<Record<string, RecommendationReason>>({});
-  const [followingIds, setFollowingIds] = useState<string[]>([]);
   const [likeStates, setLikeStates] = useState<Record<string, LikeState>>({});
   const [repostedIds, setRepostedIds] = useState<Record<string, boolean>>({});
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
@@ -181,6 +188,48 @@ export default function FeedPage() {
 
     let incomingPosts: Post[];
     let pageHasMore: boolean;
+    let incomingPinnedPosts: Post[] = [];
+    let followingRows: FollowingFeedRow[] = [];
+    let nextReposterProfiles: Record<string, ReposterProfile> = {};
+
+    if (activeTab !== "following" && nextPage === 0) {
+      const { data: pinnedRows, error: pinnedError } = await supabase
+        .from("pinned_posts")
+        .select("post_id")
+        .order("sort_order");
+      if (pinnedError) {
+        setMessage(friendlyError(pinnedError, t));
+        setLoading(false);
+        setLoadingMore(false);
+        return;
+      }
+
+      const pinnedIds = (pinnedRows ?? []).map((row) => row.post_id);
+      if (pinnedIds.length > 0) {
+        const { data: pinnedData, error: pinnedPostsError } = await supabase
+          .from("posts")
+          .select(POST_SELECT)
+          .in("id", pinnedIds);
+        if (pinnedPostsError) {
+          setMessage(friendlyError(pinnedPostsError, t));
+          setLoading(false);
+          setLoadingMore(false);
+          return;
+        }
+        const pinnedById = new Map(((pinnedData ?? []) as Post[]).map((post) => [post.id, post]));
+        incomingPinnedPosts = pinnedIds.flatMap((id) => {
+          const pinnedPost = pinnedById.get(id);
+          return pinnedPost ? [pinnedPost] : [];
+        });
+        incomingPinnedPosts = await attachQuoted(incomingPinnedPosts);
+        const { rowsByPostId, error: pinnedPollsError } = await loadPollResults(
+          incomingPinnedPosts.filter((post) => post.has_poll).map((post) => post.id)
+        );
+        if (pinnedPollsError) setMessage(friendlyError(pinnedPollsError, t));
+        else setPollResults((current) => ({ ...current, ...rowsByPostId }));
+      }
+      setPinnedPosts(incomingPinnedPosts);
+    }
 
     if (activeTab === "forYou") {
       const { data, error } = await supabase.rpc("feed_for_you", {
@@ -202,7 +251,7 @@ export default function FeedPage() {
       if (postIds.length > 0) {
         const { data: postsData, error: postsError } = await supabase
           .from("posts")
-          .select("id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))")
+          .select(POST_SELECT)
           .in("id", postIds);
         if (postsError) {
           setMessage(friendlyError(postsError, t));
@@ -223,10 +272,65 @@ export default function FeedPage() {
         uniqueRecommendations.map(({ id, reason }) => [id, reason])
       ) as Record<string, RecommendationReason>;
       setReasonsByPostId((current) => reset ? nextReasons : { ...current, ...nextReasons });
+    } else if (activeTab === "following") {
+      const { data, error } = await supabase.rpc("following_feed", {
+        p_limit: PAGE_SIZE,
+        p_offset: from,
+      });
+      if (error) {
+        setMessage(friendlyError(error, t));
+        setLoading(false);
+        setLoadingMore(false);
+        return;
+      }
+
+      followingRows = (data ?? []) as FollowingFeedRow[];
+      pageHasMore = followingRows.length === PAGE_SIZE;
+      const postIds = [...new Set(followingRows.map((row) => row.post_id))];
+      let postsById = new Map<string, Post>();
+      if (postIds.length > 0) {
+        const { data: postsData, error: postsError } = await supabase
+          .from("posts")
+          .select(POST_SELECT)
+          .in("id", postIds);
+        if (postsError) {
+          setMessage(friendlyError(postsError, t));
+          setLoading(false);
+          setLoadingMore(false);
+          return;
+        }
+        postsById = new Map(((postsData ?? []) as Post[]).map((post) => [post.id, post]));
+        incomingPosts = postIds.flatMap((postId) => {
+          const post = postsById.get(postId);
+          return post ? [post] : [];
+        });
+      } else {
+        incomingPosts = [];
+      }
+
+      const reposterIds = [...new Set(followingRows
+        .filter((row) => row.kind === "repost" && row.reposter_id)
+        .map((row) => row.reposter_id as string))];
+      if (reposterIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabase
+          .from("profiles")
+          .select("id, display_name, avatar")
+          .in("id", reposterIds);
+        if (profilesError) {
+          setMessage(friendlyError(profilesError, t));
+          setLoading(false);
+          setLoadingMore(false);
+          return;
+        }
+        nextReposterProfiles = Object.fromEntries(
+          ((profiles ?? []) as ReposterProfile[]).map((profile) => [profile.id, profile])
+        );
+      }
+      if (reset) setReasonsByPostId({});
     } else {
       const postsResult = await supabase
         .from("posts")
-        .select("id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))")
+        .select(POST_SELECT)
         .order("created_at", { ascending: false })
         .range(from, to);
 
@@ -243,6 +347,17 @@ export default function FeedPage() {
     }
 
     incomingPosts = await attachQuoted(incomingPosts);
+    if (activeTab === "following") {
+      const loadedPostIds = new Set(incomingPosts.map((post) => post.id));
+      const nextItems = followingRows.flatMap((row) => loadedPostIds.has(row.post_id)
+        ? [{ ...row, key: `${row.kind}:${row.post_id}:${row.reposter_id ?? ""}` }]
+        : []);
+      setFollowingItems((current) => reset ? nextItems : [...current, ...nextItems]);
+      setReposterProfiles((current) => reset ? nextReposterProfiles : { ...current, ...nextReposterProfiles });
+    } else if (reset) {
+      setFollowingItems([]);
+      setReposterProfiles({});
+    }
     const { rowsByPostId, error: pollsError } = await loadPollResults(
       incomingPosts.filter((post) => post.has_poll).map((post) => post.id)
     );
@@ -253,16 +368,14 @@ export default function FeedPage() {
     setHasMore(pageHasMore);
     setPage(nextPage);
 
-    if (incomingPosts.length > 0) {
-      const postIds = incomingPosts.map((post) => post.id);
-      const [likesResult, commentsResult, followsResult, bookmarksResult, repostsResult] = await Promise.all([
+    const statePosts = [...new Map([...incomingPinnedPosts, ...incomingPosts].map((post) => [post.id, post])).values()];
+    if (statePosts.length > 0) {
+      const postIds = statePosts.map((post) => post.id);
+      const [likesResult, commentsResult, bookmarksResult, repostsResult] = await Promise.all([
         currentUserId
           ? supabase.from("likes").select("post_id").eq("user_id", currentUserId).in("post_id", postIds)
           : Promise.resolve({ data: [], error: null }),
         supabase.from("comments").select("post_id").in("post_id", postIds),
-        currentUserId
-          ? supabase.from("follows").select("followee_id").eq("follower_id", currentUserId)
-          : Promise.resolve({ data: [], error: null }),
         currentUserId
           ? supabase.from("bookmarks").select("post_id").eq("user_id", currentUserId).in("post_id", postIds)
           : Promise.resolve({ data: [], error: null }),
@@ -273,7 +386,7 @@ export default function FeedPage() {
 
       setLikeStates((current) => {
         const nextLikes = reset ? {} : { ...current };
-        for (const post of incomingPosts) {
+        for (const post of statePosts) {
           nextLikes[post.id] = { count: post.like_count, liked: false };
         }
         if (!likesResult.error) {
@@ -289,7 +402,7 @@ export default function FeedPage() {
       if (!commentsResult.error) {
         setCommentCounts((current) => {
           const counts = reset ? {} : { ...current };
-          for (const post of incomingPosts) counts[post.id] = 0;
+          for (const post of statePosts) counts[post.id] = 0;
           for (const comment of commentsResult.data ?? []) {
             counts[comment.post_id] = (counts[comment.post_id] ?? 0) + 1;
           }
@@ -298,13 +411,11 @@ export default function FeedPage() {
       }
 
       if (currentUserId) {
-        if (followsResult.error) setMessage(friendlyError(followsResult.error, t));
-        else setFollowingIds((followsResult.data ?? []).map((follow) => follow.followee_id));
         if (bookmarksResult.error) setMessage(friendlyError(bookmarksResult.error, t));
         else {
           setSavedPostIds((current) => {
             const saved = reset ? {} : { ...current };
-            for (const post of incomingPosts) saved[post.id] = false;
+            for (const post of statePosts) saved[post.id] = false;
             for (const bookmark of bookmarksResult.data ?? []) saved[bookmark.post_id] = true;
             return saved;
           });
@@ -313,21 +424,20 @@ export default function FeedPage() {
         else {
           setRepostedIds((current) => {
             const shared = reset ? {} : { ...current };
-            for (const post of incomingPosts) shared[post.id] = false;
+            for (const post of statePosts) shared[post.id] = false;
             for (const repost of repostsResult.data ?? []) shared[repost.post_id] = true;
             return shared;
           });
         }
       } else {
-        setFollowingIds([]);
         setSavedPostIds((current) => {
           const saved = reset ? {} : { ...current };
-          for (const post of incomingPosts) saved[post.id] = false;
+          for (const post of statePosts) saved[post.id] = false;
           return saved;
         });
         setRepostedIds((current) => {
           const shared = reset ? {} : { ...current };
-          for (const post of incomingPosts) shared[post.id] = false;
+          for (const post of statePosts) shared[post.id] = false;
           return shared;
         });
       }
@@ -336,7 +446,6 @@ export default function FeedPage() {
         setLikeStates({});
         setCommentCounts({});
         setSavedPostIds({});
-        setFollowingIds([]);
         setRepostedIds({});
       }
     }
@@ -408,9 +517,18 @@ export default function FeedPage() {
     }
   }
 
-  const visiblePosts = activeTab === "following"
-    ? posts.filter((post) => followingIds.includes(post.author_id))
-    : posts;
+  const postById = new Map(posts.map((post) => [post.id, post]));
+  const pinnedPostIds = new Set(pinnedPosts.map((post) => post.id));
+  const visibleFeedRows = activeTab === "following"
+    ? followingItems.flatMap((item) => {
+      const post = postById.get(item.post_id);
+      return post ? [{ item, post }] : [];
+    })
+    : posts.filter((post) => !pinnedPostIds.has(post.id)).map((post) => ({
+      item: { kind: "post" as const, post_id: post.id, reposter_id: null, happened_at: post.created_at, key: `post:${post.id}` },
+      post,
+    }));
+  const visiblePosts = visibleFeedRows.map(({ post }) => post);
 
   const handleLoadMore = useCallback(async () => {
     if (loadMoreLock.current || loading || loadingMore || !hasMore) return;
@@ -455,6 +573,128 @@ export default function FeedPage() {
     return () => observer.disconnect();
   }, [hasMore, loading, loadingMore]);
 
+  function renderPostCard(post: Post, index: number, key: string, reposter?: ReposterProfile) {
+    return (
+      <div key={key} className="space-y-2">
+        {reposter && (
+          <div className="flex items-center gap-2 px-2 text-sm text-gray-600">
+            <Avatar name={reposter.display_name || "Her Space member"} avatar={reposter.avatar} size={24} />
+            <Link className="font-medium text-deep-plum hover:underline" href={`/u/${reposter.id}`}>
+              {reposter.display_name || "Her Space member"}
+            </Link>
+            <span>{t("feed.sharedBy")}</span>
+          </div>
+        )}
+        <Card
+          as="article"
+          className={`post-card space-y-4 ${page === 0 && index < 8 ? "post-entry" : ""}`}
+          style={page === 0 && index < 8 ? { animationDelay: `${index * 40}ms` } : undefined}
+        >
+          <DoubleTapLikeArea
+            liked={Boolean(likeStates[post.id]?.liked)}
+            onLike={() => { if (!likeStates[post.id]?.liked) void toggleLike(post.id); }}
+            className="flex flex-wrap items-center justify-between gap-3"
+          >
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <Badge variant={typeVariants[post.type]}>{t(typeTranslationKeys[post.type])}</Badge>
+              {post.audience === "adult" && <Badge variant="lilac">{t("audience.badge")}</Badge>}
+              <ProvenanceBadge provenance={post.provenance} sources={post.sources} short />
+            </div>
+            <TimeAgo className="text-sm text-gray-500" date={post.created_at} />
+          </DoubleTapLikeArea>
+          {activeTab === "forYou" && reasonsByPostId[post.id] && (
+            <p className="text-xs text-gray-500">{t(reasonTranslationKeys[reasonsByPostId[post.id]])}</p>
+          )}
+
+          <div className="space-y-2">
+            {!post.is_quick && <DoubleTapLikeArea
+              liked={Boolean(likeStates[post.id]?.liked)}
+              onLike={() => { if (!likeStates[post.id]?.liked) void toggleLike(post.id); }}
+            >
+              <h2 className="text-xl font-semibold text-gray-900">
+                <Link href={`/post/${post.id}`} onClick={saveScrollForPost}>{post.title}</Link>
+              </h2>
+            </DoubleTapLikeArea>}
+            <QuotedPostCard quotedPostId={post.quoted_post_id} quoted={post.quoted} />
+            {post.sensitive && !revealedPostIds[post.id] ? (
+              <div className="space-y-3 rounded-2xl border border-rose-200 bg-rose-50/70 p-4" role="note">
+                <p className="text-sm text-rose-950">{t("read.sensitiveWarning")}</p>
+                <Button variant="secondary" type="button" onClick={() => setRevealedPostIds((current) => ({ ...current, [post.id]: true }))}>
+                  {t("read.showPost")}
+                </Button>
+              </div>
+            ) : (
+              <DoubleTapLikeArea
+                liked={Boolean(likeStates[post.id]?.liked)}
+                onLike={() => { if (!likeStates[post.id]?.liked) void toggleLike(post.id); }}
+              >
+                <PostBody body={post.body} href={`/post/${post.id}`} onNavigate={saveScrollForPost} clamp={!post.is_quick} linkBody={!post.is_quick} className={post.is_quick ? "text-lg" : ""} />
+              </DoubleTapLikeArea>
+            )}
+          </div>
+          {(!post.sensitive || revealedPostIds[post.id]) && post.has_poll && (
+            <PollCard postId={post.id} rows={pollResults[post.id] ?? []} closesAt={post.poll_closes_at} />
+          )}
+
+          {(!post.sensitive || revealedPostIds[post.id]) && post.topics?.length > 0 && (
+            <ul className="flex flex-wrap gap-2" aria-label={t("common.topics")}>
+              {post.topics.map((topic, topicIndex) => (
+                <li className="rounded-full bg-soft-lilac px-2.5 py-1 text-xs text-deep-plum" key={`${topic}-${topicIndex}`}>
+                  {topic}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="flex flex-col gap-3 border-t border-rose-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-2 text-sm text-gray-600">
+              <Avatar name={getAuthorName(post.profiles)} avatar={getAuthorProfile(post.profiles)?.avatar ?? null} size={32} />
+              <span className="min-w-0 break-words">
+                {t("common.by")} <Link className="underline" href={`/u/${post.author_id}`}>{getAuthorName(post.profiles)}</Link>
+                {getProfessionalTitle(getAuthorProfile(post.profiles)) && (
+                  <span className="ml-2 inline-flex rounded bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-800">
+                    {t("common.verifiedProfessional")} {getProfessionalTitle(getAuthorProfile(post.profiles))}
+                  </span>
+                )}
+              </span>
+            </div>
+            <div className="flex shrink-0 items-center gap-1 self-end sm:self-auto">
+              <LikeButton count={likeStates[post.id]?.count ?? 0} liked={likeStates[post.id]?.liked ?? false} onToggle={() => toggleLike(post.id)} />
+              {post.allow_reposts && post.author_id !== currentUserId && (
+                <RepostButton
+                  postId={post.id}
+                  authorId={post.author_id}
+                  allowReposts={post.allow_reposts}
+                  initiallyShared={Boolean(repostedIds[post.id])}
+                />
+              )}
+              <Link
+                className="inline-flex h-11 min-w-11 items-center justify-center gap-1 rounded-full px-2 text-sm text-gray-600 hover:bg-white/80 hover:text-deep-plum focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
+                href={`/post/${post.id}#comments-heading`}
+                onClick={saveScrollForPost}
+                aria-label={`${commentCounts[post.id] ?? 0} ${t("post.comments")}`}
+                title={t("post.comments")}
+              >
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                  <path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2v-6.5A7.5 7.5 0 1 1 20 11.5Z" />
+                </svg>
+                <span>{commentCounts[post.id] ?? 0}</span>
+              </Link>
+              <BookmarkButton
+                saved={Boolean(savedPostIds[post.id])}
+                disabled={savingPostIds[post.id] === true}
+                saveLabel={t("post.savePost")}
+                savedLabel={t("post.removeSaved")}
+                onToggle={() => void toggleBookmark(post.id)}
+                className="shrink-0 rounded-full text-gray-600 hover:bg-white/80 hover:text-deep-plum focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
+              />
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <PageShell className="max-w-3xl space-y-8 px-4 py-6 md:px-6 md:py-10">
         <header className="flex items-center justify-between gap-4">
@@ -490,7 +730,7 @@ export default function FeedPage() {
         {loading && <div className="space-y-4">{[0, 1, 2].map((index) => <PostSkeleton key={index} />)}</div>}
         {message && <Card className="text-red-700"><FriendlyErrorMessage message={message} /></Card>}
         {!quietMode && activeTab === "forYou" && page === 0 && !loading && !message && posts.length > 0 && <SuggestedMembers />}
-        {!loading && !message && visiblePosts.length === 0 && (
+        {!loading && !message && visiblePosts.length === 0 && (activeTab === "following" || pinnedPosts.length === 0) && (
           <Card className="space-y-3 text-gray-700">
             <p>{activeTab === "following" ? t("feed.noFollowing") : t("feed.noPosts")}</p>
             {activeTab === "following" && (
@@ -508,110 +748,19 @@ export default function FeedPage() {
         )}
         {!quietMode && !loading && !message && activeTab === "following" && visiblePosts.length === 0 && <SuggestedMembers />}
 
+        {activeTab !== "following" && page === 0 && pinnedPosts.length > 0 && (
+          <Card as="section" className="space-y-4">
+            <h2 className="break-words text-lg font-semibold text-deep-plum">{t("pinned.label")}</h2>
+            {pinnedPosts.map((post, index) => renderPostCard(post, index, `pinned:${post.id}`))}
+          </Card>
+        )}
+
         <section className="space-y-4" aria-label="Posts">
-          {visiblePosts.map((post, index) => (
-            <Card
-              as="article"
-              key={post.id}
-              className={`post-card space-y-4 ${page === 0 && index < 8 ? "post-entry" : ""}`}
-              style={page === 0 && index < 8 ? { animationDelay: `${index * 40}ms` } : undefined}
-            >
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <Badge variant={typeVariants[post.type]}>
-                    {t(typeTranslationKeys[post.type])}
-                  </Badge>
-                  {post.audience === "adult" && <Badge variant="lilac">{t("audience.badge")}</Badge>}
-                  <ProvenanceBadge provenance={post.provenance} sources={post.sources} short />
-                </div>
-                <TimeAgo className="text-sm text-gray-500" date={post.created_at} />
-              </div>
-              {activeTab === "forYou" && reasonsByPostId[post.id] && (
-                <p className="text-xs text-gray-500">{t(reasonTranslationKeys[reasonsByPostId[post.id]])}</p>
-              )}
-
-              <div className="space-y-2">
-                {!post.is_quick && <h2 className="text-xl font-semibold text-gray-900">
-                  <Link href={`/post/${post.id}`} onClick={saveScrollForPost}>{post.title}</Link>
-                </h2>}
-                <QuotedPostCard quotedPostId={post.quoted_post_id} quoted={post.quoted} />
-                {post.sensitive && !revealedPostIds[post.id] ? (
-                  <div className="space-y-3 rounded-2xl border border-rose-200 bg-rose-50/70 p-4" role="note">
-                    <p className="text-sm text-rose-950">{t("read.sensitiveWarning")}</p>
-                    <Button variant="secondary" type="button" onClick={() => setRevealedPostIds((current) => ({ ...current, [post.id]: true }))}>
-                      {t("read.showPost")}
-                    </Button>
-                  </div>
-                ) : (
-                  <PostBody body={post.body} href={`/post/${post.id}`} onNavigate={saveScrollForPost} clamp={!post.is_quick} className={post.is_quick ? "text-lg" : ""} />
-                )}
-              </div>
-              {(!post.sensitive || revealedPostIds[post.id]) && post.has_poll && (
-                <PollCard postId={post.id} rows={pollResults[post.id] ?? []} closesAt={post.poll_closes_at} />
-              )}
-
-              {(!post.sensitive || revealedPostIds[post.id]) && post.topics?.length > 0 && (
-                <ul className="flex flex-wrap gap-2" aria-label={t("common.topics")}>
-                  {post.topics.map((topic, index) => (
-                    <li
-                      className="rounded-full bg-soft-lilac px-2.5 py-1 text-xs text-deep-plum"
-                      key={`${topic}-${index}`}
-                    >
-                      {topic}
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              <div className="flex flex-col gap-3 border-t border-rose-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex min-w-0 items-center gap-2 text-sm text-gray-600">
-                  <Avatar name={getAuthorName(post.profiles)} avatar={getAuthorProfile(post.profiles)?.avatar ?? null} size={32} />
-                  <span className="min-w-0 break-words">
-                    {t("common.by")} <Link className="underline" href={`/u/${post.author_id}`}>{getAuthorName(post.profiles)}</Link>
-                  {getProfessionalTitle(getAuthorProfile(post.profiles)) && (
-                    <span className="ml-2 inline-flex rounded bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-800">
-                      {t("common.verifiedProfessional")} {getProfessionalTitle(getAuthorProfile(post.profiles))}
-                    </span>
-                  )}
-                  </span>
-                </div>
-                <div className="flex shrink-0 items-center gap-1 self-end sm:self-auto">
-                  <LikeButton
-                    count={likeStates[post.id]?.count ?? 0}
-                    liked={likeStates[post.id]?.liked ?? false}
-                    onToggle={() => toggleLike(post.id)}
-                  />
-                  {post.allow_reposts && post.author_id !== currentUserId && (
-                    <RepostButton
-                      postId={post.id}
-                      authorId={post.author_id}
-                      allowReposts={post.allow_reposts}
-                      initiallyShared={Boolean(repostedIds[post.id])}
-                    />
-                  )}
-                  <Link
-                    className="inline-flex h-11 min-w-11 items-center justify-center gap-1 rounded-full px-2 text-sm text-gray-600 hover:bg-white/80 hover:text-deep-plum focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
-                    href={`/post/${post.id}#comments-heading`}
-                    onClick={saveScrollForPost}
-                    aria-label={`${commentCounts[post.id] ?? 0} ${t("post.comments")}`}
-                    title={t("post.comments")}
-                  >
-                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-                      <path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2v-6.5A7.5 7.5 0 1 1 20 11.5Z" />
-                    </svg>
-                    <span>{commentCounts[post.id] ?? 0}</span>
-                  </Link>
-                  <BookmarkButton
-                    saved={Boolean(savedPostIds[post.id])}
-                    disabled={savingPostIds[post.id] === true}
-                    saveLabel={t("post.savePost")}
-                    savedLabel={t("post.removeSaved")}
-                    onToggle={() => void toggleBookmark(post.id)}
-                    className="shrink-0 rounded-full text-gray-600 hover:bg-white/80 hover:text-deep-plum focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
-                  />
-                </div>
-              </div>
-            </Card>
+          {visibleFeedRows.map(({ item, post }, index) => renderPostCard(
+            post,
+            index,
+            item.key,
+            item.kind === "repost" && item.reposter_id ? reposterProfiles[item.reposter_id] : undefined
           ))}
         </section>
 

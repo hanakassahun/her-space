@@ -165,6 +165,20 @@ select:focus-visible {
     }
   }
 
+  @keyframes heart-burst {
+    0% {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.35);
+    }
+    18% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      transform: translate(calc(-50% + var(--heart-x)), calc(-50% + var(--heart-y))) scale(1.05);
+    }
+  }
+
   @keyframes bookmark-bounce {
     0%, 100% {
       transform: scale(1);
@@ -218,6 +232,12 @@ select:focus-visible {
 
   .heart-pop {
     animation: heart-pop 250ms ease-out;
+  }
+
+  .heart-burst-heart {
+    animation: heart-burst 700ms ease-out forwards;
+    font-size: 1.25rem;
+    line-height: 1;
   }
 
   .bookmark-bounce {
@@ -308,4 +328,3 @@ html[lang="am"] textarea,
 html[lang="am"] select {
   overflow-wrap: anywhere;
 }
-

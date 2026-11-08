@@ -1,19 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { useLanguage } from "@/components/LanguageProvider";
 import NavIcon from "@/components/NavIcon";
 import { supabase } from "@/lib/supabase";
+import { getEnabledNotificationKinds } from "@/lib/notifPrefs";
 
 export default function NotificationBell() {
-  const { user } = useAuth();
+  const { user, notificationPrefs, notificationsPausedUntil } = useAuth();
   const { t } = useLanguage();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadCountUserId, setUnreadCountUserId] = useState<string | null>(null);
+  const [unreadCountKinds, setUnreadCountKinds] = useState("");
+  const [now, setNow] = useState(0);
+  const isPaused = Boolean(notificationsPausedUntil && (now === 0 || new Date(notificationsPausedUntil).getTime() > now));
+  const enabledKinds = useMemo(() => getEnabledNotificationKinds(notificationPrefs), [notificationPrefs]);
+  const enabledKindsKey = enabledKinds.join(",");
 
   const refreshCount = useCallback(async () => {
-    if (!user) {
+    if (!user) return;
+    if (isPaused) {
       setUnreadCount(0);
       return;
     }
@@ -21,17 +29,25 @@ export default function NotificationBell() {
       .from("notifications")
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id)
+      .in("kind", enabledKinds)
       .is("read_at", null);
-    if (!error) setUnreadCount(count ?? 0);
-  }, [user]);
+    if (!error) {
+      setUnreadCount(count ?? 0);
+      setUnreadCountUserId(user.id);
+      setUnreadCountKinds(enabledKindsKey);
+    }
+  }, [enabledKinds, enabledKindsKey, isPaused, user]);
 
   useEffect(() => {
-    if (!user) {
-      setUnreadCount(0);
-      return;
-    }
+    if (!notificationsPausedUntil) return;
+    const remaining = new Date(notificationsPausedUntil).getTime() - Date.now();
+    const timeout = window.setTimeout(() => setNow(Date.now()), Math.max(0, remaining));
+    return () => window.clearTimeout(timeout);
+  }, [notificationsPausedUntil]);
 
-    void refreshCount();
+  useEffect(() => {
+    if (!user) return;
+    const initialRefresh = window.setTimeout(() => void refreshCount(), 0);
     const interval = window.setInterval(() => {
       if (document.visibilityState === "visible") void refreshCount();
     }, 90000);
@@ -42,6 +58,7 @@ export default function NotificationBell() {
     document.addEventListener("visibilitychange", handleVisibility);
     window.addEventListener("her-space:notifications-changed", handleNotificationsChanged);
     return () => {
+      window.clearTimeout(initialRefresh);
       window.clearInterval(interval);
       document.removeEventListener("visibilitychange", handleVisibility);
       window.removeEventListener("her-space:notifications-changed", handleNotificationsChanged);
@@ -50,7 +67,8 @@ export default function NotificationBell() {
 
   if (!user) return null;
 
-  const label = unreadCount > 0 ? `${t("notif.title")} (${unreadCount})` : t("notif.title");
+  const badgeCount = unreadCountUserId === user.id && unreadCountKinds === enabledKindsKey && !isPaused ? unreadCount : 0;
+  const label = badgeCount > 0 ? `${t("notif.title")} (${badgeCount})` : t("notif.title");
 
   return (
     <Link
@@ -60,9 +78,9 @@ export default function NotificationBell() {
       title={label}
     >
       <NavIcon icon="notifications" className="h-5 w-5" />
-      {unreadCount > 0 && (
+      {badgeCount > 0 && (
         <span className="gradient-aurora absolute right-0.5 top-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none text-white">
-          {unreadCount > 9 ? "9+" : unreadCount}
+          {badgeCount > 9 ? "9+" : badgeCount}
         </span>
       )}
     </Link>

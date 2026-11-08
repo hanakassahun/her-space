@@ -14,6 +14,7 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
+import { maskEmail } from "@/lib/maskEmail";
 
 export default function EditProfilePage() {
   const { user, loading: authLoading } = useAuth();
@@ -26,6 +27,7 @@ export default function EditProfilePage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [saved, setSaved] = useState(false);
+  const [showEmail, setShowEmail] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -91,6 +93,17 @@ export default function EditProfilePage() {
         <h1 className="text-3xl font-bold text-deep-plum">{t("profile.edit")}</h1>
       </header>
       <Card as="div">
+        {user?.email && (
+          <div className="mb-5 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="break-all text-sm text-gray-800">{showEmail ? user.email : maskEmail(user.email)}</span>
+              <Button type="button" variant="secondary" className="px-3" onClick={() => setShowEmail((current) => !current)}>
+                {showEmail ? t("account.hide") : t("account.show")}
+              </Button>
+            </div>
+            <p className="break-words text-xs text-gray-600">{t("account.emailHidden")}</p>
+          </div>
+        )}
         <form className="space-y-5" onSubmit={saveProfile}>
           <fieldset className="space-y-3">
             <legend className="text-sm font-medium text-deep-plum">{t("profile.avatar")}</legend>

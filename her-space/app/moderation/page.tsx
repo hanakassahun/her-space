@@ -38,6 +38,8 @@ type ModerationContent = {
   body: string;
   is_quick?: boolean;
   type?: string;
+  has_poll?: boolean;
+  poll_options?: { position: number; label: string }[];
   post_id?: string | null;
   hidden_at?: string | null;
 };
@@ -309,12 +311,25 @@ export default function ModerationPage() {
     setContentLoading((current) => [...current, key]);
     setErrorMessage("");
     const result = item.target_kind === "post"
-      ? await supabase.from("posts").select("id, title, body, is_quick, type, hidden_at").eq("id", id).maybeSingle()
+      ? await supabase.from("posts").select("id, title, body, is_quick, type, has_poll, hidden_at").eq("id", id).maybeSingle()
       : await supabase.from("comments").select("id, body, post_id, hidden_at").eq("id", id).maybeSingle();
     if (result.error) {
       setErrorMessage(friendlyError(result.error, translateError));
     } else {
-      setShownContent((current) => ({ ...current, [key]: result.data as ModerationContent | null }));
+      let pollOptions: { position: number; label: string }[] = [];
+      if (item.target_kind === "post" && result.data && "has_poll" in result.data && result.data.has_poll) {
+        const { data, error } = await supabase
+          .from("poll_options")
+          .select("position, label")
+          .eq("post_id", id)
+          .order("position");
+        if (error) setErrorMessage(friendlyError(error, translateError));
+        else pollOptions = data ?? [];
+      }
+      setShownContent((current) => ({
+        ...current,
+        [key]: result.data ? { ...(result.data as ModerationContent), poll_options: pollOptions } : null,
+      }));
       if (result.data) {
         const isHidden = Boolean(result.data.hidden_at);
         setHiddenItems((current) => ({ ...current, [key]: isHidden }));
@@ -542,6 +557,11 @@ export default function ModerationPage() {
                 <div className="space-y-2 rounded-2xl bg-gray-50 p-4">
                   {item.target_kind === "post" && content.title && !content.is_quick && <h2 className="font-semibold text-deep-plum">{content.title}</h2>}
                   <p className="whitespace-pre-wrap break-words text-gray-800">{skimmed}</p>
+                  {content.poll_options && content.poll_options.length > 0 && (
+                    <ul className="list-inside list-disc space-y-1 break-words text-sm text-gray-700" aria-label="Poll options">
+                      {content.poll_options.map((option) => <li key={option.position}>{option.label}</li>)}
+                    </ul>
+                  )}
                   {body.length > 200 && (
                     <div className="flex gap-2">
                       <Button className="min-h-11 px-3 text-xs" variant={!showAllContent[key] ? "secondary" : "ghost"} type="button" onClick={() => setShowAllContent((current) => ({ ...current, [key]: false }))}>Skim</Button>
