@@ -12,6 +12,7 @@ import { useAuth } from "@/components/AuthProvider";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
 import Avatar from "@/components/Avatar";
+import CoverArt from "@/components/CoverArt";
 
 type Collection = {
   id: string;
@@ -19,6 +20,7 @@ type Collection = {
   title_am: string | null;
   description: string | null;
   description_am: string | null;
+  cover: string | null;
 };
 
 type Related<T> = T | T[] | null;
@@ -31,6 +33,7 @@ type ArticleItem = {
   summary: string | null;
   summary_am: string | null;
   category: string;
+  cover: string | null;
 };
 
 type PostItem = {
@@ -40,6 +43,7 @@ type PostItem = {
   is_quick: boolean;
   type: "experience" | "question" | "knowledge";
   provenance: "personal" | "community" | "evidence";
+  cover: string | null;
   profiles: Related<{ display_name: string | null; avatar: string | null }>;
 };
 
@@ -77,7 +81,7 @@ export default function CollectionPage({ params }: { params: Promise<{ slug: str
 
       const { data: collectionData, error: collectionError } = await supabase
         .from("collections")
-        .select("id, slug, title, title_am, description, description_am")
+        .select("id, slug, title, title_am, description, description_am, cover")
         .eq("slug", slug)
         .maybeSingle();
 
@@ -96,7 +100,7 @@ export default function CollectionPage({ params }: { params: Promise<{ slug: str
       setCollection(collectionData as Collection);
       const { data: itemData, error: itemError } = await supabase
         .from("collection_items")
-        .select("id, position, articles!collection_items_article_id_fkey(id, slug, title, title_am, summary, summary_am, category), posts!collection_items_post_id_fkey(id, title, body, is_quick, type, provenance, profiles!posts_author_id_fkey(display_name, avatar))")
+        .select("id, position, articles!collection_items_article_id_fkey(id, slug, title, title_am, summary, summary_am, category, cover), posts!collection_items_post_id_fkey(id, cover, title, body, is_quick, type, provenance, profiles!posts_author_id_fkey(display_name, avatar))")
         .eq("collection_id", collectionData.id)
         .order("position", { ascending: true });
 
@@ -143,6 +147,7 @@ export default function CollectionPage({ params }: { params: Promise<{ slug: str
       {!loading && collection && (
         <>
           <header className="space-y-2">
+            {collection.cover && <div className="h-[72px] overflow-hidden rounded-xl"><CoverArt cover={collection.cover} className="h-full" /></div>}
             <h1 className="break-words text-3xl font-bold text-deep-plum">{collectionTitle}</h1>
             {collectionDescription && (
               <p className="break-words whitespace-pre-wrap leading-7 text-gray-700">{collectionDescription}</p>
@@ -165,6 +170,7 @@ export default function CollectionPage({ params }: { params: Promise<{ slug: str
                   className="block min-h-11 rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
                 >
                   <Card as="article" className="space-y-2">
+                    {article.cover && <div className="h-[72px] overflow-hidden rounded-xl"><CoverArt cover={article.cover} className="h-full" /></div>}
                     <span className="text-xs font-semibold text-gray-600">{t("collections.reviewed")}</span>
                     <h2 className="break-words text-lg font-semibold text-deep-plum">{title}</h2>
                     {summary && <p className="break-words text-sm leading-6 text-gray-700">{summary}</p>}
@@ -183,6 +189,7 @@ export default function CollectionPage({ params }: { params: Promise<{ slug: str
                 className="block min-h-11 rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
               >
                 <Card as="article" className="space-y-2">
+                  {post.cover && <div className="h-[72px] overflow-hidden rounded-xl"><CoverArt cover={post.cover} className="h-full" /></div>}
                   <span className="text-xs font-semibold text-gray-600">{t("collections.memberStory")}</span>
                   {!post.is_quick && <h2 className="break-words text-lg font-semibold text-deep-plum">{post.title}</h2>}
                   {post.is_quick && <p className="break-words text-lg leading-7 text-gray-800">{post.body}</p>}

@@ -14,6 +14,7 @@ import Button from "@/components/ui/Button";
 import PostSkeleton from "@/components/ui/PostSkeleton";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/components/AuthProvider";
+import CoverArt from "@/components/CoverArt";
 
 type ArticleCategory = "health" | "body_beauty" | "mind_life" | "life_stages";
 
@@ -27,6 +28,7 @@ type Article = {
   category: ArticleCategory;
   audience: "all" | "adult";
   topics: string[];
+  cover: string | null;
 };
 
 type Collection = {
@@ -36,6 +38,7 @@ type Collection = {
   title_am: string | null;
   description: string;
   description_am: string | null;
+  cover: string | null;
 };
 
 const categoryTranslationKeys = {
@@ -70,13 +73,13 @@ export default function LearnPage() {
       const [articleResult, collectionResult] = await Promise.all([
         supabase
           .from("articles")
-          .select("id, slug, title, title_am, summary, summary_am, category, audience, topics")
+          .select("id, slug, title, title_am, summary, summary_am, category, audience, topics, cover")
           .eq("published", true)
           .order("category", { ascending: true })
           .order("title", { ascending: true }),
         supabase
           .from("collections")
-          .select("id, slug, title, title_am, description, description_am")
+          .select("id, slug, title, title_am, description, description_am, cover")
           .eq("published", true)
           .order("sort_order", { ascending: true }),
       ]);
@@ -158,6 +161,7 @@ export default function LearnPage() {
                 className="min-h-11 w-72 shrink-0 snap-start rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle sm:w-80"
               >
                 <Card as="article" className="h-full space-y-2">
+                  {collection.cover && <div className="h-[72px] overflow-hidden rounded-xl"><CoverArt cover={collection.cover} className="h-full" /></div>}
                   <h3 className="break-words font-semibold text-deep-plum">
                     {lang === "am" && collection.title_am?.trim() ? collection.title_am : collection.title}
                   </h3>
@@ -189,6 +193,7 @@ export default function LearnPage() {
             </h2>
             {categoryArticles.map((article) => (
               <Card as="article" key={article.id} className="space-y-3">
+                {article.cover && <div className="h-[72px] overflow-hidden rounded-xl"><CoverArt cover={article.cover} className="h-full" /></div>}
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="lilac">{t(categoryTranslationKeys[article.category])}</Badge>
                   {article.audience === "adult" && <Badge variant="lilac">{t("audience.badge")}</Badge>}

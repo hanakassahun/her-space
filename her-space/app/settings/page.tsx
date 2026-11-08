@@ -365,6 +365,12 @@ export default function SettingsPage() {
           >
             {t("profile.edit")}
           </Link>
+          <Link
+            href="/settings/invites"
+            className="inline-flex min-h-11 items-center rounded-full border border-[#CDBDEB] bg-white px-4 text-sm font-semibold text-deep-plum underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
+          >
+            {t("invite.mine.title")}
+          </Link>
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="break-all text-sm text-gray-800">{user?.email ? showEmail ? user.email : maskEmail(user.email) : ""}</span>

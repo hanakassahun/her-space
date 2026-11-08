@@ -9,6 +9,8 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
+import { COVER_KEYS, type CoverKey } from "@/components/CoverArt";
+import CoverArt from "@/components/CoverArt";
 
 type ArticleCategory = "health" | "body_beauty" | "mind_life" | "life_stages";
 
@@ -28,6 +30,7 @@ type Article = {
   reviewed_by: string | null;
   published: boolean;
   helpful_count: number;
+  cover: string | null;
 };
 
 type ArticleForm = {
@@ -43,6 +46,7 @@ type ArticleForm = {
   doctorQuestions: string;
   sources: string;
   reviewedBy: string;
+  cover: CoverKey | null;
 };
 
 const emptyForm: ArticleForm = {
@@ -58,6 +62,7 @@ const emptyForm: ArticleForm = {
   doctorQuestions: "",
   sources: "",
   reviewedBy: "",
+  cover: null,
 };
 
 const categoryLabels: Record<ArticleCategory, string> = {
@@ -91,13 +96,14 @@ function formFromArticle(article: Article): ArticleForm {
     doctorQuestions: toLines(article.doctor_questions),
     sources: toLines(article.sources),
     reviewedBy: article.reviewed_by ?? "",
+    cover: COVER_KEYS.find((key) => key === article.cover) ?? null,
   };
 }
 
 function fetchArticles() {
   return supabase
     .from("articles")
-    .select("id, slug, title, summary, category, audience, topics, normal, needs_attention, see_doctor, doctor_questions, sources, reviewed_by, published, helpful_count")
+    .select("id, slug, title, summary, category, audience, topics, normal, needs_attention, see_doctor, doctor_questions, sources, reviewed_by, published, helpful_count, cover")
     .order("updated_at", { ascending: false });
 }
 
@@ -171,6 +177,7 @@ export default function AdminArticlesPage() {
       doctor_questions: fromLines(form.doctorQuestions),
       sources: fromLines(form.sources),
       reviewed_by: form.reviewedBy.trim() || null,
+      cover: form.cover,
       updated_at: new Date().toISOString(),
     };
 
@@ -268,6 +275,17 @@ export default function AdminArticlesPage() {
             <Input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required />
           </label>
           <label className="block space-y-2 text-sm font-medium text-deep-plum">
+            Cover
+            <select
+              className="min-h-11 w-full rounded-2xl border border-[#CDBDEB] bg-white px-4 py-2.5 text-deep-plum focus:border-[#8F72BE] focus:outline-none focus:ring-2 focus:ring-[#B49AD8]"
+              value={form.cover ?? ""}
+              onChange={(event) => setForm({ ...form, cover: COVER_KEYS.find((key) => key === event.target.value) ?? null })}
+            >
+              <option value="">No cover</option>
+              {COVER_KEYS.map((key) => <option key={key} value={key}>{key.charAt(0).toUpperCase() + key.slice(1)}</option>)}
+            </select>
+          </label>
+          <label className="block space-y-2 text-sm font-medium text-deep-plum">
             Summary
             <Textarea className="min-h-20" value={form.summary} onChange={(event) => setForm({ ...form, summary: event.target.value })} />
           </label>
@@ -315,6 +333,7 @@ export default function AdminArticlesPage() {
         {!loading && articles.length === 0 && <Card className="text-gray-700">No articles yet.</Card>}
         {articles.map((article) => (
           <Card as="article" key={article.id} className="space-y-3">
+            {article.cover && <div className="h-[72px] overflow-hidden rounded-xl"><CoverArt cover={article.cover} className="h-full" /></div>}
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h3 className="text-lg font-semibold text-deep-plum">{article.title}</h3>

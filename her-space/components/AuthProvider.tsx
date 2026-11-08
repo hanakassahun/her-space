@@ -79,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const activeUserId = useRef<string | null>(null);
   const requestId = useRef(0);
   const savingNotificationPrefs = useRef(new Set<string>());
+  const lastVisitPingedDate = useRef<string | null>(null);
 
   const setQuietMode = useCallback(async (next: boolean) => {
     const userId = activeUserId.current;
@@ -211,10 +212,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let active = true;
     let authEventReceived = false;
 
+    async function pingVisitForToday() {
+      const now = new Date();
+      const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      if (lastVisitPingedDate.current === localDate) return;
+      try {
+        if (window.localStorage.getItem("lastVisitPing") === localDate) {
+          lastVisitPingedDate.current = localDate;
+          return;
+        }
+        window.localStorage.setItem("lastVisitPing", localDate);
+      } catch {
+        if (lastVisitPingedDate.current === localDate) return;
+      }
+      lastVisitPingedDate.current = localDate;
+      try {
+        await supabase.rpc("touch_visit");
+      } catch {
+        // Visit pings are intentionally best-effort.
+      }
+    }
+
     async function loadUserData(nextSession: Session | null) {
       const nextUserId = nextSession?.user.id ?? null;
       setSession(nextSession);
 
+      if (nextUserId) void pingVisitForToday();
       if (nextUserId === activeUserId.current) {
         setLoading(false);
         return;

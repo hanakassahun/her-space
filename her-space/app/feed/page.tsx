@@ -27,6 +27,7 @@ import Avatar from "@/components/Avatar";
 import PollCard from "@/components/PollCard";
 import { loadPollResults, type PollResult } from "@/lib/polls";
 import DoubleTapLikeArea from "@/components/DoubleTapLikeArea";
+import CoverArt from "@/components/CoverArt";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -37,6 +38,7 @@ type Profile = {
 
 type Post = {
   id: string;
+  cover: string | null;
   author_id: string;
   type: "experience" | "question" | "knowledge";
   provenance: "personal" | "community" | "evidence";
@@ -91,7 +93,7 @@ const typeTranslationKeys = {
 } as const;
 
 const PAGE_SIZE = 20;
-const POST_SELECT = "id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))";
+const POST_SELECT = "id, cover, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))";
 
 const SuggestedMembers = dynamic(() => import("@/components/SuggestedMembers"), { ssr: false });
 
@@ -590,6 +592,7 @@ export default function FeedPage() {
           className={`post-card space-y-4 ${page === 0 && index < 8 ? "post-entry" : ""}`}
           style={page === 0 && index < 8 ? { animationDelay: `${index * 40}ms` } : undefined}
         >
+          {post.cover && <div className="h-[72px] overflow-hidden rounded-xl"><CoverArt cover={post.cover} className="h-full" /></div>}
           <DoubleTapLikeArea
             liked={Boolean(likeStates[post.id]?.liked)}
             onLike={() => { if (!likeStates[post.id]?.liked) void toggleLike(post.id); }}

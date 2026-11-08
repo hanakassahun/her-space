@@ -9,6 +9,8 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
+import { COVER_KEYS, type CoverKey } from "@/components/CoverArt";
+import CoverArt from "@/components/CoverArt";
 
 type Collection = {
   id: string;
@@ -21,6 +23,7 @@ type Collection = {
   sort_order: number;
   published: boolean;
   created_at: string;
+  cover: string | null;
 };
 
 type ArticleOption = { id: string; slug: string; title: string };
@@ -34,9 +37,9 @@ type CollectionItem = {
   articles: Related<{ title: string; slug: string }>;
   posts: Related<{ title: string; is_quick: boolean }>;
 };
-type CollectionForm = { title: string; slug: string; description: string };
+type CollectionForm = { title: string; slug: string; description: string; cover: CoverKey | null };
 
-const emptyForm: CollectionForm = { title: "", slug: "", description: "" };
+const emptyForm: CollectionForm = { title: "", slug: "", description: "", cover: null };
 const postIdPattern = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
 function first<T>(related: Related<T>): T | null {
@@ -90,7 +93,7 @@ export default function AdminCollectionsPage() {
       const [collectionResult, articleResult] = await Promise.all([
         supabase
           .from("collections")
-          .select("id, slug, title, title_am, description, description_am, audience, sort_order, published, created_at")
+          .select("id, slug, title, title_am, description, description_am, audience, sort_order, published, created_at, cover")
           .order("sort_order", { ascending: true }),
         supabase.from("articles").select("id, slug, title").order("title", { ascending: true }),
       ]);
@@ -128,6 +131,7 @@ export default function AdminCollectionsPage() {
       title: collection.title,
       slug: collection.slug,
       description: collection.description ?? "",
+      cover: COVER_KEYS.find((key) => key === collection.cover) ?? null,
     });
     setItems([]);
     setSelectedArticleId("");
@@ -153,6 +157,7 @@ export default function AdminCollectionsPage() {
       title: form.title.trim(),
       slug: form.slug.trim(),
       description: form.description.trim() || null,
+      cover: form.cover,
     };
     const result = editingCollection
       ? await supabase.from("collections").update(collectionData).eq("id", editingCollection.id)
@@ -166,7 +171,7 @@ export default function AdminCollectionsPage() {
             sort_order: collections.reduce((max, item) => Math.max(max, item.sort_order), -1) + 1,
             published: false,
           })
-          .select("id, slug, title, title_am, description, description_am, audience, sort_order, published, created_at")
+          .select("id, slug, title, title_am, description, description_am, audience, sort_order, published, created_at, cover")
           .single();
 
     if (result.error) {
@@ -184,7 +189,7 @@ export default function AdminCollectionsPage() {
       const created = result.data as Collection;
       setCollections((current) => [...current, created].sort((a, b) => a.sort_order - b.sort_order));
       setEditingCollection(created);
-      setForm({ title: created.title, slug: created.slug, description: created.description ?? "" });
+      setForm({ title: created.title, slug: created.slug, description: created.description ?? "", cover: COVER_KEYS.find((key) => key === created.cover) ?? null });
       setItems([]);
       setMessage("Collection created.");
     }
@@ -324,6 +329,17 @@ export default function AdminCollectionsPage() {
             Description
             <Textarea className="min-h-20" value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} />
           </label>
+          <label className="block space-y-2 text-sm font-medium text-deep-plum">
+            Cover
+            <select
+              className="min-h-11 w-full rounded-2xl border border-[#CDBDEB] bg-white px-4 py-2.5 text-deep-plum focus:border-[#8F72BE] focus:outline-none focus:ring-2 focus:ring-[#B49AD8]"
+              value={form.cover ?? ""}
+              onChange={(event) => setForm((current) => ({ ...current, cover: COVER_KEYS.find((key) => key === event.target.value) ?? null }))}
+            >
+              <option value="">No cover</option>
+              {COVER_KEYS.map((key) => <option key={key} value={key}>{key.charAt(0).toUpperCase() + key.slice(1)}</option>)}
+            </select>
+          </label>
           <div className="flex flex-wrap gap-3">
             <Button type="submit" disabled={saving || !form.title.trim() || !form.slug.trim()}>
               {saving ? "Saving..." : editingCollection ? "Save changes" : "Create collection"}
@@ -388,6 +404,7 @@ export default function AdminCollectionsPage() {
         {!loading && collections.length === 0 && <Card className="text-gray-700">No collections yet.</Card>}
         {collections.map((collection) => (
           <Card as="article" key={collection.id} className="space-y-3">
+            {collection.cover && <div className="h-[72px] overflow-hidden rounded-xl"><CoverArt cover={collection.cover} className="h-full" /></div>}
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <h3 className="break-words text-lg font-semibold text-deep-plum">{collection.title}</h3>

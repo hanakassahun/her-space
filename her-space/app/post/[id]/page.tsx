@@ -27,6 +27,7 @@ import HelpfulButton from "@/components/HelpfulButton";
 import Avatar from "@/components/Avatar";
 import PollCard from "@/components/PollCard";
 import { loadPollResults, type PollResult } from "@/lib/polls";
+import CoverArt from "@/components/CoverArt";
 
 const MemberActionsMenu = dynamic(() => import("@/components/MemberActionsMenu"), { ssr: false });
 
@@ -40,6 +41,7 @@ type PostProfile = {
 
 type Post = {
   id: string;
+  cover: string | null;
   author_id: string;
   type: PostType;
   provenance: "personal" | "community" | "evidence";
@@ -198,7 +200,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       const [postResult, bookmarkResult, likesResult, commentsResult, repostsResult, helpfulResult] = await Promise.all([
         supabase
           .from("posts")
-          .select("id, author_id, type, provenance, audience, like_count, helpful_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, hidden_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))")
+          .select("id, cover, author_id, type, provenance, audience, like_count, helpful_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, hidden_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))")
           .eq("id", id)
           .single(),
         supabase
@@ -402,7 +404,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
         allow_reposts: editAllowReposts && !post.sensitive && post.audience !== "adult",
       })
       .eq("id", post.id)
-      .select("id, author_id, type, provenance, audience, like_count, helpful_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))")
+      .select("id, cover, author_id, type, provenance, audience, like_count, helpful_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))")
       .single();
 
     if (error) {
@@ -573,6 +575,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
               </Card>
             )}
             <Card as="article" className="post-card space-y-5">
+              {post.cover && <div className="h-[72px] overflow-hidden rounded-xl"><CoverArt cover={post.cover} className="h-full" /></div>}
               {editingPost ? (
                 <form className="space-y-4" onSubmit={savePostEdit}>
                   {!post.is_quick && (

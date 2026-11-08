@@ -25,6 +25,7 @@ import PollCard from "@/components/PollCard";
 import { loadPollResults, type PollResult } from "@/lib/polls";
 import DoubleTapLikeArea from "@/components/DoubleTapLikeArea";
 import PostBody from "@/components/PostBody";
+import CoverArt from "@/components/CoverArt";
 
 type LikeState = { count: number; liked: boolean };
 type Professional = { title: string } | { title: string }[] | null;
@@ -36,6 +37,7 @@ type Profile = {
 
 type Post = {
   id: string;
+  cover: string | null;
   author_id: string;
   type: "experience" | "question" | "knowledge";
   provenance: "personal" | "community" | "evidence";
@@ -114,7 +116,7 @@ export default function LibraryPage() {
       const { data, error } = await supabase
         .from("bookmarks")
         .select(
-          "created_at, posts!bookmarks_post_id_fkey(id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title)))")
+          "created_at, posts!bookmarks_post_id_fkey(id, cover, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title)))")
         .eq("user_id", userId)
         .order("created_at", { ascending: false });
 
@@ -289,6 +291,7 @@ export default function LibraryPage() {
 
             return (
               <Card as="article" key={post.id} className="post-card space-y-4">
+                {post.cover && <div className="h-[72px] overflow-hidden rounded-xl"><CoverArt cover={post.cover} className="h-full" /></div>}
                 <DoubleTapLikeArea
                   liked={Boolean(likeStates[post.id]?.liked)}
                   onLike={() => { if (!likeStates[post.id]?.liked) void toggleLike(post.id); }}

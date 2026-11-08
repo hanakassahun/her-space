@@ -60,6 +60,12 @@ export default function AdminPage() {
           <Link className="inline-flex min-h-11 items-center rounded-full border border-white/70 bg-white/70 px-4 text-sm font-medium text-deep-plum shadow-sm transition hover:bg-white" href="/admin/invites">
             Manage invites
           </Link>
+          <Link className="inline-flex min-h-11 items-center rounded-full border border-white/70 bg-white/70 px-4 text-sm font-medium text-deep-plum shadow-sm transition hover:bg-white" href="/admin/stats">
+            Demand dashboard
+          </Link>
+          <Link className="inline-flex min-h-11 items-center rounded-full border border-white/70 bg-white/70 px-4 text-sm font-medium text-deep-plum shadow-sm transition hover:bg-white" href="/admin/invite-requests">
+            Invite requests
+          </Link>
           <Link className="inline-flex min-h-11 items-center rounded-full border border-white/70 bg-white/70 px-4 text-sm font-medium text-deep-plum shadow-sm transition hover:bg-white" href="/admin/feedback">
             Member feedback
           </Link>

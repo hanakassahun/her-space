@@ -12,6 +12,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/components/AuthProvider";
 import type { TranslationKey } from "@/lib/i18n/en";
 import HelpfulButton from "@/components/HelpfulButton";
+import CoverArt from "@/components/CoverArt";
 
 type Article = {
   id: string;
@@ -34,6 +35,7 @@ type Article = {
   doctor_questions_am: string[];
   sources: string[];
   reviewed_by: string | null;
+  cover: string | null;
 };
 
 const categoryTranslationKeys: Record<string, TranslationKey> = {
@@ -64,7 +66,7 @@ export default function LearnArticlePage({ params }: { params: Promise<{ slug: s
 
       const { data, error } = await supabase
         .from("articles")
-        .select("id, slug, title, title_am, summary, summary_am, category, audience, helpful_count, topics, normal, normal_am, needs_attention, needs_attention_am, see_doctor, see_doctor_am, doctor_questions, doctor_questions_am, sources, reviewed_by")
+        .select("id, slug, title, title_am, summary, summary_am, category, audience, helpful_count, topics, normal, normal_am, needs_attention, needs_attention_am, see_doctor, see_doctor_am, doctor_questions, doctor_questions_am, sources, reviewed_by, cover")
         .eq("slug", slug)
         .eq("published", true)
         .single();
@@ -112,6 +114,7 @@ export default function LearnArticlePage({ params }: { params: Promise<{ slug: s
       {article && (
         <>
           <header className="space-y-3">
+            {article.cover && <div className="h-[72px] overflow-hidden rounded-xl"><CoverArt cover={article.cover} className="h-full" /></div>}
             <div className="flex flex-wrap gap-2">
               <Badge variant="lilac">{t(categoryTranslationKeys[article.category] ?? "explore.health")}</Badge>
               {article.audience === "adult" && <Badge variant="lilac">{t("audience.badge")}</Badge>}

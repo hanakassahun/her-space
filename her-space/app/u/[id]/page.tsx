@@ -26,6 +26,7 @@ import PollCard from "@/components/PollCard";
 import { loadPollResults, type PollResult } from "@/lib/polls";
 import DoubleTapLikeArea from "@/components/DoubleTapLikeArea";
 import PostBody from "@/components/PostBody";
+import CoverArt from "@/components/CoverArt";
 
 const MemberActionsMenu = dynamic(() => import("@/components/MemberActionsMenu"), { ssr: false });
 
@@ -43,6 +44,7 @@ type PostProfile = {
 };
 type Post = {
   id: string;
+  cover: string | null;
   author_id: string;
   type: "experience" | "question" | "knowledge";
   provenance: "personal" | "community" | "evidence";
@@ -157,13 +159,13 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
           supabase
             .from("posts")
             .select(
-              "id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))"
+              "id, cover, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))"
             )
             .eq("author_id", id)
             .order("created_at", { ascending: false }),
           supabase
             .from("reposts")
-            .select("created_at, posts!reposts_post_id_fkey(id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar))")
+            .select("created_at, posts!reposts_post_id_fkey(id, cover, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar))")
             .eq("user_id", id)
             .order("created_at", { ascending: false }),
         ]);
@@ -344,7 +346,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
         ...(post.provenance === "evidence" ? { sources } : {}),
       })
       .eq("id", post.id)
-      .select("id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))")
+      .select("id, cover, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))")
       .single();
 
     if (error) setMessage(friendlyError(error, t));
@@ -425,12 +427,12 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                       const [postsResult, repostsResult] = await Promise.all([
                         supabase
                           .from("posts")
-                          .select("id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))")
+                          .select("id, cover, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))")
                           .eq("author_id", id)
                           .order("created_at", { ascending: false }),
                         supabase
                           .from("reposts")
-                          .select("created_at, posts!reposts_post_id_fkey(id, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar))")
+                          .select("created_at, posts!reposts_post_id_fkey(id, cover, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar))")
                           .eq("user_id", id)
                           .order("created_at", { ascending: false }),
                       ]);
@@ -514,6 +516,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
               )}
           {posts.map((post) => (
             <Card as="article" key={post.id} className="post-card space-y-4">
+              {post.cover && <div className="h-[72px] overflow-hidden rounded-xl"><CoverArt cover={post.cover} className="h-full" /></div>}
               <DoubleTapLikeArea
                 liked={Boolean(likeStates[post.id]?.liked)}
                 onLike={() => { if (!likeStates[post.id]?.liked) void toggleLike(post.id); }}
@@ -628,6 +631,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
               const postProfile = first(post.profiles);
               return (
                 <Card as="article" key={`${post.id}-${sharedAt}`} className="post-card space-y-4">
+                  {post.cover && <div className="h-[72px] overflow-hidden rounded-xl"><CoverArt cover={post.cover} className="h-full" /></div>}
                   <p className="text-xs font-medium text-gray-500">{t("repost.shared")}</p>
                   <DoubleTapLikeArea
                     liked={Boolean(likeStates[post.id]?.liked)}

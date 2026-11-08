@@ -17,6 +17,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import type { TranslationKey } from "@/lib/i18n/en";
 import { useAuth } from "@/components/AuthProvider";
 import { getPollClosingTime } from "@/lib/polls";
+import CoverArt, { COVER_KEYS, type CoverKey } from "@/components/CoverArt";
 
 type PostType = "experience" | "question" | "knowledge";
 type Provenance = "personal" | "community" | "evidence";
@@ -49,6 +50,7 @@ type Draft = {
   extraTopics: string;
   sources: string;
   sensitive: boolean;
+  cover?: CoverKey | null;
 };
 
 const topicOptions = [
@@ -84,6 +86,7 @@ function parseTopicText(value: string) {
 function hasDraftContent(draft: Draft) {
   return Boolean(
     draft.title.trim() || draft.body.trim() || draft.topics.length || draft.extraTopics.trim() || draft.sources.trim()
+    || draft.cover
   );
 }
 
@@ -102,6 +105,8 @@ export default function NewPostPage() {
   const [sources, setSources] = useState("");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [cover, setCover] = useState<CoverKey | null>(null);
+  const [coverPickerOpen, setCoverPickerOpen] = useState(false);
   const [guidedOpen, setGuidedOpen] = useState(false);
   const [guidedStep, setGuidedStep] = useState(0);
   const [guidedAnswers, setGuidedAnswers] = useState(["", "", ""]);
@@ -218,6 +223,7 @@ export default function NewPostPage() {
               setExtraTopics(draft.extraTopics ?? "");
               setSources(draft.sources ?? "");
               setSensitive(Boolean(draft.sensitive));
+              setCover(COVER_KEYS.find((key) => key === draft.cover) ?? null);
               setAllowReposts(!draft.sensitive && defaultAllowReposts(draft.type ?? "experience", draft.provenance ?? "personal"));
               setDraftRestored(true);
               restored = true;
@@ -262,7 +268,7 @@ export default function NewPostPage() {
 
   useEffect(() => {
     if (!draftReady || !userId) return;
-    const draft: Draft = { title, body, quickPost, pollEnabled, pollOptions, pollDuration, type, provenance, topics, extraTopics, sources, sensitive };
+    const draft: Draft = { title, body, quickPost, pollEnabled, pollOptions, pollDuration, type, provenance, topics, extraTopics, sources, sensitive, cover };
     const timeout = window.setTimeout(() => {
       try {
         const key = draftStorageKey(userId, quoteId, quickPost);
@@ -273,7 +279,7 @@ export default function NewPostPage() {
       }
     }, 800);
     return () => window.clearTimeout(timeout);
-  }, [body, draftReady, extraTopics, pollDuration, pollEnabled, pollOptions, provenance, quickPost, quoteId, sensitive, sources, title, topics, type, userId]);
+  }, [body, cover, draftReady, extraTopics, pollDuration, pollEnabled, pollOptions, provenance, quickPost, quoteId, sensitive, sources, title, topics, type, userId]);
 
   function discardDraft() {
     if (userId) clearDraftFor(userId, quoteId);
@@ -281,6 +287,8 @@ export default function NewPostPage() {
     setDraftRestored(false);
     setTitle("");
     setBody("");
+    setCover(null);
+    setCoverPickerOpen(false);
     setQuickPost(false);
     setPollEnabled(false);
     setPollOptions(["", ""]);
@@ -347,7 +355,7 @@ export default function NewPostPage() {
     try {
       window.localStorage.setItem(
         draftStorageKey(currentUserId, quoteId, quickPost),
-        JSON.stringify({ title, body, quickPost, pollEnabled, pollOptions, pollDuration, type, provenance, topics, extraTopics, sources, sensitive } satisfies Draft)
+        JSON.stringify({ title, body, quickPost, pollEnabled, pollOptions, pollDuration, type, provenance, topics, extraTopics, sources, sensitive, cover } satisfies Draft)
       );
     } catch {
       // Keep publishing available when local storage is unavailable.
@@ -364,6 +372,7 @@ export default function NewPostPage() {
       audience: ageGroup === "adult" && adultsOnly ? "adult" : "all",
       allow_reposts: allowReposts && !sensitive && !adultsOnly,
       is_quick: quickPost,
+      cover: quickPost ? null : cover,
       ...(quoteId ? { quoted_post_id: quoteId } : {}),
     }).select("id").single();
 
@@ -588,6 +597,26 @@ export default function NewPostPage() {
 
               {!quickPost && (
                 <div className="space-y-3">
+                  <div className="space-y-3">
+                    <Button variant="secondary" type="button" className="px-3" aria-expanded={coverPickerOpen} onClick={() => setCoverPickerOpen((current) => !current)}>
+                      {t("cover.title")}
+                    </Button>
+                    {coverPickerOpen && (
+                      <Card as="section" className="space-y-3" aria-label={t("cover.title")}>
+                        <div className="flex flex-wrap gap-2">
+                          <Button variant={cover === null ? "primary" : "secondary"} type="button" onClick={() => setCover(null)}>
+                            {t("cover.none")}
+                          </Button>
+                          {COVER_KEYS.map((key) => (
+                            <Button key={key} variant={cover === key ? "primary" : "secondary"} type="button" aria-pressed={cover === key} onClick={() => setCover(key)}>
+                              {key.charAt(0).toUpperCase() + key.slice(1)}
+                            </Button>
+                          ))}
+                        </div>
+                        {cover && <div className="h-[72px] overflow-hidden rounded-xl"><CoverArt cover={cover} className="h-full" /></div>}
+                      </Card>
+                    )}
+                  </div>
                   {!guidedOpen ? (
                     <Button variant="secondary" type="button" onClick={() => setGuidedOpen(true)}>
                       {t("write.guided")}
