@@ -68,10 +68,28 @@ export default function SettingsPage() {
   const [interestMessage, setInterestMessage] = useState("");
   const [showEmail, setShowEmail] = useState(false);
   const [recentAccountsMessage, setRecentAccountsMessage] = useState("");
+  const [calmMode, setCalmMode] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordSaving, setPasswordSaving] = useState(false);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setCalmMode(document.documentElement.dataset.calm === "true");
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, []);
+
+  function setVisualEffectsCalm(next: boolean) {
+    setCalmMode(next);
+    document.documentElement.dataset.calm = next ? "true" : "false";
+    try {
+      window.localStorage.setItem("calm", next ? "1" : "0");
+    } catch {
+      // The selected mode remains active for this page session.
+    }
+  }
 
   useEffect(() => {
     async function checkSession() {
@@ -236,6 +254,26 @@ export default function SettingsPage() {
         <h1 className="text-3xl font-bold text-deep-plum">Settings</h1>
         <p className="mt-2 text-gray-700">Account and community information.</p>
       </header>
+
+      <Card as="section" className="space-y-3">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="break-words text-lg font-semibold text-deep-plum">{t("effects.title")}</h2>
+            <p className="mt-1 break-words text-sm leading-6 text-gray-700">{t("effects.hint")}</p>
+            <p className="mt-2 text-sm font-medium text-deep-plum">{t(calmMode ? "effects.calm" : "effects.full")}</p>
+          </div>
+          <button
+            className={`relative inline-flex h-11 w-16 shrink-0 items-center rounded-full border px-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle ${calmMode ? "bg-soft-lilac border-[#CDBDEB]" : "gradient-aurora border-transparent"}`}
+            type="button"
+            role="switch"
+            aria-label={t("effects.title")}
+            aria-checked={calmMode}
+            onClick={() => setVisualEffectsCalm(!calmMode)}
+          >
+            <span className={`h-7 w-7 rounded-full bg-white shadow-sm transition-transform ${calmMode ? "translate-x-7" : "translate-x-0"}`} />
+          </button>
+        </div>
+      </Card>
 
       <Card as="section" className="space-y-3">
         <div className="flex items-start justify-between gap-4">

@@ -15,6 +15,7 @@ import FriendlyErrorMessage from "@/components/FriendlyErrorMessage";
 import { supabase } from "@/lib/supabase";
 import Avatar from "@/components/Avatar";
 import { getEnabledNotificationKinds, type NotificationKind } from "@/lib/notifPrefs";
+import DecorativeEmptyArt from "@/components/DecorativeEmptyArt";
 
 type NotificationRow = {
   id: string;
@@ -273,6 +274,7 @@ export default function NotificationsPage() {
       {loading && <div className="space-y-3">{[0, 1, 2].map((index) => <PostSkeleton key={index} />)}</div>}
       {!loading && !message && displayedNotifications.length === 0 && !hasMore && (
         <Card className="space-y-4 text-center">
+          <div className="flex justify-center"><DecorativeEmptyArt variant="moon" /></div>
           <p className="break-words leading-7 text-gray-700">{t("notif.empty")}</p>
           <Button type="button" onClick={() => router.push("/feed")}>{t("empty.browseFeed")}</Button>
         </Card>

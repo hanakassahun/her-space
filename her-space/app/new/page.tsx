@@ -18,6 +18,8 @@ import type { TranslationKey } from "@/lib/i18n/en";
 import { useAuth } from "@/components/AuthProvider";
 import { getPollClosingTime } from "@/lib/polls";
 import CoverArt, { COVER_KEYS, type CoverKey } from "@/components/CoverArt";
+import Burst from "@/components/Burst";
+import { showJoyLine } from "@/lib/joy";
 
 type PostType = "experience" | "question" | "knowledge";
 type Provenance = "personal" | "community" | "evidence";
@@ -129,6 +131,7 @@ export default function NewPostPage() {
   const [preview, setPreview] = useState(false);
   const [message, setMessage] = useState("");
   const [published, setPublished] = useState(false);
+  const [postBurstTrigger, setPostBurstTrigger] = useState(0);
   const [quoteId, setQuoteId] = useState<string | null>(null);
   const [quotedPost, setQuotedPost] = useState<QuotedSource | null>(null);
   const [quoteChecked, setQuoteChecked] = useState(false);
@@ -407,6 +410,8 @@ export default function NewPostPage() {
     clearDraftFor(currentUserId, quoteId, true);
     setDraftRestored(false);
     setPublished(true);
+    setPostBurstTrigger((current) => current + 1);
+    showJoyLine(t("joy.shared"));
     setMessage(t("new.published"));
     window.setTimeout(() => router.push("/feed"), 600);
   }
@@ -925,7 +930,7 @@ export default function NewPostPage() {
           {message && (
             <div className={`break-words text-sm ${published ? "text-emerald-800" : "text-red-600"}`} role="status">
               <div className="flex items-center gap-2">
-                {published && <SuccessCheck />}
+                {published && <span className="relative inline-flex"><SuccessCheck /><Burst variant="petals" trigger={postBurstTrigger} /></span>}
                 <FriendlyErrorMessage message={message} />
               </div>
             </div>

@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import Button from "@/components/ui/Button";
+import Burst from "@/components/Burst";
+import { useState } from "react";
 
 type BookmarkButtonProps = {
   saved: boolean;
@@ -25,6 +27,11 @@ export default function BookmarkButton({
   const iconRef = useRef<SVGSVGElement>(null);
   const previousSaved = useRef(saved);
   const didMount = useRef(false);
+  const [burstTrigger, setBurstTrigger] = useState(0);
+
+  function handleToggle() {
+    onToggle();
+  }
 
   useEffect(() => {
     if (!didMount.current) {
@@ -36,6 +43,7 @@ export default function BookmarkButton({
     if (icon && saved && !previousSaved.current) {
       icon.classList.remove("bookmark-bounce");
       window.requestAnimationFrame(() => icon.classList.add("bookmark-bounce"));
+      setBurstTrigger((current) => current + 1);
       const timeout = window.setTimeout(() => icon.classList.remove("bookmark-bounce"), 250);
       previousSaved.current = saved;
       return () => window.clearTimeout(timeout);
@@ -46,9 +54,9 @@ export default function BookmarkButton({
   return (
     <Button
       variant={variant}
-      className={`!h-11 !w-11 !min-w-11 !px-0 !py-0 text-deep-plum ${className}`}
+      className={`relative !h-11 !w-11 !min-w-11 !px-0 !py-0 text-deep-plum ${className}`}
       type="button"
-      onClick={onToggle}
+      onClick={handleToggle}
       disabled={disabled}
       aria-label={saved ? savedLabel : saveLabel}
       aria-pressed={saved}
@@ -57,6 +65,7 @@ export default function BookmarkButton({
       <svg ref={iconRef} className="h-5 w-5" viewBox="0 0 24 24" fill={saved ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
         <path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-4-6 4z" />
       </svg>
+      <Burst variant="petals" trigger={burstTrigger} />
     </Button>
   );
 }

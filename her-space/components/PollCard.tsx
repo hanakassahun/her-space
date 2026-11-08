@@ -6,6 +6,8 @@ import { friendlyError } from "@/lib/errors";
 import { loadPollResults, type PollResult } from "@/lib/polls";
 import { useAuth } from "@/components/AuthProvider";
 import { useLanguage } from "@/components/LanguageProvider";
+import Burst from "@/components/Burst";
+import { showJoyLine } from "@/lib/joy";
 
 export default function PollCard({
   postId,
@@ -21,6 +23,7 @@ export default function PollCard({
   const [localResults, setLocalResults] = useState<PollResult[] | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [burstTrigger, setBurstTrigger] = useState(0);
   const results = localResults ?? rows;
 
   const userVote = results.find((row) => row.my_option)?.option_id ?? null;
@@ -56,6 +59,8 @@ export default function PollCard({
       return;
     }
     await reload();
+    setBurstTrigger((current) => current + 1);
+    showJoyLine(t("joy.voted"));
     setBusy(false);
   }
 
@@ -86,7 +91,8 @@ export default function PollCard({
   }
 
   return (
-    <section className="space-y-3 rounded-2xl border border-[#CDBDEB] bg-white/80 p-4" aria-label={t("poll.add")}>
+    <section className="relative space-y-3 rounded-2xl border border-[#CDBDEB] bg-white/80 p-4" aria-label={t("poll.add")}>
+      <Burst variant="petals" trigger={burstTrigger} />
       <div className="space-y-2">
         {results.map((row) => {
           const count = row.votes ?? 0;
@@ -102,7 +108,7 @@ export default function PollCard({
             >
               {resultsVisible && (
                 <span
-                  className="absolute inset-y-0 left-0 bg-soft-lilac/70"
+                  className="poll-result-bar absolute inset-y-0 left-0 bg-soft-lilac/70"
                   style={{ width: `${percentage}%` }}
                   aria-hidden="true"
                 />

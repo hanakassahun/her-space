@@ -28,6 +28,7 @@ import PollCard from "@/components/PollCard";
 import { loadPollResults, type PollResult } from "@/lib/polls";
 import DoubleTapLikeArea from "@/components/DoubleTapLikeArea";
 import CoverArt from "@/components/CoverArt";
+import DecorativeEmptyArt from "@/components/DecorativeEmptyArt";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -655,11 +656,12 @@ export default function ExplorePage() {
         {loading && <div className="space-y-4">{[0, 1, 2].map((index) => <PostSkeleton key={index} />)}</div>}
         {message && <Card className="text-red-700"><FriendlyErrorMessage message={message} /></Card>}
         {!isSearchMode && !loading && !message && posts.length === 0 && (
-          <Card className="text-gray-700">{t("explore.noResults")}</Card>
+          <Card className="space-y-2 text-gray-700"><DecorativeEmptyArt variant="cloud" />{t("explore.noResults")}</Card>
         )}
         {isSearchMode && !loading && !message &&
           posts.length + searchContent.filter((item) => item.kind !== "post").length + searchMembers.length === 0 && (
             <Card className="space-y-3">
+              <DecorativeEmptyArt variant="cloud" />
               <h2 className="text-lg font-semibold text-deep-plum">{t("search.noResultsTitle")}</h2>
               <p className="break-words text-gray-700">{t("search.noResultsBody")}</p>
               <div className="flex flex-wrap items-center gap-3">

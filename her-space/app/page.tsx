@@ -9,6 +9,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/components/AuthProvider";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
+import FloatingDots from "@/components/FloatingDots";
 
 const InstallBanner = dynamic(() => import("@/components/InstallBanner"), { ssr: false });
 const WelcomeCards = dynamic(() => import("@/components/WelcomeCards"), { ssr: false });
@@ -30,14 +31,15 @@ export default function Home() {
   }, []);
 
   return (
-    <PageShell className="flex min-h-screen flex-col items-center justify-center text-center">
-      <h1 className="bg-clip-text text-5xl font-bold text-transparent gradient-aurora">Her Space</h1>
-      <p className="mt-4 max-w-md text-lg text-deep-plum">
+    <PageShell className="relative flex min-h-screen flex-col items-center justify-center text-center">
+      <FloatingDots />
+      <h1 className="wordmark-alive relative z-10 bg-clip-text text-5xl font-bold text-transparent gradient-aurora">Her Space</h1>
+      <p className="relative z-10 mt-4 max-w-md text-lg text-deep-plum">
         {t("home.tagline")}
       </p>
 
       {!loading && name && (
-        <section className="mt-8 w-full max-w-3xl space-y-4 text-left">
+        <section className="relative z-10 mt-8 w-full max-w-3xl space-y-4 text-left">
           <p className="text-center text-deep-plum">{greetingKey ? t(greetingKey) : ""} {name} 🌸</p>
           {userId && (remindLog || remindPeriod) && <ReminderCards />}
           {userId && !quietMode && <WelcomeCards />}
@@ -75,7 +77,7 @@ export default function Home() {
 
       {!loading && !name && (
         <>
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <div className="relative z-10 mt-8 flex flex-wrap justify-center gap-3">
             <Link className="gradient-aurora shadow-glow inline-flex min-h-11 items-center justify-center rounded-full px-6 py-3 font-semibold text-white" href="/signup">
               {t("home.signup")}
             </Link>
@@ -83,7 +85,7 @@ export default function Home() {
               {t("home.login")}
             </Link>
           </div>
-          <footer className="mt-10 flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-gray-600">
+          <footer className="relative z-10 mt-10 flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-gray-600">
             <Link className="underline underline-offset-4" href="/rules">{t("legal.rules")}</Link>
             <Link className="underline underline-offset-4" href="/privacy">{t("legal.privacy")}</Link>
             <Link className="underline underline-offset-4" href="/terms">{t("legal.terms")}</Link>

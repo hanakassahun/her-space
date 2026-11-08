@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { DM_Sans, Noto_Sans_Ethiopic, Sora } from "next/font/google";
 import { preconnect } from "react-dom";
 import AppChrome from "@/components/AppChrome";
+import AmbientBackground from "@/components/AmbientBackground";
 import { AuthProvider } from "@/components/AuthProvider";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import "./globals.css";
@@ -57,8 +58,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       className={`${sora.variable} ${dmSans.variable} ${notoSansEthiopic.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `var r=document.documentElement,s=null;try{s=localStorage.getItem("calm")}catch(e){}try{var m=window.matchMedia("(prefers-reduced-motion: reduce)").matches,d=typeof navigator.deviceMemory==="number"&&navigator.deviceMemory<=2,c=!!(navigator.connection&&navigator.connection.saveData);r.dataset.lowend=d?"true":"false";r.dataset.calm=s===null?(m||d||c?"true":"false"):(s==="1"?"true":"false")}catch(e){}`,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col">
+        <AmbientBackground />
         <LanguageProvider>
           <AuthProvider>
             <AppChrome>{children}</AppChrome>

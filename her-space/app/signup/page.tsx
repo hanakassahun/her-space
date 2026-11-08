@@ -8,6 +8,7 @@ import { friendlyError } from "@/lib/errors";
 import FriendlyErrorMessage from "@/components/FriendlyErrorMessage";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
+import FloatingDots from "@/components/FloatingDots";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -77,8 +78,9 @@ export default function SignupPage() {
   }
 
   return (
-    <PageShell className="flex min-h-screen items-center justify-center">
-      <Card className="w-full max-w-sm space-y-4">
+    <PageShell className="relative flex min-h-screen items-center justify-center">
+      <FloatingDots />
+      <Card className="relative z-10 w-full max-w-sm space-y-4">
         <h1 className="text-3xl font-bold text-deep-plum">{t("signup.title")}</h1>
         <p className="text-deep-plum">
           {t("signup.intro")}

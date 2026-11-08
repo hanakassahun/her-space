@@ -18,6 +18,9 @@ import { useAuth } from "@/components/AuthProvider";
 import JournalTabs from "@/components/journal/JournalTabs";
 import { isValidDateString } from "@/lib/cycle";
 import type { TranslationKey } from "@/lib/i18n/en";
+import Burst from "@/components/Burst";
+import { showJoyLine } from "@/lib/joy";
+import DecorativeEmptyArt from "@/components/DecorativeEmptyArt";
 
 type PeriodStatus = "none" | "spotting" | "light" | "medium" | "heavy";
 
@@ -159,6 +162,7 @@ function JournalContent({ userId }: { userId: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveSucceeded, setSaveSucceeded] = useState(false);
+  const [journalBurstTrigger, setJournalBurstTrigger] = useState(0);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -263,6 +267,8 @@ function JournalContent({ userId }: { userId: string }) {
     } else {
       setMessage(t("journal.saved"));
       setSaveSucceeded(true);
+      setJournalBurstTrigger((current) => current + 1);
+      showJoyLine(t("joy.logged"));
       if (!selectedQueryDate) {
         setEditingPastDate(null);
         setEntryDate(getLocalDate());
@@ -475,7 +481,7 @@ function JournalContent({ userId }: { userId: string }) {
           {message && (
             <div className="text-sm text-deep-plum" role="status">
               <div className="flex items-center gap-2">
-                {saveSucceeded && <SuccessCheck />}
+                {saveSucceeded && <span className="relative inline-flex"><SuccessCheck /><Burst variant="petals" trigger={journalBurstTrigger} /></span>}
                 <FriendlyErrorMessage message={message} />
               </div>
             </div>
@@ -502,6 +508,7 @@ function JournalContent({ userId }: { userId: string }) {
         {loading && <p className="text-gray-700">{t("journal.loading")}</p>}
         {!loading && pastEntries.length === 0 && (
           <Card className="space-y-2 text-gray-700">
+            <DecorativeEmptyArt variant="sprout" />
             <p>{t("journal.earlierEmpty")}</p>
             <p className="text-sm text-gray-600">{t("empty.journalHint")}</p>
           </Card>

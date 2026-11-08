@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Button from "@/components/ui/Button";
 import { useLanguage } from "@/components/LanguageProvider";
+import Burst from "@/components/Burst";
 
 type LikeButtonProps = {
   count: number;
@@ -17,6 +18,7 @@ export default function LikeButton({ count, liked, onToggle }: LikeButtonProps) 
   const heartRef = useRef<SVGSVGElement>(null);
   const previousLiked = useRef(liked);
   const didMount = useRef(false);
+  const [burstTrigger, setBurstTrigger] = useState(0);
 
   useEffect(() => {
     if (!didMount.current) {
@@ -38,6 +40,7 @@ export default function LikeButton({ count, liked, onToggle }: LikeButtonProps) 
   async function handleClick() {
     if (inFlight.current) return;
     inFlight.current = true;
+    if (!liked) setBurstTrigger((current) => current + 1);
     setLoading(true);
     try {
       await onToggle();
@@ -50,7 +53,7 @@ export default function LikeButton({ count, liked, onToggle }: LikeButtonProps) 
   return (
     <span className="inline-flex items-center gap-2 text-sm text-deep-plum">
       <Button
-        className="!h-11 !w-11 !min-w-11 !px-0 !py-0 text-rose-700 hover:bg-rose-50"
+        className="relative !h-11 !w-11 !min-w-11 !px-0 !py-0 text-rose-700 hover:bg-rose-50"
         variant="ghost"
         type="button"
         onClick={handleClick}
@@ -70,6 +73,7 @@ export default function LikeButton({ count, liked, onToggle }: LikeButtonProps) 
         >
           <path d="M20.8 8.8c0 5.2-8.8 10-8.8 10s-8.8-4.8-8.8-10A4.8 4.8 0 0 1 12 6.1a4.8 4.8 0 0 1 8.8 2.7Z" />
         </svg>
+        <Burst variant="hearts" trigger={burstTrigger} count={6} duration={700} />
       </Button>
       <span aria-label={`${count} ${t("like.likes")}`}>{count}</span>
     </span>

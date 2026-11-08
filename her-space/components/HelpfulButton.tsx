@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/components/AuthProvider";
+import Burst from "@/components/Burst";
 
 type HelpfulButtonProps = {
   initialCount: number;
@@ -27,6 +28,7 @@ export default function HelpfulButton({
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const inFlight = useRef(false);
+  const [burstTrigger, setBurstTrigger] = useState(0);
 
   async function toggleHelpful() {
     const targetId = postId ?? articleId;
@@ -51,6 +53,7 @@ export default function HelpfulButton({
             postId ? { post_id: postId } : { article_id: targetId }
           );
       if (result.error) throw result.error;
+      if (!previousMarked) setBurstTrigger((current) => current + 1);
     } catch (error) {
       setCount(previousCount);
       setMarked(previousMarked);
@@ -64,7 +67,7 @@ export default function HelpfulButton({
   return (
     <div className="space-y-1">
       <button
-        className={`inline-flex min-h-11 max-w-full items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle disabled:cursor-not-allowed disabled:opacity-60 ${
+        className={`relative inline-flex min-h-11 max-w-full items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle disabled:cursor-not-allowed disabled:opacity-60 ${
           marked
             ? "border-soft-lilac bg-soft-lilac/70 text-deep-plum"
             : "border-[#CDBDEB] bg-white/70 text-gray-700 hover:bg-soft-lilac/30"
@@ -89,6 +92,7 @@ export default function HelpfulButton({
           <path d="M12 12c0-4.5 2.5-7 7-7 0 4.5-2.5 7-7 7Z" />
         </svg>
         <span className="break-words">{t(marked ? "helpful.marked" : "helpful.button")}</span>
+        <Burst variant="sprout" trigger={burstTrigger} />
       </button>
       {count > 0 && (
         <p className="break-words text-xs text-gray-500">

@@ -28,6 +28,7 @@ import PollCard from "@/components/PollCard";
 import { loadPollResults, type PollResult } from "@/lib/polls";
 import DoubleTapLikeArea from "@/components/DoubleTapLikeArea";
 import CoverArt from "@/components/CoverArt";
+import DecorativeEmptyArt from "@/components/DecorativeEmptyArt";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -735,6 +736,7 @@ export default function FeedPage() {
         {!quietMode && activeTab === "forYou" && page === 0 && !loading && !message && posts.length > 0 && <SuggestedMembers />}
         {!loading && !message && visiblePosts.length === 0 && (activeTab === "following" || pinnedPosts.length === 0) && (
           <Card className="space-y-3 text-gray-700">
+            <DecorativeEmptyArt variant={activeTab === "following" ? "sprout" : "cloud"} />
             <p>{activeTab === "following" ? t("feed.noFollowing") : t("feed.noPosts")}</p>
             {activeTab === "following" && (
               <p className="text-sm text-gray-600">{t("empty.followingHint")}</p>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
@@ -11,6 +11,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
 import { cacheOnboarded, isOnboardedCached } from "@/lib/onboarding";
+import { showJoyLine } from "@/lib/joy";
 
 const onboardingExemptPaths = new Set([
   "/login",
@@ -28,6 +29,9 @@ export default function AppChrome({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { t } = useLanguage();
   const { user, loading } = useAuth();
+  const [joyMessage, setJoyMessage] = useState("");
+  const [animatedPath, setAnimatedPath] = useState("");
+  const previousPath = useRef(pathname);
   const userId = user?.id ?? null;
   const hideOnAuthRoute =
     pathname === "/login" ||
@@ -50,6 +54,36 @@ export default function AppChrome({ children }: { children: ReactNode }) {
       delete document.documentElement.dataset.lowend;
     };
   }, []);
+
+  useEffect(() => {
+    const handleJoy = (event: Event) => {
+      const detail = (event as CustomEvent<string>).detail;
+      if (typeof detail !== "string" || !detail) return;
+      setJoyMessage(detail);
+      window.setTimeout(() => setJoyMessage((current) => current === detail ? "" : current), 2500);
+    };
+    window.addEventListener("her-space:joy", handleJoy);
+    return () => window.removeEventListener("her-space:joy", handleJoy);
+  }, []);
+
+  useEffect(() => {
+    if (pathname !== "/") return;
+    try {
+      if (window.localStorage.getItem("joyWelcome")) return;
+      window.localStorage.setItem("joyWelcome", "1");
+    } catch {
+      // Do not block home when device storage is unavailable.
+    }
+    showJoyLine(t("joy.welcome"));
+  }, [pathname, t]);
+
+  useEffect(() => {
+    if (previousPath.current === pathname) return;
+    previousPath.current = pathname;
+    setAnimatedPath(pathname);
+    const timeout = window.setTimeout(() => setAnimatedPath(""), 200);
+    return () => window.clearTimeout(timeout);
+  }, [pathname]);
 
   useEffect(() => {
     if (loading || !userId || onboardingExemptPaths.has(pathname) || isOnboardedCached(userId)) return;
@@ -95,9 +129,12 @@ export default function AppChrome({ children }: { children: ReactNode }) {
       {showNavigation && userId && <AppHeader />}
       {showNavigation && userId && <ConnectionBanner />}
       <div className={showNavigation ? "min-h-0 flex-1 pb-[calc(5.25rem+env(safe-area-inset-bottom))] md:pb-0" : "min-h-0 flex-1"}>
-        {children}
+        <div key={pathname} className={animatedPath === pathname ? "route-transition" : undefined}>
+          {children}
+        </div>
       </div>
       {showNavigation && userId && <BottomNav />}
+      {joyMessage && <div className="joy-toast" role="status">{joyMessage}</div>}
     </>
   );
 }

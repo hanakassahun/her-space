@@ -26,6 +26,7 @@ import { loadPollResults, type PollResult } from "@/lib/polls";
 import DoubleTapLikeArea from "@/components/DoubleTapLikeArea";
 import PostBody from "@/components/PostBody";
 import CoverArt from "@/components/CoverArt";
+import DecorativeEmptyArt from "@/components/DecorativeEmptyArt";
 
 type LikeState = { count: number; liked: boolean };
 type Professional = { title: string } | { title: string }[] | null;
@@ -271,6 +272,7 @@ export default function LibraryPage() {
         {message && <Card className="text-red-700"><FriendlyErrorMessage message={message} /></Card>}
         {!loading && !message && savedPosts.length === 0 && (
           <Card className="space-y-3 text-gray-700">
+            <DecorativeEmptyArt variant="sprout" />
             <p>{t("library.empty")}</p>
             <p className="text-sm text-gray-600">{t("empty.libraryHint")}</p>
             <Button type="button" onClick={() => router.push("/feed")}>

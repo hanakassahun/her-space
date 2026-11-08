@@ -12,6 +12,7 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { useLanguage } from "@/components/LanguageProvider";
 import { maskEmail } from "@/lib/maskEmail";
+import FloatingDots from "@/components/FloatingDots";
 
 type RecentAccount = { email: string; name: string; ts: number };
 const RECENT_ACCOUNTS_KEY = "recentAccounts";
@@ -99,8 +100,9 @@ export default function LoginPage() {
   }
 
   return (
-    <PageShell className="flex min-h-screen items-center justify-center">
-      <Card className="w-full max-w-sm space-y-4">
+    <PageShell className="relative flex min-h-screen items-center justify-center">
+      <FloatingDots />
+      <Card className="relative z-10 w-full max-w-sm space-y-4">
         <h1 className="text-3xl font-bold text-deep-plum">{t("login.title")}</h1>
         {recentAccounts.length > 0 && (
           <section className="space-y-2" aria-labelledby="recent-accounts-heading">
