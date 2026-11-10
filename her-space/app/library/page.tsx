@@ -50,6 +50,11 @@ type Post = {
   sources: string[];
   title: string;
   body: string;
+  is_series_opener: boolean;
+  series_root_id: string | null;
+  series_position: number | null;
+  series_cadence: "daily" | "weekly" | "monthly" | "whenever" | null;
+  series_status: "active" | "paused" | "finished" | null;
   topics: string[];
   sensitive: boolean;
   is_quick: boolean;
@@ -117,7 +122,7 @@ export default function LibraryPage() {
       const { data, error } = await supabase
         .from("bookmarks")
         .select(
-          "created_at, posts!bookmarks_post_id_fkey(id, cover, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title)))")
+          "created_at, posts!bookmarks_post_id_fkey(id, cover, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, is_series_opener, series_root_id, series_position, series_cadence, series_status, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title)))")
         .eq("user_id", userId)
         .order("created_at", { ascending: false });
 
@@ -240,6 +245,7 @@ export default function LibraryPage() {
           <div>
             <h1 className="text-3xl font-bold text-deep-plum">{t("library.title")}</h1>
           </div>
+          <Link className="inline-flex min-h-11 items-center rounded-full border border-soft-lilac bg-white px-4 font-medium text-deep-plum" href="/series">{t("series.discover")}</Link>
         </header>
 
         {topics.length > 0 && (
@@ -303,6 +309,7 @@ export default function LibraryPage() {
                     {t(typeTranslationKeys[post.type])}
                   </Badge>
                   {post.audience === "adult" && <Badge variant="lilac">{t("audience.badge")}</Badge>}
+                  {(post.is_series_opener || post.series_root_id) && <Badge variant="lilac">{t("series.badge")} · {t("series.part")} {post.series_position ?? 1}</Badge>}
                   <span className="text-xs text-gray-500">{likeStates[post.id]?.count ?? post.like_count} {t("like.likes")}</span>
                   <TimeAgo className="text-sm text-gray-500" date={savedAt} prefix={t("library.saved")} />
                 </DoubleTapLikeArea>

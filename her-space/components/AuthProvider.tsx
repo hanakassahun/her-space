@@ -39,12 +39,13 @@ type AuthContextValue = {
     notif_follows: boolean;
     notif_shares: boolean;
     notif_milestones: boolean;
+    notif_series: boolean;
   };
   notificationsPausedUntil: string | null;
   notificationPrefsSaving: boolean;
   notificationPrefsError: string;
   setNotificationPreference: (
-    key: "notif_comments" | "notif_follows" | "notif_shares" | "notif_milestones" | "notifications_paused_until",
+    key: "notif_comments" | "notif_follows" | "notif_shares" | "notif_milestones" | "notif_series" | "notifications_paused_until",
     value: boolean | string | null
   ) => Promise<void>;
 };
@@ -72,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     notif_follows: true,
     notif_shares: true,
     notif_milestones: true,
+    notif_series: true,
   });
   const [notificationsPausedUntil, setNotificationsPausedUntilState] = useState<string | null>(null);
   const [notificationPrefsSaving, setNotificationPrefsSaving] = useState(false);
@@ -169,7 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [remindPeriod, remindPeriodSaving, t]);
 
   const setNotificationPreference = useCallback(async (
-    key: "notif_comments" | "notif_follows" | "notif_shares" | "notif_milestones" | "notifications_paused_until",
+    key: "notif_comments" | "notif_follows" | "notif_shares" | "notif_milestones" | "notif_series" | "notifications_paused_until",
     value: boolean | string | null
   ) => {
     const userId = activeUserId.current;
@@ -260,7 +262,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRemindPeriodState(false);
         setRemindPeriodSaving(false);
         setRemindPeriodError("");
-        setNotificationPrefs({ notif_comments: true, notif_follows: true, notif_shares: true, notif_milestones: true });
+        setNotificationPrefs({ notif_comments: true, notif_follows: true, notif_shares: true, notif_milestones: true, notif_series: true });
         setNotificationsPausedUntilState(null);
         setNotificationPrefsSaving(false);
         setNotificationPrefsError("");
@@ -281,7 +283,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setRemindPeriodState(false);
       setRemindPeriodSaving(false);
       setRemindPeriodError("");
-      setNotificationPrefs({ notif_comments: true, notif_follows: true, notif_shares: true, notif_milestones: true });
+      setNotificationPrefs({ notif_comments: true, notif_follows: true, notif_shares: true, notif_milestones: true, notif_series: true });
       setNotificationsPausedUntilState(null);
       setNotificationPrefsSaving(false);
       setNotificationPrefsError("");
@@ -291,7 +293,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         supabase.from("profiles").select("display_name").eq("id", nextUserId).maybeSingle(),
         supabase.from("admins").select("user_id").eq("user_id", nextUserId).maybeSingle(),
         supabase.rpc("is_moderator"),
-        supabase.from("member_prefs").select("quiet_mode, remind_log, remind_period, notif_comments, notif_follows, notif_shares, notif_milestones, notifications_paused_until").eq("user_id", nextUserId).maybeSingle(),
+        supabase.from("member_prefs").select("quiet_mode, remind_log, remind_period, notif_comments, notif_follows, notif_shares, notif_milestones, notif_series, notifications_paused_until").eq("user_id", nextUserId).maybeSingle(),
       ]);
 
       if (!active || currentRequestId !== requestId.current) return;
@@ -306,6 +308,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         notif_follows: prefsResult.data?.notif_follows ?? true,
         notif_shares: prefsResult.data?.notif_shares ?? true,
         notif_milestones: prefsResult.data?.notif_milestones ?? true,
+        notif_series: prefsResult.data?.notif_series ?? true,
       });
       setNotificationsPausedUntilState(prefsResult.data?.notifications_paused_until ?? null);
       if (prefsResult.error) {

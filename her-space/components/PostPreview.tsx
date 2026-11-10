@@ -4,7 +4,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import ProvenanceBadge from "@/components/ProvenanceBadge";
-import UserText from "@/components/UserText";
+import RichText from "@/components/RichText";
 import type { TranslationKey } from "@/lib/i18n/en";
 
 type PostType = "experience" | "question" | "knowledge";
@@ -16,6 +16,7 @@ type PostPreviewProps = {
   sources: string[];
   title: string;
   body: string;
+  rich?: string | null;
   topics: string[];
   sensitive: boolean;
   t: (key: TranslationKey) => string;
@@ -34,6 +35,7 @@ export default function PostPreview({
   sources,
   title,
   body,
+  rich,
   topics,
   sensitive,
   t,
@@ -50,7 +52,7 @@ export default function PostPreview({
         </div>
         <div className="space-y-2">
           <h2 className="break-words text-xl font-semibold text-gray-900">{title || t("common.title")}</h2>
-          <UserText text={body} className="min-h-6 text-gray-800" />
+          <RichText text={body} rich={rich} className="min-h-6 text-gray-800" />
         </div>
         {topics.length > 0 && (
           <ul className="flex flex-wrap gap-2" aria-label={t("common.topics")}>

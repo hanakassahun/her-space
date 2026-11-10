@@ -14,6 +14,7 @@ import FloatingDots from "@/components/FloatingDots";
 const InstallBanner = dynamic(() => import("@/components/InstallBanner"), { ssr: false });
 const WelcomeCards = dynamic(() => import("@/components/WelcomeCards"), { ssr: false });
 const ReminderCards = dynamic(() => import("@/components/ReminderCards"), { ssr: false });
+const SeriesReminder = dynamic(() => import("@/components/SeriesReminder"), { ssr: false });
 
 export default function Home() {
   const { t } = useLanguage();
@@ -42,6 +43,7 @@ export default function Home() {
         <section className="relative z-10 mt-8 w-full max-w-3xl space-y-4 text-left">
           <p className="text-center text-deep-plum">{greetingKey ? t(greetingKey) : ""} {name} 🌸</p>
           {userId && (remindLog || remindPeriod) && <ReminderCards />}
+          {userId && <SeriesReminder />}
           {userId && !quietMode && <WelcomeCards />}
           <InstallBanner />
           <div className="grid grid-cols-2 gap-3">

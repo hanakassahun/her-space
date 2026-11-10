@@ -185,6 +185,7 @@ export default function NotificationsPage() {
       .from("notifications")
       .update({ read_at: readAt })
       .eq("user_id", userId)
+      .in("kind", enabledKinds)
       .is("read_at", null);
     if (error) {
       const unreadIds = new Set(unread.map((row) => row.id));
@@ -231,13 +232,17 @@ export default function NotificationsPage() {
     const displayRows: { notification: NotificationRow; rows: NotificationRow[] }[] = [];
     for (const notification of notifications.filter((row) => enabledKinds.includes(row.kind))) {
       const canGroup = ["comment", "follow", "repost", "quote"].includes(notification.kind)
-        && new Date(notification.created_at).getTime() >= cutoff
-        && (notification.kind === "follow" || Boolean(notification.post_id));
-      if (!canGroup) {
+        || notification.kind === "series";
+      const recent = new Date(notification.created_at).getTime() >= cutoff;
+      const groupable = canGroup
+        && recent
+        && (notification.kind === "follow" || notification.kind === "series" ? Boolean(notification.actor_id) : Boolean(notification.post_id));
+      if (!groupable) {
         displayRows.push({ notification, rows: [notification] });
         continue;
       }
-      const target = notification.kind === "follow" ? "member" : notification.post_id;
+      const target = notification.kind === "follow" ? "member"
+        : notification.kind === "series" ? notification.actor_id : notification.post_id;
       const key = `${notification.kind}:${target}`;
       const existing = groups.get(key);
       if (existing) existing.push(notification);
@@ -321,6 +326,14 @@ export default function NotificationsPage() {
                   <span className="block break-words font-medium text-deep-plum">
                     {notification.amount ?? 0} {t(notification.metric === "helpful" ? "notif.milestoneHelpful" : "notif.milestoneLikes")}
                   </span>
+                ) : notification.kind === "series" ? (
+                  <>
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="break-words font-medium text-deep-plum">{actorName}</span>
+                      <span className="break-words text-sm text-gray-700">{rows.length > 1 ? `${t("notif.and")} ${rows.length - 1} ${t("notif.others")}` : t("notif.series")}</span>
+                    </span>
+                    <span className="block line-clamp-1 break-words text-sm text-gray-600">{post?.title || t("notif.postUnavailable")}</span>
+                  </>
                 ) : (
                   <>
                     <span className="flex flex-wrap items-center gap-2">

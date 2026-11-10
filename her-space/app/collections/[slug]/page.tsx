@@ -11,6 +11,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/components/AuthProvider";
 import PageShell from "@/components/ui/PageShell";
 import Card from "@/components/ui/Card";
+import Badge from "@/components/ui/Badge";
 import Avatar from "@/components/Avatar";
 import CoverArt from "@/components/CoverArt";
 
@@ -43,6 +44,11 @@ type PostItem = {
   is_quick: boolean;
   type: "experience" | "question" | "knowledge";
   provenance: "personal" | "community" | "evidence";
+  is_series_opener: boolean;
+  series_root_id: string | null;
+  series_position: number | null;
+  series_cadence: "daily" | "weekly" | "monthly" | "whenever" | null;
+  series_status: "active" | "paused" | "finished" | null;
   cover: string | null;
   profiles: Related<{ display_name: string | null; avatar: string | null }>;
 };
@@ -100,7 +106,7 @@ export default function CollectionPage({ params }: { params: Promise<{ slug: str
       setCollection(collectionData as Collection);
       const { data: itemData, error: itemError } = await supabase
         .from("collection_items")
-        .select("id, position, articles!collection_items_article_id_fkey(id, slug, title, title_am, summary, summary_am, category, cover), posts!collection_items_post_id_fkey(id, cover, title, body, is_quick, type, provenance, profiles!posts_author_id_fkey(display_name, avatar))")
+        .select("id, position, articles!collection_items_article_id_fkey(id, slug, title, title_am, summary, summary_am, category, cover), posts!collection_items_post_id_fkey(id, cover, title, body, is_quick, type, provenance, is_series_opener, series_root_id, series_position, series_cadence, series_status, profiles!posts_author_id_fkey(display_name, avatar))")
         .eq("collection_id", collectionData.id)
         .order("position", { ascending: true });
 
@@ -195,6 +201,7 @@ export default function CollectionPage({ params }: { params: Promise<{ slug: str
                   {post.is_quick && <p className="break-words text-lg leading-7 text-gray-800">{post.body}</p>}
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <ProvenanceBadge provenance={post.provenance} short />
+                    {(post.is_series_opener || post.series_root_id) && <Badge variant="lilac">{t("series.badge")} · {t("series.part")} {post.series_position ?? 1}</Badge>}
                     <span className="flex items-center gap-2 break-words text-sm text-gray-600">
                       <Avatar name={profile?.display_name || t("common.herSpaceMember")} avatar={profile?.avatar ?? null} size={32} />
                       {profile?.display_name || t("common.herSpaceMember")}

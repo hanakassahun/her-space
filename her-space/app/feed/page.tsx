@@ -29,6 +29,7 @@ import { loadPollResults, type PollResult } from "@/lib/polls";
 import DoubleTapLikeArea from "@/components/DoubleTapLikeArea";
 import CoverArt from "@/components/CoverArt";
 import DecorativeEmptyArt from "@/components/DecorativeEmptyArt";
+import { useSwipeTabs } from "@/lib/useSwipeTabs";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -51,6 +52,11 @@ type Post = {
   sources: string[];
   title: string;
   body: string;
+  is_series_opener: boolean;
+  series_root_id: string | null;
+  series_position: number | null;
+  series_cadence: "daily" | "weekly" | "monthly" | "whenever" | null;
+  series_status: "active" | "paused" | "finished" | null;
   topics: string[];
   sensitive: boolean;
   is_quick: boolean;
@@ -73,6 +79,7 @@ const feedTabLabels = {
   latest: "feed.latest",
   following: "feed.following",
 } as const;
+const FEED_TABS = Object.keys(feedTabLabels) as FeedTab[];
 
 const reasonTranslationKeys: Record<RecommendationReason, "feed.whyFollow" | "feed.whyInterest" | "feed.whyPopular" | "feed.whyRecent"> = {
   follow: "feed.whyFollow",
@@ -94,7 +101,7 @@ const typeTranslationKeys = {
 } as const;
 
 const PAGE_SIZE = 20;
-const POST_SELECT = "id, cover, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))";
+const POST_SELECT = "id, cover, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, is_series_opener, series_root_id, series_position, series_cadence, series_status, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))";
 
 const SuggestedMembers = dynamic(() => import("@/components/SuggestedMembers"), { ssr: false });
 
@@ -144,11 +151,45 @@ export default function FeedPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [message, setMessage] = useState("");
+  const [showSwipeHint, setShowSwipeHint] = useState(false);
   const restoreState = useRef<FeedRestoreState | null>(null);
   const loadMoreLock = useRef(false);
   const loadMoreSentinel = useRef<HTMLDivElement>(null);
   const likeRequests = useRef(new Set<string>());
   const bookmarkRequests = useRef(new Set<string>());
+  const feedTabs = FEED_TABS;
+  const changeTab = useCallback((index: number) => {
+    const next = feedTabs[index];
+    if (next === "following" && !isSignedIn) {
+      router.push("/login");
+      return;
+    }
+    if (!next || next === activeTab) return;
+    setActiveTab(next);
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, [activeTab, feedTabs, isSignedIn, router]);
+  const swipeHandlers = useSwipeTabs({
+    count: feedTabs.length,
+    index: feedTabs.indexOf(activeTab),
+    onChange: changeTab,
+    enabled: true,
+  });
+
+  useEffect(() => {
+    if (!("ontouchstart" in window) && navigator.maxTouchPoints === 0) return;
+    try {
+      if (window.localStorage.getItem("swipeHintSeen")) return;
+      window.localStorage.setItem("swipeHintSeen", "1");
+    } catch {
+      // The hint remains available for this visit when storage is disabled.
+    }
+    const showTimeout = window.setTimeout(() => setShowSwipeHint(true), 0);
+    const timeout = window.setTimeout(() => setShowSwipeHint(false), 4500);
+    return () => {
+      window.clearTimeout(showTimeout);
+      window.clearTimeout(timeout);
+    };
+  }, []);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -603,6 +644,7 @@ export default function FeedPage() {
               <Badge variant={typeVariants[post.type]}>{t(typeTranslationKeys[post.type])}</Badge>
               {post.audience === "adult" && <Badge variant="lilac">{t("audience.badge")}</Badge>}
               <ProvenanceBadge provenance={post.provenance} sources={post.sources} short />
+              {(post.is_series_opener || post.series_root_id) && <Badge variant="lilac">{t("series.badge")} · {t("series.part")} {post.series_position ?? 1}</Badge>}
             </div>
             <TimeAgo className="text-sm text-gray-500" date={post.created_at} />
           </DoubleTapLikeArea>
@@ -723,7 +765,7 @@ export default function FeedPage() {
               aria-pressed={activeTab === tab}
               onClick={() => {
                 if (tab === "following" && !isSignedIn) router.push("/login");
-                else setActiveTab(tab);
+                else changeTab(feedTabs.indexOf(tab));
               }}
             >
               {t(feedTabLabels[tab])}
@@ -731,6 +773,8 @@ export default function FeedPage() {
           ))}
         </nav>
 
+        <div {...swipeHandlers} className="touch-pan-y space-y-4">
+        <div data-swipe-content className="space-y-4">
         {loading && <div className="space-y-4">{[0, 1, 2].map((index) => <PostSkeleton key={index} />)}</div>}
         {message && <Card className="text-red-700"><FriendlyErrorMessage message={message} /></Card>}
         {!quietMode && activeTab === "forYou" && page === 0 && !loading && !message && posts.length > 0 && <SuggestedMembers />}
@@ -744,7 +788,7 @@ export default function FeedPage() {
             {(activeTab === "following" || !quietMode) && (
               <Button
                 type="button"
-                onClick={() => activeTab === "following" ? setActiveTab("latest") : router.push("/new")}
+                onClick={() => activeTab === "following" ? changeTab(feedTabs.indexOf("latest")) : router.push("/new")}
               >
                 {activeTab === "following" ? t("empty.browseFeed") : t("empty.writeFirst")}
               </Button>
@@ -768,6 +812,7 @@ export default function FeedPage() {
             item.kind === "repost" && item.reposter_id ? reposterProfiles[item.reposter_id] : undefined
           ))}
         </section>
+        </div>
 
         {loadingMore && <div className="space-y-4">{[0, 1, 2].map((index) => <PostSkeleton key={index} />)}</div>}
         {!loading && hasMore && visiblePosts.length > 0 && <div ref={loadMoreSentinel} className="h-px" aria-hidden="true" />}
@@ -782,6 +827,8 @@ export default function FeedPage() {
             {t("common.loadMore")}
           </Button>
         )}
+        </div>
+        {showSwipeHint && <div role="status" className="fixed bottom-24 left-1/2 z-50 max-w-[calc(100vw-2rem)] -translate-x-1/2 break-words rounded-full bg-deep-plum px-4 py-2 text-center text-sm whitespace-normal text-white shadow-lg motion-reduce:transition-none">{t("swipe.hint")}</div>}
     </PageShell>
   );
 }

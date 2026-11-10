@@ -360,6 +360,7 @@ export default function SettingsPage() {
           ["notif_follows", "notif.setFollows"],
           ["notif_shares", "notif.setShares"],
           ["notif_milestones", "notif.setMilestones"],
+          ["notif_series", "notif.setSeries"],
         ] as const).map(([key, label]) => (
           <div className="flex items-start justify-between gap-4 border-t border-soft-lilac/70 pt-4" key={key}>
             <p className="min-w-0 break-words font-medium text-deep-plum">{t(label)}</p>

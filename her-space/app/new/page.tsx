@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -20,10 +20,14 @@ import { getPollClosingTime } from "@/lib/polls";
 import CoverArt, { COVER_KEYS, type CoverKey } from "@/components/CoverArt";
 import Burst from "@/components/Burst";
 import { showJoyLine } from "@/lib/joy";
+import RichEditor from "@/components/RichEditor";
+import { hasRich, stripRich, trimRich } from "@/lib/richtext";
 
 type PostType = "experience" | "question" | "knowledge";
 type Provenance = "personal" | "community" | "evidence";
 type AgeGroup = "teen" | "adult";
+type SeriesCadence = "daily" | "weekly" | "monthly" | "whenever";
+type SeriesOpener = { id: string; title: string };
 type QuotedSource = {
   id: string;
   title: string;
@@ -53,6 +57,9 @@ type Draft = {
   sources: string;
   sensitive: boolean;
   cover?: CoverKey | null;
+  seriesMode?: "none" | "start" | "add";
+  seriesCadence?: SeriesCadence;
+  seriesRootId?: string;
 };
 
 const topicOptions = [
@@ -107,6 +114,11 @@ export default function NewPostPage() {
   const [sources, setSources] = useState("");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [seriesMode, setSeriesMode] = useState<"none" | "start" | "add">("none");
+  const [seriesCadence, setSeriesCadence] = useState<SeriesCadence>("weekly");
+  const [seriesRootId, setSeriesRootId] = useState("");
+  const [seriesOpeners, setSeriesOpeners] = useState<SeriesOpener[]>([]);
+  const [seriesOpen, setSeriesOpen] = useState(false);
   const [cover, setCover] = useState<CoverKey | null>(null);
   const [coverPickerOpen, setCoverPickerOpen] = useState(false);
   const [guidedOpen, setGuidedOpen] = useState(false);
@@ -138,6 +150,7 @@ export default function NewPostPage() {
   const [quoteUnavailable, setQuoteUnavailable] = useState(false);
   const [loading, setLoading] = useState(false);
   const userIdRef = useRef<string | null>(null);
+  const seriesPrefilled = useRef("");
   const ageGroup = ageSetting?.userId === currentUserId ? ageSetting.ageGroup : null;
 
   function clearDraftFor(id: string, draftQuoteId: string | null = null, quickPost = false) {
@@ -155,6 +168,12 @@ export default function NewPostPage() {
       if (authLoading) return;
       if (!active) return;
       const requestedQuoteId = new URLSearchParams(window.location.search).get("quote");
+      const requestedSeriesId = new URLSearchParams(window.location.search).get("series");
+      if (requestedSeriesId && !requestedQuoteId) {
+        setSeriesMode("add");
+        setSeriesRootId(requestedSeriesId);
+        setSeriesOpen(true);
+      }
       setQuoteId(requestedQuoteId);
       setQuoteUnavailable(false);
       let sourcePost: QuotedSource | null = null;
@@ -217,6 +236,9 @@ export default function NewPostPage() {
               setQuickPost(restoredQuickPost);
               setTitle(draft.title ?? "");
               setBody(draft.body ?? "");
+              setSeriesMode(requestedSeriesId ? "add" : draft.seriesMode ?? "none");
+              setSeriesCadence(draft.seriesCadence ?? "weekly");
+              setSeriesRootId(requestedSeriesId ?? draft.seriesRootId ?? "");
               setPollEnabled(Boolean(draft.pollEnabled));
               setPollOptions(Array.isArray(draft.pollOptions) && draft.pollOptions.length >= 2 && draft.pollOptions.length <= 4 ? draft.pollOptions : ["", ""]);
               setPollDuration(draft.pollDuration ?? "never");
@@ -270,8 +292,24 @@ export default function NewPostPage() {
   }, [authLoading, currentUserId, t]);
 
   useEffect(() => {
+    if (!currentUserId) return;
+    let active = true;
+    void supabase.from("posts")
+      .select("id, title")
+      .eq("author_id", currentUserId)
+      .eq("is_series_opener", true)
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) setMessage(friendlyError(error, t));
+        else setSeriesOpeners((data ?? []) as SeriesOpener[]);
+      });
+    return () => { active = false; };
+  }, [currentUserId, t]);
+
+  useEffect(() => {
     if (!draftReady || !userId) return;
-    const draft: Draft = { title, body, quickPost, pollEnabled, pollOptions, pollDuration, type, provenance, topics, extraTopics, sources, sensitive, cover };
+    const draft: Draft = { title, body, quickPost, pollEnabled, pollOptions, pollDuration, type, provenance, topics, extraTopics, sources, sensitive, cover, seriesMode, seriesCadence, seriesRootId };
     const timeout = window.setTimeout(() => {
       try {
         const key = draftStorageKey(userId, quoteId, quickPost);
@@ -282,7 +320,7 @@ export default function NewPostPage() {
       }
     }, 800);
     return () => window.clearTimeout(timeout);
-  }, [body, cover, draftReady, extraTopics, pollDuration, pollEnabled, pollOptions, provenance, quickPost, quoteId, sensitive, sources, title, topics, type, userId]);
+  }, [body, cover, draftReady, extraTopics, pollDuration, pollEnabled, pollOptions, provenance, quickPost, quoteId, sensitive, sources, title, topics, type, userId, seriesMode, seriesCadence, seriesRootId]);
 
   function discardDraft() {
     if (userId) clearDraftFor(userId, quoteId);
@@ -303,6 +341,8 @@ export default function NewPostPage() {
     setSources("");
     setSensitive(false);
     setAllowReposts(false);
+    setSeriesMode("none");
+    setSeriesRootId("");
   }
 
   function toggleTopic(topic: string) {
@@ -326,7 +366,12 @@ export default function NewPostPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pendingPoll || (quickPost ? !body.trim() : !title.trim() || !body.trim())) return;
+    const plainBody = quickPost ? body.trim() : stripRich(body).trim();
+    if (pendingPoll || (quickPost ? !plainBody : !title.trim() || !plainBody)) return;
+    if (!quickPost && (plainBody.length > 5000 || body.length > 12000)) {
+      setMessage(t("errors.generic"));
+      return;
+    }
     setLoading(true);
     setMessage("");
     setPublished(false);
@@ -358,18 +403,19 @@ export default function NewPostPage() {
     try {
       window.localStorage.setItem(
         draftStorageKey(currentUserId, quoteId, quickPost),
-        JSON.stringify({ title, body, quickPost, pollEnabled, pollOptions, pollDuration, type, provenance, topics, extraTopics, sources, sensitive, cover } satisfies Draft)
+        JSON.stringify({ title, body, quickPost, pollEnabled, pollOptions, pollDuration, type, provenance, topics, extraTopics, sources, sensitive, cover, seriesMode, seriesCadence, seriesRootId } satisfies Draft)
       );
     } catch {
       // Keep publishing available when local storage is unavailable.
     }
 
-    const { data: createdPost, error } = await supabase.from("posts").insert({
+    const postInput = {
       type,
       provenance,
       sources: !quickPost && provenance === "evidence" ? sourceList : [],
       title: quickPost ? "" : title.trim(),
-      body: body.trim(),
+      body: plainBody,
+      body_rich: !quickPost && hasRich(body) ? trimRich(body) : null,
       topics: mergedTopics,
       sensitive,
       audience: ageGroup === "adult" && adultsOnly ? "adult" : "all",
@@ -377,10 +423,17 @@ export default function NewPostPage() {
       is_quick: quickPost,
       cover: quickPost ? null : cover,
       ...(quoteId ? { quoted_post_id: quoteId } : {}),
-    }).select("id").single();
+      ...(!quickPost && !quoteId && seriesMode === "start" ? { is_series_opener: true, series_cadence: seriesCadence } : {}),
+      ...(!quickPost && !quoteId && seriesMode === "add" && seriesRootId ? { series_root_id: seriesRootId } : {}),
+    };
+    let createResult = await supabase.from("posts").insert(postInput).select("id").single();
+    if (createResult.error?.code === "23505") {
+      createResult = await supabase.from("posts").insert(postInput).select("id").single();
+    }
+    const { data: createdPost, error } = createResult;
 
     if (error) {
-      setMessage(friendlyError(error, t));
+      setMessage(error.message.toLowerCase().includes("up to 10 series") ? t("series.limit") : friendlyError(error, t));
       setLoading(false);
       return;
     }
@@ -403,6 +456,27 @@ export default function NewPostPage() {
 
     finishPublish(currentUserId);
   }
+
+  const selectSeriesRoot = useCallback(async (rootId: string) => {
+    setSeriesRootId(rootId);
+    const opener = seriesOpeners.find((item) => item.id === rootId);
+    if (!opener) return;
+    const { count, error } = await supabase.from("posts")
+      .select("id", { count: "exact", head: true })
+      .eq("series_root_id", rootId);
+    if (error) {
+      setMessage(friendlyError(error, t));
+      return;
+    }
+    setTitle(`${opener.title}: ${t("series.part")} ${(count ?? 0) + 2}`);
+  }, [seriesOpeners, t]);
+
+  useEffect(() => {
+    const requestedSeriesId = new URLSearchParams(window.location.search).get("series");
+    if (!requestedSeriesId || seriesPrefilled.current === requestedSeriesId || !seriesOpeners.some((opener) => opener.id === requestedSeriesId)) return;
+    seriesPrefilled.current = requestedSeriesId;
+    void selectSeriesRoot(requestedSeriesId);
+  }, [selectSeriesRoot, seriesOpeners]);
 
   function finishPublish(currentUserId: string) {
     setDraftReady(false);
@@ -509,6 +583,7 @@ export default function NewPostPage() {
               aria-label={t("write.quickToggle")}
               onClick={() => {
                 setQuickPost((current) => !current);
+                if (!quickPost) setBody((current) => stripRich(current));
                 setPreview(false);
                 setProvenance((current) => current === "evidence" ? "personal" : current);
                 setSources("");
@@ -532,7 +607,8 @@ export default function NewPostPage() {
               provenance={provenance}
               sources={sources.split("\n").map((source) => source.trim()).filter(Boolean)}
               title={title}
-              body={body}
+              body={stripRich(body)}
+              rich={body}
               topics={mergedTopics}
               sensitive={sensitive}
               t={t}
@@ -680,18 +756,69 @@ export default function NewPostPage() {
                 </div>
               )}
 
+              {!quickPost && !quoteId && (
+                <section className="space-y-3">
+                  <Button variant="secondary" type="button" className="px-3" aria-expanded={seriesOpen} onClick={() => setSeriesOpen((open) => !open)}>
+                    {t("series.badge")}
+                  </Button>
+                  {seriesOpen && (
+                    <Card className="space-y-3">
+                      <label className="block space-y-2 text-sm font-medium text-deep-plum">
+                        {t("series.badge")}
+                        <select className="min-h-11 w-full rounded-2xl border border-[#CDBDEB] bg-white px-4 py-2.5 text-deep-plum" value={seriesMode} onChange={(event) => setSeriesMode(event.target.value as "none" | "start" | "add")}>
+                          <option value="none">{t("series.none")}</option>
+                          <option value="start">{t("series.start")}</option>
+                          <option value="add" disabled={seriesOpeners.length === 0}>{t("series.addTo")}</option>
+                        </select>
+                      </label>
+                      {seriesMode === "start" && (
+                        <label className="block space-y-2 text-sm font-medium text-deep-plum">
+                          {t("series.cadence")}
+                          <select className="min-h-11 w-full rounded-2xl border border-[#CDBDEB] bg-white px-4 py-2.5 text-deep-plum" value={seriesCadence} onChange={(event) => setSeriesCadence(event.target.value as SeriesCadence)}>
+                            <option value="daily">{t("series.daily")}</option>
+                            <option value="weekly">{t("series.weekly")}</option>
+                            <option value="monthly">{t("series.monthly")}</option>
+                            <option value="whenever">{t("series.whenever")}</option>
+                          </select>
+                        </label>
+                      )}
+                      {seriesMode === "add" && (
+                        <label className="block space-y-2 text-sm font-medium text-deep-plum">
+                          {t("series.addTo")}
+                          <select className="min-h-11 w-full rounded-2xl border border-[#CDBDEB] bg-white px-4 py-2.5 text-deep-plum" value={seriesRootId} onChange={(event) => void selectSeriesRoot(event.target.value)}>
+                            <option value="">{t("series.addTo")}</option>
+                            {seriesOpeners.map((opener) => <option value={opener.id} key={opener.id}>{opener.title}</option>)}
+                          </select>
+                        </label>
+                      )}
+                    </Card>
+                  )}
+                </section>
+              )}
+
               <label className="block space-y-2 text-sm font-medium text-deep-plum">
                 {t("common.body")}
-                <Textarea
-                  className={quickPost ? "min-h-32 resize-y text-lg" : "min-h-40 resize-y"}
-                  rows={quickPost ? 4 : 6}
-                  maxLength={quickPost ? 280 : 5000}
-                  placeholder={t(quickPost ? "write.quickPlaceholder" : quotedPost ? "quote.bodyPlaceholder" : "write.bodyPlaceholder")}
-                  value={body}
-                  onChange={(event) => setBody(event.target.value)}
-                  required
-                />
-                {(quickPost || body.length > 4000) && <span className="block text-right text-xs font-normal text-gray-600">{body.length}/{quickPost ? 280 : 5000}</span>}
+                {quickPost ? (
+                  <Textarea
+                    className="min-h-32 resize-y text-lg"
+                    rows={4}
+                    maxLength={280}
+                    placeholder={t("write.quickPlaceholder")}
+                    value={body}
+                    onChange={(event) => setBody(event.target.value)}
+                    required
+                  />
+                ) : (
+                  <RichEditor
+                    value={body}
+                    onChange={setBody}
+                    maxPlain={5000}
+                    maxRaw={12000}
+                    placeholder={t(quotedPost ? "quote.bodyPlaceholder" : "write.bodyPlaceholder")}
+                    id="post-body"
+                  />
+                )}
+                {quickPost && <span className="block text-right text-xs font-normal text-gray-600">{body.length}/280</span>}
               </label>
 
               {!quickPost && !quoteId && (

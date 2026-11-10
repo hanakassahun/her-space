@@ -50,6 +50,11 @@ type Post = {
   sources: string[];
   title: string;
   body: string;
+  is_series_opener: boolean;
+  series_root_id: string | null;
+  series_position: number | null;
+  series_cadence: "daily" | "weekly" | "monthly" | "whenever" | null;
+  series_status: "active" | "paused" | "finished" | null;
   topics: string[];
   sensitive: boolean;
   is_quick: boolean;
@@ -111,7 +116,7 @@ const typeTranslationKeys = {
 
 const PAGE_SIZE = 20;
 const POST_SELECT =
-  "id, cover, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))";
+  "id, cover, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, is_series_opener, series_root_id, series_position, series_cadence, series_status, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))";
 const searchArticleCategoryKeys: Record<string, TranslationKey> = {
   health: "explore.health",
   body_beauty: "explore.bodyBeauty",
@@ -570,6 +575,7 @@ export default function ExplorePage() {
           <div>
             <h1 className="text-3xl font-bold text-deep-plum">{t("explore.title")}</h1>
           </div>
+          <Link className="inline-flex min-h-11 items-center rounded-full border border-soft-lilac bg-white px-4 font-medium text-deep-plum" href="/series">{t("series.discover")}</Link>
         </header>
 
         <Input
@@ -711,6 +717,7 @@ export default function ExplorePage() {
                     </Badge>
                     {post.audience === "adult" && <Badge variant="lilac">{t("audience.badge")}</Badge>}
                     <ProvenanceBadge provenance={post.provenance} sources={post.sources} short />
+                    {(post.is_series_opener || post.series_root_id) && <Badge variant="lilac">{t("series.badge")} · {t("series.part")} {post.series_position ?? 1}</Badge>}
                   </div>
                   <TimeAgo className="text-sm text-gray-500" date={post.created_at} />
                 </DoubleTapLikeArea>

@@ -3,6 +3,7 @@ export type NotificationPreferences = {
   notif_follows: boolean;
   notif_shares: boolean;
   notif_milestones: boolean;
+  notif_series: boolean;
 };
 
 export type NotificationKind =
@@ -12,7 +13,8 @@ export type NotificationKind =
   | "quote"
   | "review"
   | "notice"
-  | "milestone";
+  | "milestone"
+  | "series";
 
 export function getEnabledNotificationKinds(
   prefs: NotificationPreferences
@@ -22,6 +24,7 @@ export function getEnabledNotificationKinds(
   if (prefs.notif_follows) kinds.push("follow");
   if (prefs.notif_shares) kinds.push("repost", "quote");
   if (prefs.notif_milestones) kinds.push("milestone");
+  if (prefs.notif_series) kinds.push("series");
   kinds.push("review", "notice");
   return kinds;
 }

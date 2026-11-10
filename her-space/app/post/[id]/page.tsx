@@ -28,6 +28,10 @@ import Avatar from "@/components/Avatar";
 import PollCard from "@/components/PollCard";
 import { loadPollResults, type PollResult } from "@/lib/polls";
 import CoverArt from "@/components/CoverArt";
+import RichEditor from "@/components/RichEditor";
+import RichText from "@/components/RichText";
+import { hasRich, stripRich, trimRich } from "@/lib/richtext";
+import SeriesBox from "@/components/SeriesBox";
 
 const MemberActionsMenu = dynamic(() => import("@/components/MemberActionsMenu"), { ssr: false });
 
@@ -54,6 +58,7 @@ type Post = {
   sources: string[];
   title: string;
   body: string;
+  body_rich: string | null;
   topics: string[];
   sensitive: boolean;
   is_quick: boolean;
@@ -61,6 +66,11 @@ type Post = {
   poll_closes_at: string | null;
   created_at: string;
   hidden_at: string | null;
+  is_series_opener: boolean;
+  series_root_id: string | null;
+  series_position: number | null;
+  series_cadence: "daily" | "weekly" | "monthly" | "whenever" | null;
+  series_status: "active" | "paused" | "finished" | null;
   profiles: PostProfile | PostProfile[] | null;
 };
 
@@ -200,7 +210,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       const [postResult, bookmarkResult, likesResult, commentsResult, repostsResult, helpfulResult] = await Promise.all([
         supabase
           .from("posts")
-          .select("id, cover, author_id, type, provenance, audience, like_count, helpful_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, hidden_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))")
+          .select("id, cover, author_id, type, provenance, audience, like_count, helpful_count, allow_reposts, quoted_post_id, sources, title, body, body_rich, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, hidden_at, is_series_opener, series_root_id, series_position, series_cadence, series_status, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))")
           .eq("id", id)
           .single(),
         supabase
@@ -374,7 +384,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
   function beginPostEdit() {
     if (!post) return;
     setEditTitle(post.title);
-    setEditBody(post.body);
+    setEditBody(post.body_rich ?? post.body);
     setEditTopics(post.topics.join(", "));
     setEditSources(post.sources.join("\n"));
     setEditAllowReposts(post.allow_reposts && !post.sensitive && post.audience !== "adult");
@@ -398,13 +408,14 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       .from("posts")
       .update({
         title: post.is_quick ? "" : editTitle.trim(),
-        body: editBody.trim(),
+        body: post.is_quick ? editBody.trim() : stripRich(editBody).trim(),
+        body_rich: !post.is_quick && hasRich(editBody) ? trimRich(editBody) : null,
         topics: editTopics.split(/[,،፣]/).map((topic) => topic.trim()).filter(Boolean),
         ...(post.provenance === "evidence" ? { sources } : {}),
         allow_reposts: editAllowReposts && !post.sensitive && post.audience !== "adult",
       })
       .eq("id", post.id)
-      .select("id, cover, author_id, type, provenance, audience, like_count, helpful_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))")
+      .select("id, cover, author_id, type, provenance, audience, like_count, helpful_count, allow_reposts, quoted_post_id, sources, title, body, body_rich, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, is_series_opener, series_root_id, series_position, series_cadence, series_status, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))")
       .single();
 
     if (error) {
@@ -586,7 +597,9 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                   )}
                   <label className="block space-y-2 text-sm font-medium text-deep-plum">
                     {t("common.body")}
-                    <Textarea className="min-h-40" maxLength={post.is_quick ? 280 : 5000} value={editBody} onChange={(event) => setEditBody(event.target.value)} required />
+                    {post.is_quick
+                      ? <Textarea className="min-h-40" maxLength={280} value={editBody} onChange={(event) => setEditBody(event.target.value)} required />
+                      : <RichEditor value={editBody} onChange={setEditBody} maxPlain={5000} maxRaw={12000} id="edit-post-body" />}
                   </label>
                   <label className="block space-y-2 text-sm font-medium text-deep-plum">
                     {t("post.topicsInput")}
@@ -631,6 +644,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                     <Badge variant={typeVariants[post.type]}>{t(typeTranslationKeys[post.type])}</Badge>
                     {post.audience === "adult" && <Badge variant="lilac">{t("audience.badge")}</Badge>}
                     <ProvenanceBadge provenance={post.provenance} sources={post.sources} />
+                    {(post.is_series_opener || post.series_root_id) && <Badge variant="lilac">{t("series.badge")} · {t("series.part")} {post.series_position ?? 1}</Badge>}
                   </div>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-gray-600">
                     <Avatar name={getAuthorName(post.profiles)} avatar={getAuthorAvatar(post.profiles)} size={36} />
@@ -660,6 +674,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                     </Button>
                   )}
                   <p className="text-sm text-gray-600">{getReadingMinutes(post.body)} {t("read.minRead")}</p>
+                  {(post.is_series_opener || post.series_root_id) && <SeriesBox postId={post.id} authorId={post.author_id} isOpener={post.is_series_opener} rootPostId={post.series_root_id} position={post.series_position} />}
 
                   {post.sensitive && revealedPostId !== post.id ? (
                     <div className="space-y-3 rounded-2xl border border-rose-200 bg-rose-50/70 p-4" role="note">
@@ -677,7 +692,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                           ))}
                         </ul>
                       )}
-                      <UserText text={post.body} className={`max-w-[65ch] ${post.is_quick ? "text-lg" : "text-[17px]"} text-gray-800`} />
+                      <RichText text={post.body} rich={post.is_quick ? null : post.body_rich} className={`max-w-[65ch] ${post.is_quick ? "text-lg" : "text-[17px]"} text-gray-800`} />
                     </>
                   )}
                   {(!post.sensitive || revealedPostId === post.id) && post.has_poll && (
