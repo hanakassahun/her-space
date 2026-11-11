@@ -14,6 +14,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import PostSkeleton from "@/components/ui/PostSkeleton";
 import BookmarkButton from "@/components/ui/BookmarkButton";
+import PostTypeBadgeLink from "@/components/PostTypeBadgeLink";
 import UserText from "@/components/UserText";
 import { useLanguage } from "@/components/LanguageProvider";
 import TimeAgo from "@/components/TimeAgo";
@@ -73,18 +74,6 @@ type BookmarkRow = {
   created_at: string;
   posts: Post | Post[] | null;
 };
-
-const typeVariants: Record<Post["type"], "rose" | "sky" | "mint"> = {
-  experience: "rose",
-  question: "sky",
-  knowledge: "mint",
-};
-
-const typeTranslationKeys = {
-  experience: "postType.experience",
-  question: "postType.question",
-  knowledge: "postType.knowledge",
-} as const;
 
 function first<T>(value: T | T[] | null) {
   return Array.isArray(value) ? value[0] : value;
@@ -305,9 +294,7 @@ export default function LibraryPage() {
                   onLike={() => { if (!likeStates[post.id]?.liked) void toggleLike(post.id); }}
                   className="flex flex-wrap items-center justify-between gap-3"
                 >
-                  <Badge variant={typeVariants[post.type]}>
-                    {t(typeTranslationKeys[post.type])}
-                  </Badge>
+                  <PostTypeBadgeLink type={post.type} />
                   {post.audience === "adult" && <Badge variant="lilac">{t("audience.badge")}</Badge>}
                   {(post.is_series_opener || post.series_root_id) && <Badge variant="lilac">{t("series.badge")} · {t("series.part")} {post.series_position ?? 1}</Badge>}
                   <span className="text-xs text-gray-500">{likeStates[post.id]?.count ?? post.like_count} {t("like.likes")}</span>

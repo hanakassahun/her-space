@@ -18,6 +18,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import PostSkeleton from "@/components/ui/PostSkeleton";
 import BookmarkButton from "@/components/ui/BookmarkButton";
+import PostTypeBadgeLink from "@/components/PostTypeBadgeLink";
 import { useLanguage } from "@/components/LanguageProvider";
 import TimeAgo from "@/components/TimeAgo";
 import { useAuth } from "@/components/AuthProvider";
@@ -87,18 +88,6 @@ const reasonTranslationKeys: Record<RecommendationReason, "feed.whyFollow" | "fe
   popular: "feed.whyPopular",
   recent: "feed.whyRecent",
 };
-
-const typeVariants: Record<Post["type"], "rose" | "sky" | "mint"> = {
-  experience: "rose",
-  question: "sky",
-  knowledge: "mint",
-};
-
-const typeTranslationKeys = {
-  experience: "postType.experience",
-  question: "postType.question",
-  knowledge: "postType.knowledge",
-} as const;
 
 const PAGE_SIZE = 20;
 const POST_SELECT = "id, cover, author_id, type, provenance, audience, like_count, allow_reposts, quoted_post_id, sources, title, body, topics, sensitive, is_quick, has_poll, poll_closes_at, created_at, is_series_opener, series_root_id, series_position, series_cadence, series_status, profiles!posts_author_id_fkey(display_name, avatar, verified_professionals!verified_professionals_user_id_fkey(title))";
@@ -641,7 +630,7 @@ export default function FeedPage() {
             className="flex flex-wrap items-center justify-between gap-3"
           >
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <Badge variant={typeVariants[post.type]}>{t(typeTranslationKeys[post.type])}</Badge>
+              <PostTypeBadgeLink type={post.type} />
               {post.audience === "adult" && <Badge variant="lilac">{t("audience.badge")}</Badge>}
               <ProvenanceBadge provenance={post.provenance} sources={post.sources} short />
               {(post.is_series_opener || post.series_root_id) && <Badge variant="lilac">{t("series.badge")} · {t("series.part")} {post.series_position ?? 1}</Badge>}

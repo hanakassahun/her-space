@@ -29,6 +29,7 @@ import { loadPollResults, type PollResult } from "@/lib/polls";
 import DoubleTapLikeArea from "@/components/DoubleTapLikeArea";
 import CoverArt from "@/components/CoverArt";
 import DecorativeEmptyArt from "@/components/DecorativeEmptyArt";
+import PostTypeBadgeLink from "@/components/PostTypeBadgeLink";
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
@@ -84,6 +85,7 @@ type ExploreRestoreState = {
   scrollY: number;
   pages: number;
   selectedTopic: string | null;
+  selectedType: Post["type"] | null;
   search: string;
 };
 
@@ -102,17 +104,33 @@ const topicGroups = {
   "Life stages": ["puberty", "pregnancy", "postpartum", "menopause"],
 };
 
-const typeVariants: Record<Post["type"], "rose" | "sky" | "mint"> = {
-  experience: "rose",
-  question: "sky",
-  knowledge: "mint",
-};
-
 const typeTranslationKeys = {
   experience: "postType.experience",
   question: "postType.question",
   knowledge: "postType.knowledge",
 } as const;
+
+const kindChipTranslationKeys = {
+  experience: "explore.kindExperience",
+  question: "explore.kindQuestion",
+  knowledge: "explore.kindKnowledge",
+} as const;
+
+const kindDescriptionTranslationKeys = {
+  experience: "explore.kindExperienceDesc",
+  question: "explore.kindQuestionDesc",
+  knowledge: "explore.kindKnowledgeDesc",
+} as const;
+
+const kindIcons: Record<Post["type"], string> = {
+  experience: "♡",
+  question: "?",
+  knowledge: "✦",
+};
+
+function parsePostType(value: string | null): Post["type"] | null {
+  return value === "experience" || value === "question" || value === "knowledge" ? value : null;
+}
 
 const PAGE_SIZE = 20;
 const POST_SELECT =
@@ -158,6 +176,7 @@ export default function ExplorePage() {
   const [searchContent, setSearchContent] = useState<SearchContentResult[]>([]);
   const [searchMembers, setSearchMembers] = useState<SearchMemberResult[]>([]);
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
+  const [selectedType, setSelectedType] = useState<Post["type"] | null>(null);
   const [restoreReady, setRestoreReady] = useState(false);
   const [posts, setPosts] = useState<Post[]>([]);
   const [pollResults, setPollResults] = useState<Record<string, PollResult[]>>({});
@@ -183,19 +202,27 @@ export default function ExplorePage() {
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       try {
+        const urlType = parsePostType(new URLSearchParams(window.location.search).get("type"));
         const restoreKey = window.sessionStorage.getItem("explore:return-key");
         const serialized = restoreKey ? window.sessionStorage.getItem(restoreKey) : null;
         if (serialized) {
           const saved = JSON.parse(serialized) as ExploreRestoreState;
           if (Number.isFinite(saved.scrollY) && Number.isInteger(saved.pages) && saved.pages > 0) {
-            restoreState.current = saved;
+            const restored = { ...saved, selectedType: urlType ?? parsePostType(saved.selectedType) };
+            restoreState.current = restored;
             setSelectedTopic(saved.selectedTopic);
+            setSelectedType(restored.selectedType);
             setSearch(saved.search);
             setDebouncedSearch(saved.search);
+          } else {
+            setSelectedType(urlType);
           }
+        } else {
+          setSelectedType(urlType);
         }
       } catch {
         restoreState.current = null;
+        setSelectedType(parsePostType(new URLSearchParams(window.location.search).get("type")));
       }
       setRestoreReady(true);
     }, 0);
@@ -203,12 +230,13 @@ export default function ExplorePage() {
   }, []);
 
   function saveScrollForPost() {
-    const key = `explore:${selectedTopic ?? "all"}:${encodeURIComponent(debouncedSearch)}`;
+    const key = `explore:${selectedTopic ?? "all"}:${selectedType ?? "all"}:${encodeURIComponent(debouncedSearch)}`;
     try {
       window.sessionStorage.setItem(key, JSON.stringify({
         scrollY: window.scrollY,
         pages: page + 1,
         selectedTopic,
+        selectedType,
         search: debouncedSearch,
       }));
       window.sessionStorage.setItem("explore:return-key", key);
@@ -268,6 +296,32 @@ export default function ExplorePage() {
     } catch {
       // Keep the in-memory list cleared when local storage is unavailable.
     }
+  }
+
+  function chooseKind(kind: Post["type"] | null) {
+    setSelectedType(kind);
+    const url = new URL(window.location.href);
+    if (kind) url.searchParams.set("type", kind);
+    else url.searchParams.delete("type");
+    router.replace(`${url.pathname}${url.search}${url.hash}`, { scroll: false });
+  }
+
+  function renderNoPostsCard() {
+    return (
+      <Card className="space-y-2 text-gray-700">
+        <DecorativeEmptyArt variant="cloud" />
+        <p>{t("explore.noResults")}</p>
+        {selectedType && <p className="font-semibold text-deep-plum">{t(typeTranslationKeys[selectedType])}</p>}
+        {selectedType === "question" && (
+          <Link
+            className="inline-flex min-h-11 items-center rounded-full bg-deep-plum px-4 font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
+            href="/new?type=question"
+          >
+            {t("search.ask")}
+          </Link>
+        )}
+      </Card>
+    );
   }
 
   const loadPostInteractionState = useCallback(async (incomingPosts: Post[], reset: boolean, requestId?: number) => {
@@ -356,6 +410,7 @@ export default function ExplorePage() {
         );
       }
     }
+    if (selectedType) query = query.eq("type", selectedType);
     if (selectedTopic) query = query.contains("topics", [selectedTopic]);
 
     const { data, error } = await query;
@@ -378,7 +433,7 @@ export default function ExplorePage() {
     setPage(nextPage);
     setLoading(false);
     setLoadingMore(false);
-  }, [authLoading, debouncedSearch, loadPostInteractionState, selectedTopic, t, userId]);
+  }, [authLoading, debouncedSearch, loadPostInteractionState, selectedTopic, selectedType, t, userId]);
 
   const loadPostsPageRef = useRef(loadPostsPage);
   useEffect(() => {
@@ -394,7 +449,7 @@ export default function ExplorePage() {
 
     async function searchAllContent() {
       const [contentResult, membersResult] = await Promise.all([
-        supabase.rpc("search_content", { p_query: query, p_per_kind: 8 }),
+        supabase.rpc("search_content", { p_query: query, p_per_kind: 20 }),
         supabase.rpc("search_members", { p_query: query, p_limit: 8 }),
       ]);
       if (!isCurrentRequest()) return;
@@ -407,7 +462,6 @@ export default function ExplorePage() {
 
       const contentRows = (contentResult.data ?? []) as SearchContentResult[];
       const memberRows = (membersResult.data ?? []) as SearchMemberResult[];
-      setSearchContent(contentRows);
       setSearchMembers(memberRows);
       const postIds = contentRows.filter((item) => item.kind === "post").map((item) => item.id);
       let matchedPosts: Post[] = [];
@@ -428,10 +482,15 @@ export default function ExplorePage() {
         const orderedPosts = postIds
           .map((id) => postsById.get(id))
           .filter((post): post is Post => post !== undefined);
-        matchedPosts = await attachQuoted(orderedPosts);
+        const postsWithQuotes = await attachQuoted(orderedPosts);
+        matchedPosts = selectedType
+          ? postsWithQuotes.filter((post) => post.type === selectedType)
+          : postsWithQuotes;
         if (!isCurrentRequest()) return;
       }
 
+      const matchedPostIds = new Set(matchedPosts.map((post) => post.id));
+      setSearchContent(contentRows.filter((item) => item.kind !== "post" || matchedPostIds.has(item.id)));
       setPosts(matchedPosts);
       const { rowsByPostId, error: pollsError } = await loadPollResults(
         matchedPosts.filter((post) => post.has_poll).map((post) => post.id)
@@ -459,7 +518,7 @@ export default function ExplorePage() {
       active = false;
       window.clearTimeout(timeout);
     };
-  }, [authLoading, debouncedSearch, isSearchMode, loadPostInteractionState, restoreReady, t, userId]);
+  }, [authLoading, debouncedSearch, isSearchMode, loadPostInteractionState, restoreReady, selectedType, t, userId]);
 
   useEffect(() => {
     if (!userId || authLoading || !restoreReady || isSearchMode) return;
@@ -472,7 +531,7 @@ export default function ExplorePage() {
       void loadPostsPageRef.current(0, true);
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, [authLoading, debouncedSearch, isSearchMode, restoreReady, selectedTopic, userId]);
+  }, [authLoading, debouncedSearch, isSearchMode, restoreReady, selectedTopic, selectedType, userId]);
 
   const handleLoadMore = useCallback(async () => {
     if (loadMoreLock.current || loading || loadingMore || !hasMore) return;
@@ -498,7 +557,7 @@ export default function ExplorePage() {
     }
 
     restoreState.current = null;
-    const key = `explore:${saved.selectedTopic ?? "all"}:${encodeURIComponent(saved.search)}`;
+    const key = `explore:${saved.selectedTopic ?? "all"}:${saved.selectedType ?? "all"}:${encodeURIComponent(saved.search)}`;
     try {
       window.sessionStorage.removeItem(key);
       window.sessionStorage.removeItem("explore:return-key");
@@ -595,6 +654,28 @@ export default function ExplorePage() {
           aria-label={t("explore.searchLabel")}
         />
 
+        <div className="hide-scrollbar flex gap-2 overflow-x-auto pb-1" role="group" aria-label={t("explore.browseByKind")}>
+          <button
+            type="button"
+            aria-pressed={selectedType === null}
+            onClick={() => chooseKind(null)}
+            className={`inline-flex min-h-11 max-w-[11rem] shrink-0 items-center whitespace-normal rounded-full border px-4 py-2 text-center text-sm font-semibold leading-5 ${selectedType === null ? "gradient-aurora border-transparent text-white" : "border-soft-lilac bg-white text-deep-plum"}`}
+          >
+            {t("explore.kindAll")}
+          </button>
+          {(Object.keys(kindChipTranslationKeys) as Post["type"][]).map((kind) => (
+            <button
+              key={kind}
+              type="button"
+              aria-pressed={selectedType === kind}
+              onClick={() => chooseKind(kind)}
+              className={`inline-flex min-h-11 max-w-[11rem] shrink-0 items-center whitespace-normal rounded-full border px-4 py-2 text-center text-sm font-semibold leading-5 ${selectedType === kind ? "gradient-aurora border-transparent text-white" : "border-soft-lilac bg-white text-deep-plum"}`}
+            >
+              {t(kindChipTranslationKeys[kind])}
+            </button>
+          ))}
+        </div>
+
         {searchFocused && !search.trim() && recentSearches.length > 0 && (
           <section className="space-y-2" aria-label={t("search.recent")}>
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -620,6 +701,29 @@ export default function ExplorePage() {
                 >
                   {recentSearch}
                 </Button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {!isSearchMode && !search.trim() && !selectedTopic && !selectedType && (
+          <section className="space-y-3" aria-labelledby="browse-kind-heading">
+            <h2 id="browse-kind-heading" className="text-sm font-semibold text-deep-plum">{t("explore.browseByKind")}</h2>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {(Object.keys(kindChipTranslationKeys) as Post["type"][]).map((kind) => (
+                <Card key={kind} className="p-0">
+                  <button
+                    type="button"
+                    onClick={() => chooseKind(kind)}
+                    className="flex min-h-11 w-full items-start gap-3 rounded-2xl p-4 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
+                  >
+                    <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-soft-lilac text-lg font-semibold text-deep-plum">{kindIcons[kind]}</span>
+                    <span className="min-w-0">
+                      <span className="block break-words font-semibold text-deep-plum">{t(kindChipTranslationKeys[kind])}</span>
+                      <span className="mt-1 block break-words text-sm font-normal text-gray-600">{t(kindDescriptionTranslationKeys[kind])}</span>
+                    </span>
+                  </button>
+                </Card>
               ))}
             </div>
           </section>
@@ -661,10 +765,9 @@ export default function ExplorePage() {
 
         {loading && <div className="space-y-4">{[0, 1, 2].map((index) => <PostSkeleton key={index} />)}</div>}
         {message && <Card className="text-red-700"><FriendlyErrorMessage message={message} /></Card>}
-        {!isSearchMode && !loading && !message && posts.length === 0 && (
-          <Card className="space-y-2 text-gray-700"><DecorativeEmptyArt variant="cloud" />{t("explore.noResults")}</Card>
-        )}
-        {isSearchMode && !loading && !message &&
+        {!isSearchMode && !loading && !message && posts.length === 0 && renderNoPostsCard()}
+        {isSearchMode && selectedType && !loading && !message && posts.length === 0 && renderNoPostsCard()}
+        {isSearchMode && !selectedType && !loading && !message &&
           posts.length + searchContent.filter((item) => item.kind !== "post").length + searchMembers.length === 0 && (
             <Card className="space-y-3">
               <DecorativeEmptyArt variant="cloud" />
@@ -712,9 +815,7 @@ export default function ExplorePage() {
                   className="flex flex-wrap items-center justify-between gap-3"
                 >
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <Badge variant={typeVariants[post.type]}>
-                      {t(typeTranslationKeys[post.type])}
-                    </Badge>
+                    <PostTypeBadgeLink type={post.type} />
                     {post.audience === "adult" && <Badge variant="lilac">{t("audience.badge")}</Badge>}
                     <ProvenanceBadge provenance={post.provenance} sources={post.sources} short />
                     {(post.is_series_opener || post.series_root_id) && <Badge variant="lilac">{t("series.badge")} · {t("series.part")} {post.series_position ?? 1}</Badge>}

@@ -27,6 +27,7 @@ import { loadPollResults, type PollResult } from "@/lib/polls";
 import DoubleTapLikeArea from "@/components/DoubleTapLikeArea";
 import PostBody from "@/components/PostBody";
 import CoverArt from "@/components/CoverArt";
+import PostTypeBadgeLink from "@/components/PostTypeBadgeLink";
 
 const MemberActionsMenu = dynamic(() => import("@/components/MemberActionsMenu"), { ssr: false });
 
@@ -71,18 +72,6 @@ type Post = {
 };
 type RepostRow = { created_at: string; posts: Post | Post[] | null };
 type LikeState = { count: number; liked: boolean };
-
-const typeVariants: Record<Post["type"], "rose" | "sky" | "mint"> = {
-  experience: "rose",
-  question: "sky",
-  knowledge: "mint",
-};
-
-const typeTranslationKeys = {
-  experience: "postType.experience",
-  question: "postType.question",
-  knowledge: "postType.knowledge",
-} as const;
 
 function first<T>(value: T | T[] | null) {
   return Array.isArray(value) ? value[0] : value;
@@ -545,9 +534,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                 onLike={() => { if (!likeStates[post.id]?.liked) void toggleLike(post.id); }}
                 className="flex flex-wrap items-center justify-between gap-3"
               >
-                <Badge variant={typeVariants[post.type]}>
-                  {t(typeTranslationKeys[post.type])}
-                </Badge>
+                <PostTypeBadgeLink type={post.type} />
                 {post.audience === "adult" && <Badge variant="lilac">{t("audience.badge")}</Badge>}
                 {(post.is_series_opener || post.series_root_id) && <Badge variant="lilac">{t("series.badge")} · {t("series.part")} {post.series_position ?? 1}</Badge>}
                 <span className="text-xs text-gray-500">{likeStates[post.id]?.count ?? post.like_count} {t("like.likes")}</span>
@@ -662,7 +649,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                     onLike={() => { if (!likeStates[post.id]?.liked) void toggleLike(post.id); }}
                     className="flex flex-wrap items-center gap-2"
                   >
-                    <Badge variant={typeVariants[post.type]}>{t(typeTranslationKeys[post.type])}</Badge>
+                    <PostTypeBadgeLink type={post.type} />
                     {post.audience === "adult" && <Badge variant="lilac">{t("audience.badge")}</Badge>}
                     {(post.is_series_opener || post.series_root_id) && <Badge variant="lilac">{t("series.badge")} · {t("series.part")} {post.series_position ?? 1}</Badge>}
                     <span className="text-xs text-gray-500">{likeStates[post.id]?.count ?? post.like_count} {t("like.likes")}</span>

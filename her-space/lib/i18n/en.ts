@@ -766,6 +766,15 @@ const en = {
   "rich.simple": "Switch to plain editor",
   "rich.simpleWarn": "The plain editor removes formatting. Switch anyway?",
   "rich.formatted": "Back to the formatted editor",
+  "explore.browseByKind": "Browse by kind",
+  "explore.kindAll": "All kinds",
+  "explore.kindExperience": "Experiences",
+  "explore.kindQuestion": "Questions",
+  "explore.kindKnowledge": "Knowledge",
+  "explore.kindExperienceDesc": "Stories from members' own lives",
+  "explore.kindQuestionDesc": "Ask, and help answer",
+  "explore.kindKnowledgeDesc": "Things members have learned",
+  "explore.seeMoreLike": "See more like this",
 } as const;
 
 export type TranslationKey = keyof typeof en;

@@ -772,6 +772,15 @@ const am: Record<TranslationKey, string> = {
   "rich.simple": "ወደ ቀላል አርታኢ ቀይር",
   "rich.simpleWarn": "ቀላሉ አርታኢ ቅርጸትን ያስወግዳል። ቢሆንም ልቀይር?",
   "rich.formatted": "ወደ ቅርጸት አርታኢ ተመለስ",
+  "explore.browseByKind": "በዓይነት አስሺ",
+  "explore.kindAll": "ሁሉም ዓይነቶች",
+  "explore.kindExperience": "ተሞክሮዎች",
+  "explore.kindQuestion": "ጥያቄዎች",
+  "explore.kindKnowledge": "እውቀት",
+  "explore.kindExperienceDesc": "ከአባላት የራሳቸው ሕይወት የመጡ ታሪኮች",
+  "explore.kindQuestionDesc": "ጠይቂ፤ በመመለስም እርዳ",
+  "explore.kindKnowledgeDesc": "አባላት የተማሯቸው ነገሮች",
+  "explore.seeMoreLike": "እንደዚህ ያሉትን ተጨማሪ ተመልከቺ",
 };
  
 export default am;
