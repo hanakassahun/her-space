@@ -763,6 +763,9 @@ const en = {
   "remind.cardPeriod": "Your period may start soon (estimate).",
   "remind.dismiss": "Not now",
   "privacy.cycle": "Cycle estimates and reminders are calculated on your device from your own journal entries. We never use journal data to rank posts, for search, or for analytics.",
+  "rich.simple": "Switch to plain editor",
+  "rich.simpleWarn": "The plain editor removes formatting. Switch anyway?",
+  "rich.formatted": "Back to the formatted editor",
 } as const;
 
 export type TranslationKey = keyof typeof en;

@@ -769,6 +769,9 @@ const am: Record<TranslationKey, string> = {
   "remind.cardPeriod": "የወር አበባሽ በቅርቡ ሊጀምር ይችላል (ግምት)።",
   "remind.dismiss": "አሁን አይደለም",
   "privacy.cycle": "የዑደት ግምቶችና ማስታወሻዎች በመሣሪያሽ ላይ ከራስሽ የማስታወሻ ደብተር መዝገቦች ይሰላሉ። የማስታወሻ ደብተር መረጃን ጽሑፎችን ለመደርደር፣ ለመፈለግ ወይም ለትንታኔ በጭራሽ አንጠቀምም።",
+  "rich.simple": "ወደ ቀላል አርታኢ ቀይር",
+  "rich.simpleWarn": "ቀላሉ አርታኢ ቅርጸትን ያስወግዳል። ቢሆንም ልቀይር?",
+  "rich.formatted": "ወደ ቅርጸት አርታኢ ተመለስ",
 };
  
 export default am;

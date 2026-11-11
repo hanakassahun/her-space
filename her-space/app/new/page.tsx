@@ -21,7 +21,7 @@ import CoverArt, { COVER_KEYS, type CoverKey } from "@/components/CoverArt";
 import Burst from "@/components/Burst";
 import { showJoyLine } from "@/lib/joy";
 import RichEditor from "@/components/RichEditor";
-import { hasRich, stripRich, trimRich } from "@/lib/richtext";
+import { stripRich, toPostFields } from "@/lib/richtext";
 
 type PostType = "experience" | "question" | "knowledge";
 type Provenance = "personal" | "community" | "evidence";
@@ -366,8 +366,9 @@ export default function NewPostPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const plainBody = quickPost ? body.trim() : stripRich(body).trim();
-    if (pendingPoll || (quickPost ? !plainBody : !title.trim() || !plainBody)) return;
+    const richFields = quickPost ? null : toPostFields(body);
+    const plainBody = quickPost ? body.trim() : richFields!.body;
+    if (pendingPoll || (quickPost ? !plainBody : !title.trim() || !richFields!.ok)) return;
     if (!quickPost && (plainBody.length > 5000 || body.length > 12000)) {
       setMessage(t("errors.generic"));
       return;
@@ -415,7 +416,7 @@ export default function NewPostPage() {
       sources: !quickPost && provenance === "evidence" ? sourceList : [],
       title: quickPost ? "" : title.trim(),
       body: plainBody,
-      body_rich: !quickPost && hasRich(body) ? trimRich(body) : null,
+      body_rich: richFields?.body_rich ?? null,
       topics: mergedTopics,
       sensitive,
       audience: ageGroup === "adult" && adultsOnly ? "adult" : "all",

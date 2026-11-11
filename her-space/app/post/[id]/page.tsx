@@ -30,7 +30,7 @@ import { loadPollResults, type PollResult } from "@/lib/polls";
 import CoverArt from "@/components/CoverArt";
 import RichEditor from "@/components/RichEditor";
 import RichText from "@/components/RichText";
-import { hasRich, stripRich, trimRich } from "@/lib/richtext";
+import { stripRich, toPostFields } from "@/lib/richtext";
 import SeriesBox from "@/components/SeriesBox";
 
 const MemberActionsMenu = dynamic(() => import("@/components/MemberActionsMenu"), { ssr: false });
@@ -402,14 +402,19 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       return;
     }
 
+    const richFields = post.is_quick ? null : toPostFields(editBody);
+    if (!post.is_quick && (!richFields!.ok || richFields!.body.length > 5000 || editBody.length > 12000)) {
+      setMessage(t("errors.generic"));
+      return;
+    }
     setSavingPost(true);
     setMessage("");
     const { data, error } = await supabase
       .from("posts")
       .update({
         title: post.is_quick ? "" : editTitle.trim(),
-        body: post.is_quick ? editBody.trim() : stripRich(editBody).trim(),
-        body_rich: !post.is_quick && hasRich(editBody) ? trimRich(editBody) : null,
+        body: post.is_quick ? editBody.trim() : richFields!.body,
+        body_rich: richFields?.body_rich ?? null,
         topics: editTopics.split(/[,،፣]/).map((topic) => topic.trim()).filter(Boolean),
         ...(post.provenance === "evidence" ? { sources } : {}),
         allow_reposts: editAllowReposts && !post.sensitive && post.audience !== "adult",

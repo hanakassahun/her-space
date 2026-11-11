@@ -1,15 +1,4 @@
-import { parseRich, stripRich, type RichNode } from "@/lib/richtext";
-
-const colors: Record<string, string> = {
-  rose: "#A12B63", lilac: "#6A4DB3", sky: "#1F62A8", mint: "#1D7552",
-  plum: "#2A1B3D", gold: "#8A5200", gray: "#4B5563",
-};
-const sizes: Record<string, string> = { small: "0.875rem", large: "1.25rem", huge: "1.6rem" };
-const fonts: Record<string, string> = {
-  serif: 'Georgia, "Noto Serif", serif',
-  hand: '"Segoe Print", "Bradley Hand", "Comic Sans MS", cursive',
-  mono: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
-};
+import { parseRich, RICH_COLORS, RICH_FONTS, RICH_SIZES, stripRich, type RichNode } from "@/lib/richtext";
 
 function renderNodes(nodes: RichNode[], keyPrefix: string): React.ReactNode[] {
   return nodes.map((node, index) => {
@@ -29,11 +18,11 @@ function renderNodes(nodes: RichNode[], keyPrefix: string): React.ReactNode[] {
       case "quote": return <blockquote key={key} className="border-l-4 border-soft-lilac pl-4">{children}</blockquote>;
       case "center": return inline("block text-center");
       case "color": {
-        const color = colors[node.value ?? ""];
+        const color = RICH_COLORS[node.value ?? ""];
         return color ? inline("", { color }) : inline();
       }
-      case "size": return sizes[node.value ?? ""] ? inline("", { fontSize: sizes[node.value!] }) : inline();
-      case "font": return fonts[node.value ?? ""] ? inline("", { fontFamily: fonts[node.value!] }) : inline();
+      case "size": return RICH_SIZES[node.value ?? ""] ? inline("", { fontSize: RICH_SIZES[node.value!] }) : inline();
+      case "font": return RICH_FONTS[node.value ?? ""] ? inline("", { fontFamily: RICH_FONTS[node.value!] }) : inline();
       default: return inline();
     }
   });

@@ -7,7 +7,7 @@ export type PollResult = {
   option_position: number;
   votes: number | null;
   total: number | null;
-  my_option: boolean;
+  my_option: string | null;
   is_open: boolean;
   results_visible: boolean;
 };
@@ -27,8 +27,8 @@ export async function loadPollResults(postIds: string[]) {
   for (const row of (data ?? []) as PollResult[]) {
     (rowsByPostId[row.post_id] ??= []).push(row);
   }
-  for (const rows of Object.values(rowsByPostId)) {
-    rows.sort((left, right) => left.option_position - right.option_position);
+  for (const [postId, rows] of Object.entries(rowsByPostId)) {
+    rowsByPostId[postId] = [...rows].sort((left, right) => left.option_position - right.option_position);
   }
   return { rowsByPostId, error: null };
 }
