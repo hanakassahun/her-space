@@ -78,6 +78,7 @@ type SearchContentResult = {
 type SearchMemberResult = {
   id: string;
   display_name: string | null;
+  username: string | null;
   bio: string | null;
   avatar: string | null;
 };
@@ -988,6 +989,7 @@ export default function ExplorePage() {
                 <Avatar name={member.display_name || "Her Space member"} avatar={member.avatar} size={40} />
                 <span className="min-w-0 break-words">
                   <span className="block font-semibold text-deep-plum">{member.display_name || "Her Space member"}</span>
+                  {member.username && <span className="block break-words text-sm text-gray-500">@{member.username}</span>}
                   {member.bio && <span className="line-clamp-1 break-words text-sm text-gray-700">{member.bio}</span>}
                 </span>
               </Link>

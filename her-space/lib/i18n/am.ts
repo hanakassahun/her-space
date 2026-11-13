@@ -798,6 +798,21 @@ const am: Record<TranslationKey, string> = {
   "feed.lessAuthors": "ጥቂት እንዲታዩ የጠየቅሻቸው አባላት",
   "feed.lessTopics": "ጥቂት እንዲታዩ የጠየቅሻቸው ርዕሶች",
   "feed.remove": "አስወግጂ",
+  "username.promptTitle": "የተጠቃሚ ስምሽን ምረጪ",
+  "username.promptBody": "የተጠቃሚ ስምሽ ሌሎች ሊያገኙሽና ሊጠቅሱሽ የሚችሉበት ነው። ከመጠሪያ ስምሽ የተለየና አንድ ብቻ ነው።",
+  "username.label": "የተጠቃሚ ስም",
+  "username.rules": "ከ3 እስከ 20 ቁምፊዎች፦ ትናንሽ ፊደላት፣ ቁጥሮችና ሰረዝ፣ በፊደል የሚጀምር።",
+  "username.checking": "በመፈተሽ ላይ...",
+  "username.ok": "ይገኛል",
+  "username.yours": "ይህ አሁን ያለሽ የተጠቃሚ ስም ነው",
+  "username.taken": "ተወስዷል",
+  "username.reserved": "ያ ስም አይገኝም",
+  "username.invalid": "ከ3 እስከ 20 ትናንሽ ፊደላት፣ ቁጥሮች ወይም ሰረዝ ተጠቀሚ፣ በፊደል የሚጀምር",
+  "username.tooSoon": "የተጠቃሚ ስምሽን በቅርቡ ቀይረሻል። ከ14 ቀን በኋላ እንደገና መቀየር ትችያለሽ።",
+  "username.use": "ይህን የተጠቃሚ ስም ተጠቀሚ",
+  "username.saved": "የተጠቃሚ ስም ተቀምጧል።",
+  "username.change": "በየ14 ቀኑ አንድ ጊዜ መቀየር ትችያለሽ።",
+  "username.notFound": "ያንን አባል ማግኘት አልቻልንም።",
 };
  
 export default am;

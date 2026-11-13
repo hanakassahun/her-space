@@ -19,6 +19,9 @@ type AuthContextValue = {
   session: Session | null;
   user: User | null;
   displayName: string | null;
+  username: string | null;
+  usernameConfirmed: boolean | null;
+  refreshProfile: () => Promise<void>;
   isAdmin: boolean;
   isModerator: boolean;
   loading: boolean;
@@ -56,6 +59,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { t } = useLanguage();
   const [session, setSession] = useState<Session | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
+  const [usernameConfirmed, setUsernameConfirmed] = useState<boolean | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isModerator, setIsModerator] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -82,6 +87,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const requestId = useRef(0);
   const savingNotificationPrefs = useRef(new Set<string>());
   const lastVisitPingedDate = useRef<string | null>(null);
+
+  const refreshProfile = useCallback(async () => {
+    const userId = activeUserId.current;
+    if (!userId) return;
+    const currentRequestId = requestId.current;
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("display_name, username, username_confirmed")
+      .eq("id", userId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error("Profile could not be refreshed.");
+    if (activeUserId.current !== userId || currentRequestId !== requestId.current) return;
+    setDisplayName(data.display_name ?? null);
+    setUsername(data.username ?? null);
+    setUsernameConfirmed(data.username_confirmed ?? null);
+  }, []);
 
   const setQuietMode = useCallback(async (next: boolean) => {
     const userId = activeUserId.current;
@@ -251,6 +273,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!nextUserId) {
         setDisplayName(null);
+        setUsername(null);
+        setUsernameConfirmed(null);
         setIsAdmin(false);
         setIsModerator(false);
         setQuietModeState(false);
@@ -272,6 +296,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       setDisplayName(null);
+      setUsername(null);
+      setUsernameConfirmed(null);
       setIsAdmin(false);
       setIsModerator(false);
       setQuietModeState(false);
@@ -290,7 +316,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       savingNotificationPrefs.current.clear();
 
       const [profileResult, adminResult, moderatorResult, prefsResult] = await Promise.all([
-        supabase.from("profiles").select("display_name").eq("id", nextUserId).maybeSingle(),
+        supabase.from("profiles").select("display_name, username, username_confirmed").eq("id", nextUserId).maybeSingle(),
         supabase.from("admins").select("user_id").eq("user_id", nextUserId).maybeSingle(),
         supabase.rpc("is_moderator"),
         supabase.from("member_prefs").select("quiet_mode, remind_log, remind_period, notif_comments, notif_follows, notif_shares, notif_milestones, notif_series, notifications_paused_until").eq("user_id", nextUserId).maybeSingle(),
@@ -298,6 +324,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!active || currentRequestId !== requestId.current) return;
       setDisplayName(profileResult.data?.display_name ?? null);
+      setUsername(profileResult.data?.username ?? null);
+      setUsernameConfirmed(profileResult.data?.username_confirmed ?? null);
       setIsAdmin(Boolean(adminResult.data));
       setIsModerator(Boolean(moderatorResult.data));
       setQuietModeState(Boolean(prefsResult.data?.quiet_mode));
@@ -345,6 +373,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session,
     user: session?.user ?? null,
     displayName,
+    username,
+    usernameConfirmed,
+    refreshProfile,
     isAdmin,
     isModerator,
     loading,
@@ -365,7 +396,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     notificationPrefsSaving,
     notificationPrefsError,
     setNotificationPreference,
-  }), [displayName, isAdmin, isModerator, loading, quietMode, quietModeError, quietModeSaving, remindLog, remindLogSaving, remindLogError, remindPeriod, remindPeriodSaving, remindPeriodError, session, setQuietMode, setRemindLog, setRemindPeriod, notificationPrefs, notificationsPausedUntil, notificationPrefsSaving, notificationPrefsError, setNotificationPreference]);
+  }), [displayName, username, usernameConfirmed, refreshProfile, isAdmin, isModerator, loading, quietMode, quietModeError, quietModeSaving, remindLog, remindLogSaving, remindLogError, remindPeriod, remindPeriodSaving, remindPeriodError, session, setQuietMode, setRemindLog, setRemindPeriod, notificationPrefs, notificationsPausedUntil, notificationPrefsSaving, notificationPrefsError, setNotificationPreference]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

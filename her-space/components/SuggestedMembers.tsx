@@ -13,6 +13,7 @@ import Avatar from "@/components/Avatar";
 type SuggestedMember = {
   id: string;
   display_name: string | null;
+  username: string | null;
   bio: string | null;
   avatar: string | null;
   shared_topics: string[] | null;
@@ -116,9 +117,12 @@ export default function SuggestedMembers() {
             >
               <div className="flex min-w-0 items-center gap-2">
                 <Avatar name={displayName} avatar={member.avatar} size={36} />
-                <Link className="min-w-0 break-words font-medium text-deep-plum underline" href={`/u/${member.id}`}>
-                  {displayName}
-                </Link>
+                <div className="min-w-0">
+                  <Link className="block break-words font-medium text-deep-plum underline" href={`/u/${member.id}`}>
+                    {displayName}
+                  </Link>
+                  {member.username && <p className="break-words text-sm text-gray-500">@{member.username}</p>}
+                </div>
               </div>
               <p className="line-clamp-1 break-words text-sm text-gray-600">{member.bio || " "}</p>
               {sharedTopics.length > 0 && (

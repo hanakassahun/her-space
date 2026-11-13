@@ -792,6 +792,21 @@ const en = {
   "feed.lessAuthors": "Members you see less of",
   "feed.lessTopics": "Topics you see less of",
   "feed.remove": "Remove",
+  "username.promptTitle": "Choose your username",
+  "username.promptBody": "Your username is how others can find and tag you. It's different from your display name, and it's unique.",
+  "username.label": "Username",
+  "username.rules": "3 to 20 characters: lowercase letters, numbers and underscores, starting with a letter.",
+  "username.checking": "Checking...",
+  "username.ok": "Available",
+  "username.yours": "That's your current username",
+  "username.taken": "Already taken",
+  "username.reserved": "That name isn't available",
+  "username.invalid": "Use 3 to 20 lowercase letters, numbers or underscores, starting with a letter",
+  "username.tooSoon": "You changed your username recently. You can change it again after 14 days.",
+  "username.use": "Use this username",
+  "username.saved": "Username saved.",
+  "username.change": "You can change it once every 14 days.",
+  "username.notFound": "We couldn't find that member.",
 } as const;
 
 export type TranslationKey = keyof typeof en;

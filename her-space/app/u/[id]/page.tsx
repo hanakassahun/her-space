@@ -30,11 +30,13 @@ import CoverArt from "@/components/CoverArt";
 import PostTypeBadgeLink from "@/components/PostTypeBadgeLink";
 
 const MemberActionsMenu = dynamic(() => import("@/components/MemberActionsMenu"), { ssr: false });
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type Professional = { title: string } | { title: string }[] | null;
 type Profile = {
   id: string;
   display_name: string | null;
+  username: string | null;
   bio: string;
   avatar: string | null;
 };
@@ -96,6 +98,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
   const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [usernameNotFoundFor, setUsernameNotFoundFor] = useState<string | null>(null);
   const [bioDraft, setBioDraft] = useState("");
   const [posts, setPosts] = useState<Post[]>([]);
   const [pollResults, setPollResults] = useState<Record<string, PollResult[]>>({});
@@ -124,6 +127,26 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
     let cancelled = false;
 
     async function loadProfile() {
+      if (!UUID_PATTERN.test(id)) {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("username", id.toLowerCase())
+          .maybeSingle();
+        if (cancelled) return;
+        if (error) {
+          setMessage(friendlyError(error, t));
+          setLoading(false);
+          return;
+        }
+        if (!data) {
+          setUsernameNotFoundFor(id);
+          setLoading(false);
+          return;
+        }
+        router.replace(`/u/${data.id}`);
+        return;
+      }
       if (authLoading) return;
       if (!currentUserId) {
         router.replace("/login");
@@ -133,7 +156,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
 
       const [profileResult, followersResult, followingResult, followResult, postsResult, repostsResult] =
         await Promise.all([
-          supabase.from("profiles").select("id, display_name, bio, avatar").eq("id", id).single(),
+          supabase.from("profiles").select("id, display_name, username, bio, avatar").eq("id", id).single(),
           supabase
             .from("follows")
             .select("follower_id", { count: "exact", head: true })
@@ -370,6 +393,19 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
     return post ? [{ post, sharedAt: row.created_at }] : [];
   });
 
+  if (usernameNotFoundFor === id) {
+    return (
+      <PageShell className="max-w-3xl space-y-4 px-4 py-6 md:px-6 md:py-10">
+        <Card className="space-y-3 text-center">
+          <p className="break-words text-gray-700">{t("username.notFound")}</p>
+          <Link className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#CDBDEB] bg-white px-4 font-semibold text-deep-plum underline" href="/explore">
+            {t("nav.explore")}
+          </Link>
+        </Card>
+      </PageShell>
+    );
+  }
+
   return (
     <PageShell className="max-w-3xl space-y-8 px-4 py-6 md:px-6 md:py-10">
         <header className="flex flex-wrap items-start justify-between gap-4">
@@ -382,6 +418,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ id: stri
                     <h1 className="text-3xl font-bold text-deep-plum">
                       {profile.display_name || "Her Space member"}
                     </h1>
+                    {profile.username && <p className="break-words text-sm text-gray-500">@{profile.username}</p>}
                     <UserText text={profile.bio || ""} className="mt-1 max-w-xl text-gray-700" />
                     <p className="mt-2 text-sm text-gray-600">
                       {followerCount} {t("profile.followers")} · {followingCount} {t("profile.following")}

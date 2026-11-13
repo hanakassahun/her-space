@@ -9,6 +9,7 @@ import ConnectionBanner from "@/components/ConnectionBanner";
 import Card from "@/components/ui/Card";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/components/AuthProvider";
+import UsernamePrompt from "@/components/UsernamePrompt";
 import { supabase } from "@/lib/supabase";
 import { cacheOnboarded, isOnboardedCached } from "@/lib/onboarding";
 import { showJoyLine } from "@/lib/joy";
@@ -134,6 +135,7 @@ export default function AppChrome({ children }: { children: ReactNode }) {
         </div>
       </div>
       {showNavigation && userId && <BottomNav />}
+      {showNavigation && userId && <UsernamePrompt enabled={!hideOnAuthRoute} />}
       {joyMessage && <div className="joy-toast" role="status">{joyMessage}</div>}
     </>
   );

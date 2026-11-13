@@ -15,12 +15,15 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import { maskEmail } from "@/lib/maskEmail";
+import UsernameField, { useUsernameAvailability } from "@/components/UsernameField";
+import { usernameErrorMessage } from "@/lib/username";
 
 export default function EditProfilePage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, refreshProfile } = useAuth();
   const { t } = useLanguage();
   const router = useRouter();
   const [displayName, setDisplayName] = useState("");
+  const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
   const [avatar, setAvatar] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,6 +31,10 @@ export default function EditProfilePage() {
   const [message, setMessage] = useState("");
   const [saved, setSaved] = useState(false);
   const [showEmail, setShowEmail] = useState(false);
+  const [usernameSaving, setUsernameSaving] = useState(false);
+  const [usernameMessage, setUsernameMessage] = useState("");
+  const [usernameSaved, setUsernameSaved] = useState(false);
+  const usernameAvailability = useUsernameAvailability(username, !loading && Boolean(user));
 
   useEffect(() => {
     let active = true;
@@ -39,13 +46,14 @@ export default function EditProfilePage() {
       }
       const { data, error } = await supabase
         .from("profiles")
-        .select("display_name, bio, avatar")
+        .select("display_name, bio, avatar, username")
         .eq("id", user.id)
         .single();
       if (!active) return;
       if (error) setMessage(friendlyError(error, t));
       else {
         setDisplayName(data.display_name ?? "");
+        setUsername(data.username ?? "");
         setBio(data.bio ?? "");
         setAvatar(data.avatar ?? null);
       }
@@ -81,6 +89,25 @@ export default function EditProfilePage() {
       setMessage(t("profile.saved"));
     }
     setSaving(false);
+  }
+
+  async function saveUsername(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!user || usernameSaving || (usernameAvailability.status !== "ok" && usernameAvailability.status !== "yours")) return;
+    setUsernameSaving(true);
+    setUsernameMessage("");
+    setUsernameSaved(false);
+    try {
+      const { error } = await supabase.rpc("set_username", { p_username: username });
+      if (error) throw error;
+      await refreshProfile();
+      setUsernameSaved(true);
+      setUsernameMessage(t("username.saved"));
+    } catch (error) {
+      setUsernameMessage(usernameErrorMessage(error, t));
+    } finally {
+      setUsernameSaving(false);
+    }
   }
 
   if (loading) {
@@ -151,6 +178,36 @@ export default function EditProfilePage() {
               {t("common.cancel")}
             </Button>
           </div>
+        </form>
+        <form className="mt-6 space-y-4 border-t border-soft-lilac/70 pt-5" onSubmit={saveUsername}>
+          <div className="space-y-2">
+            <h2 className="text-lg font-semibold text-deep-plum">{t("username.label")}</h2>
+            <p className="break-words text-sm text-gray-500">@{username}</p>
+          </div>
+          <UsernameField
+            id="profile-username"
+            value={username}
+            onChange={(next) => {
+              setUsername(next);
+              setUsernameMessage("");
+              setUsernameSaved(false);
+            }}
+            status={usernameAvailability.status}
+            error={usernameAvailability.error}
+            hint={t("username.change")}
+            disabled={usernameSaving}
+          />
+          {usernameMessage && (
+            <p className={`break-words text-sm ${usernameSaved ? "text-emerald-800" : "text-red-700"}`} role={usernameSaved ? "status" : "alert"}>
+              <FriendlyErrorMessage message={usernameMessage} />
+            </p>
+          )}
+          <Button
+            type="submit"
+            disabled={usernameSaving || (usernameAvailability.status !== "ok" && usernameAvailability.status !== "yours")}
+          >
+            {usernameSaving ? t("reset.saving") : t("common.saveChanges")}
+          </Button>
         </form>
       </Card>
     </PageShell>
