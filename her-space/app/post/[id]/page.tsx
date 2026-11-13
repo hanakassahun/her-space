@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, use, useEffect, useRef, useState } from "react";
+import { FormEvent, use, useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -15,6 +15,7 @@ import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Textarea from "@/components/ui/Textarea";
+import MentionTextarea from "@/components/MentionTextarea";
 import Input from "@/components/ui/Input";
 import BookmarkButton from "@/components/ui/BookmarkButton";
 import UserText from "@/components/UserText";
@@ -30,7 +31,7 @@ import { loadPollResults, type PollResult } from "@/lib/polls";
 import CoverArt from "@/components/CoverArt";
 import RichEditor from "@/components/RichEditor";
 import RichText from "@/components/RichText";
-import { stripRich, toPostFields } from "@/lib/richtext";
+import { toPostFields } from "@/lib/richtext";
 import SeriesBox from "@/components/SeriesBox";
 
 const MemberActionsMenu = dynamic(() => import("@/components/MemberActionsMenu"), { ssr: false });
@@ -92,6 +93,14 @@ type Comment = {
   profiles: { display_name: string | null; avatar: string | null } | { display_name: string | null; avatar: string | null }[] | null;
 };
 
+type MentionRow = {
+  post_id: string | null;
+  comment_id: string | null;
+  hidden: boolean;
+  mentioned_id: string;
+  profiles: { username: string | null } | { username: string | null }[] | null;
+};
+
 const reportCategories = [
   "self_harm",
   "abuse",
@@ -151,6 +160,9 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
   const [relatedArticle, setRelatedArticle] = useState<RelatedArticle | null>(null);
   const [revealedPostId, setRevealedPostId] = useState<string | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [mentionRows, setMentionRows] = useState<MentionRow[]>([]);
+  const [untagging, setUntagging] = useState<string | null>(null);
+  const [untagDone, setUntagDone] = useState<Record<string, boolean>>({});
   const [userId, setUserId] = useState<string | null>(null);
   const [editingPost, setEditingPost] = useState(false);
   const [editTitle, setEditTitle] = useState("");
@@ -181,6 +193,28 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
   const likeRequest = useRef(false);
   const bookmarkRequest = useRef(false);
 
+  const loadMentions = useCallback(async (postId: string, loadedComments: Comment[]) => {
+    const commentIds = loadedComments.map((comment) => comment.id);
+    const [postResult, commentResult] = await Promise.all([
+      supabase
+        .from("mentions")
+        .select("post_id, comment_id, hidden, mentioned_id, profiles!mentions_mentioned_id_fkey(username)")
+        .eq("post_id", postId),
+      commentIds.length
+        ? supabase
+          .from("mentions")
+          .select("post_id, comment_id, hidden, mentioned_id, profiles!mentions_mentioned_id_fkey(username)")
+          .in("comment_id", commentIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (postResult.error) setMessage(friendlyError(postResult.error, t));
+    if (commentResult.error) setMessage(friendlyError(commentResult.error, t));
+    setMentionRows([
+      ...((postResult.data ?? []) as MentionRow[]),
+      ...((commentResult.data ?? []) as MentionRow[]),
+    ]);
+  }, [t]);
+
   async function loadComments(postId: string) {
     const { data, error } = await supabase
       .from("comments")
@@ -193,7 +227,9 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       return;
     }
 
-    setComments((data ?? []) as Comment[]);
+    const loadedComments = (data ?? []) as Comment[];
+    setComments(loadedComments);
+    await loadMentions(postId, loadedComments);
   }
 
   useEffect(() => {
@@ -277,6 +313,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       if (!postResult.error) {
         if (commentsResult.error) setMessage(friendlyError(commentsResult.error, t));
         else setComments((commentsResult.data ?? []) as Comment[]);
+        await loadMentions(id, (commentsResult.data ?? []) as Comment[]);
       }
 
       if (isAdmin) {
@@ -293,7 +330,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
     }
 
     void loadPost();
-  }, [authLoading, currentUserId, id, isAdmin, router, t]);
+  }, [authLoading, currentUserId, id, isAdmin, loadMentions, router, t]);
 
   async function togglePinned() {
     if (!isAdmin || pinSaving) return;
@@ -379,6 +416,38 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
       await loadComments(id);
     }
     setSubmittingComment(false);
+  }
+
+  async function untagMention(target: "post" | "comment", targetId: string) {
+    const key = `${target}:${targetId}`;
+    if (!userId || untagging) return;
+    setUntagging(key);
+    setMessage("");
+    setMentionRows((current) => current.map((row) => {
+      const matchesTarget = target === "post"
+        ? row.post_id === targetId && row.comment_id === null
+        : row.comment_id === targetId;
+      return matchesTarget && row.mentioned_id === userId ? { ...row, hidden: true } : row;
+    }));
+
+    try {
+      const { error } = await supabase.rpc("untag_me", {
+        p_post: target === "post" ? targetId : null,
+        p_comment: target === "comment" ? targetId : null,
+      });
+      if (error) throw error;
+      setUntagDone((current) => ({ ...current, [key]: true }));
+    } catch (error) {
+      setMentionRows((current) => current.map((row) => {
+        const matchesTarget = target === "post"
+          ? row.post_id === targetId && row.comment_id === null
+          : row.comment_id === targetId;
+        return matchesTarget && row.mentioned_id === userId ? { ...row, hidden: false } : row;
+      }));
+      setMessage(friendlyError(error, t));
+    } finally {
+      setUntagging(null);
+    }
   }
 
   function beginPostEdit() {
@@ -603,7 +672,7 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                   <label className="block space-y-2 text-sm font-medium text-deep-plum">
                     {t("common.body")}
                     {post.is_quick
-                      ? <Textarea className="min-h-40" maxLength={280} value={editBody} onChange={(event) => setEditBody(event.target.value)} required />
+                      ? <MentionTextarea className="min-h-40" maxLength={280} value={editBody} onChange={setEditBody} required />
                       : <RichEditor value={editBody} onChange={setEditBody} maxPlain={5000} maxRaw={12000} id="edit-post-body" />}
                   </label>
                   <label className="block space-y-2 text-sm font-medium text-deep-plum">
@@ -697,8 +766,21 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                           ))}
                         </ul>
                       )}
-                      <RichText text={post.body} rich={post.is_quick ? null : post.body_rich} className={`max-w-[65ch] ${post.is_quick ? "text-lg" : "text-[17px]"} text-gray-800`} />
+                      <RichText
+                        text={post.body}
+                        rich={post.is_quick ? null : post.body_rich}
+                        mentions={mentionRows
+                          .filter((row) => !row.hidden && row.comment_id === null)
+                          .map((row) => Array.isArray(row.profiles) ? row.profiles[0]?.username : row.profiles?.username)
+                          .filter((username): username is string => Boolean(username))}
+                        className={`max-w-[65ch] ${post.is_quick ? "text-lg" : "text-[17px]"} text-gray-800`}
+                      />
                     </>
+                  )}
+                  {(untagDone[`post:${post.id}`] || mentionRows.some((row) => !row.hidden && row.mentioned_id === userId && row.post_id === post.id && row.comment_id === null)) && (
+                    untagDone[`post:${post.id}`]
+                      ? <p className="break-words text-sm text-gray-600" role="status">{t("mention.untagDone")}</p>
+                      : <Button variant="ghost" className="text-sm" type="button" disabled={untagging !== null} onClick={() => void untagMention("post", post.id)}>{t("mention.untag")}</Button>
                   )}
                   {(!post.sensitive || revealedPostId === post.id) && post.has_poll && (
                     <PollCard postId={post.id} rows={pollResults} closesAt={post.poll_closes_at} />
@@ -770,7 +852,19 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                           )}
                         </div>
                       </div>
-                      <UserText text={comment.body} className="text-gray-800" />
+                      <UserText
+                        text={comment.body}
+                        mentions={mentionRows
+                          .filter((row) => !row.hidden && row.comment_id === comment.id)
+                          .map((row) => Array.isArray(row.profiles) ? row.profiles[0]?.username : row.profiles?.username)
+                          .filter((username): username is string => Boolean(username))}
+                        className="text-gray-800"
+                      />
+                      {(untagDone[`comment:${comment.id}`] || mentionRows.some((row) => !row.hidden && row.mentioned_id === userId && row.comment_id === comment.id)) && (
+                        untagDone[`comment:${comment.id}`]
+                          ? <p className="break-words text-sm text-gray-600" role="status">{t("mention.untagDone")}</p>
+                          : <Button variant="ghost" className="text-sm" type="button" disabled={untagging !== null} onClick={() => void untagMention("comment", comment.id)}>{t("mention.untag")}</Button>
+                      )}
                       {comment.author_id === userId && (
                         <Button
                           variant="ghost"
@@ -806,10 +900,10 @@ export default function PostPage({ params }: { params: Promise<{ id: string }> }
                   <form id="comment-form" className="space-y-3" onSubmit={handleCommentSubmit}>
                     <label className="block space-y-2 text-sm font-medium text-gray-900">
                       {t("post.addComment")}
-                      <Textarea
+                      <MentionTextarea
                         className="min-h-28"
                         value={commentBody}
-                        onChange={(event) => setCommentBody(event.target.value)}
+                        onChange={setCommentBody}
                         maxLength={2000}
                         required
                       />

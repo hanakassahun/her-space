@@ -43,14 +43,17 @@ type AuthContextValue = {
     notif_shares: boolean;
     notif_milestones: boolean;
     notif_series: boolean;
+    notif_mentions: boolean;
   };
+  mentionsFrom: "everyone" | "following" | "nobody";
   notificationsPausedUntil: string | null;
   notificationPrefsSaving: boolean;
   notificationPrefsError: string;
   setNotificationPreference: (
-    key: "notif_comments" | "notif_follows" | "notif_shares" | "notif_milestones" | "notif_series" | "notifications_paused_until",
+    key: "notif_comments" | "notif_follows" | "notif_shares" | "notif_milestones" | "notif_series" | "notif_mentions" | "notifications_paused_until",
     value: boolean | string | null
   ) => Promise<void>;
+  setMentionsFrom: (next: "everyone" | "following" | "nobody") => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -79,7 +82,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     notif_shares: true,
     notif_milestones: true,
     notif_series: true,
+    notif_mentions: true,
   });
+  const [mentionsFrom, setMentionsFromState] = useState<"everyone" | "following" | "nobody">("following");
   const [notificationsPausedUntil, setNotificationsPausedUntilState] = useState<string | null>(null);
   const [notificationPrefsSaving, setNotificationPrefsSaving] = useState(false);
   const [notificationPrefsError, setNotificationPrefsError] = useState("");
@@ -193,7 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [remindPeriod, remindPeriodSaving, t]);
 
   const setNotificationPreference = useCallback(async (
-    key: "notif_comments" | "notif_follows" | "notif_shares" | "notif_milestones" | "notif_series" | "notifications_paused_until",
+    key: "notif_comments" | "notif_follows" | "notif_shares" | "notif_milestones" | "notif_series" | "notif_mentions" | "notifications_paused_until",
     value: boolean | string | null
   ) => {
     const userId = activeUserId.current;
@@ -231,6 +236,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
   }, [notificationPrefs, notificationsPausedUntil, t]);
+
+  const setMentionsFrom = useCallback(async (next: "everyone" | "following" | "nobody") => {
+    const userId = activeUserId.current;
+    if (!userId || savingNotificationPrefs.current.has("mentions_from")) return;
+
+    const previous = mentionsFrom;
+    const currentRequestId = requestId.current;
+    setMentionsFromState(next);
+    savingNotificationPrefs.current.add("mentions_from");
+    setNotificationPrefsSaving(true);
+    setNotificationPrefsError("");
+    try {
+      const { error } = await supabase
+        .from("member_prefs")
+        .upsert({ mentions_from: next, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+      if (error) throw error;
+    } catch (error) {
+      if (activeUserId.current === userId && currentRequestId === requestId.current) {
+        setMentionsFromState(previous);
+        setNotificationPrefsError(friendlyError(error, t));
+      }
+    } finally {
+      if (currentRequestId === requestId.current) savingNotificationPrefs.current.delete("mentions_from");
+      if (activeUserId.current === userId && currentRequestId === requestId.current) {
+        setNotificationPrefsSaving(savingNotificationPrefs.current.size > 0);
+      }
+    }
+  }, [mentionsFrom, t]);
 
   useEffect(() => {
     let active = true;
@@ -286,7 +319,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRemindPeriodState(false);
         setRemindPeriodSaving(false);
         setRemindPeriodError("");
-        setNotificationPrefs({ notif_comments: true, notif_follows: true, notif_shares: true, notif_milestones: true, notif_series: true });
+        setNotificationPrefs({ notif_comments: true, notif_follows: true, notif_shares: true, notif_milestones: true, notif_series: true, notif_mentions: true });
+        setMentionsFromState("following");
         setNotificationsPausedUntilState(null);
         setNotificationPrefsSaving(false);
         setNotificationPrefsError("");
@@ -309,7 +343,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setRemindPeriodState(false);
       setRemindPeriodSaving(false);
       setRemindPeriodError("");
-      setNotificationPrefs({ notif_comments: true, notif_follows: true, notif_shares: true, notif_milestones: true, notif_series: true });
+      setNotificationPrefs({ notif_comments: true, notif_follows: true, notif_shares: true, notif_milestones: true, notif_series: true, notif_mentions: true });
+      setMentionsFromState("following");
       setNotificationsPausedUntilState(null);
       setNotificationPrefsSaving(false);
       setNotificationPrefsError("");
@@ -319,7 +354,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         supabase.from("profiles").select("display_name, username, username_confirmed").eq("id", nextUserId).maybeSingle(),
         supabase.from("admins").select("user_id").eq("user_id", nextUserId).maybeSingle(),
         supabase.rpc("is_moderator"),
-        supabase.from("member_prefs").select("quiet_mode, remind_log, remind_period, notif_comments, notif_follows, notif_shares, notif_milestones, notif_series, notifications_paused_until").eq("user_id", nextUserId).maybeSingle(),
+        supabase.from("member_prefs").select("quiet_mode, remind_log, remind_period, notif_comments, notif_follows, notif_shares, notif_milestones, notif_series, notif_mentions, mentions_from, notifications_paused_until").eq("user_id", nextUserId).maybeSingle(),
       ]);
 
       if (!active || currentRequestId !== requestId.current) return;
@@ -337,7 +372,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         notif_shares: prefsResult.data?.notif_shares ?? true,
         notif_milestones: prefsResult.data?.notif_milestones ?? true,
         notif_series: prefsResult.data?.notif_series ?? true,
+        notif_mentions: prefsResult.data?.notif_mentions ?? true,
       });
+      setMentionsFromState(prefsResult.data?.mentions_from ?? "following");
       setNotificationsPausedUntilState(prefsResult.data?.notifications_paused_until ?? null);
       if (prefsResult.error) {
         const errorMessage = friendlyError(prefsResult.error, t);
@@ -392,11 +429,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     remindPeriodError,
     setRemindPeriod,
     notificationPrefs,
+    mentionsFrom,
     notificationsPausedUntil,
     notificationPrefsSaving,
     notificationPrefsError,
     setNotificationPreference,
-  }), [displayName, username, usernameConfirmed, refreshProfile, isAdmin, isModerator, loading, quietMode, quietModeError, quietModeSaving, remindLog, remindLogSaving, remindLogError, remindPeriod, remindPeriodSaving, remindPeriodError, session, setQuietMode, setRemindLog, setRemindPeriod, notificationPrefs, notificationsPausedUntil, notificationPrefsSaving, notificationPrefsError, setNotificationPreference]);
+    setMentionsFrom,
+  }), [displayName, username, usernameConfirmed, refreshProfile, isAdmin, isModerator, loading, quietMode, quietModeError, quietModeSaving, remindLog, remindLogSaving, remindLogError, remindPeriod, remindPeriodSaving, remindPeriodError, session, setQuietMode, setRemindLog, setRemindPeriod, notificationPrefs, mentionsFrom, notificationsPausedUntil, notificationPrefsSaving, notificationPrefsError, setNotificationPreference, setMentionsFrom]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

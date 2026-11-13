@@ -74,10 +74,12 @@ export default function SettingsPage() {
     remindPeriodError,
     setRemindPeriod,
     notificationPrefs,
+    mentionsFrom,
     notificationsPausedUntil,
     notificationPrefsSaving,
     notificationPrefsError,
     setNotificationPreference,
+    setMentionsFrom,
   } = useAuth();
   const userId = user?.id ?? null;
   const router = useRouter();
@@ -425,6 +427,7 @@ export default function SettingsPage() {
           ["notif_shares", "notif.setShares"],
           ["notif_milestones", "notif.setMilestones"],
           ["notif_series", "notif.setSeries"],
+          ["notif_mentions", "notif.setMentions"],
         ] as const).map(([key, label]) => (
           <div className="flex items-start justify-between gap-4 border-t border-soft-lilac/70 pt-4" key={key}>
             <p className="min-w-0 break-words font-medium text-deep-plum">{t(label)}</p>
@@ -474,6 +477,30 @@ export default function SettingsPage() {
           </Button>
         </div>
         {notificationPrefsError && <p className="break-words text-sm text-red-700" role="alert">{notificationPrefsError}</p>}
+      </Card>
+
+      <Card as="section" className="space-y-4">
+        <fieldset className="space-y-2">
+          <legend className="break-words text-xl font-semibold text-deep-plum">{t("mention.whoTitle")}</legend>
+          {([
+            ["everyone", "mention.everyone"],
+            ["following", "mention.following"],
+            ["nobody", "mention.nobody"],
+          ] as const).map(([value, label]) => (
+            <label key={value} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl px-2 py-2 text-deep-plum hover:bg-soft-lilac/30">
+              <input
+                type="radio"
+                name="mentions-from"
+                value={value}
+                checked={mentionsFrom === value}
+                disabled={notificationPrefsSaving}
+                onChange={() => void setMentionsFrom(value)}
+                className="h-5 w-5 shrink-0 accent-[#7755A5]"
+              />
+              <span className="break-words">{t(label)}</span>
+            </label>
+          ))}
+        </fieldset>
       </Card>
 
       <Card as="section" className="space-y-4">

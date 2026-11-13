@@ -1,10 +1,17 @@
+import Link from "next/link";
 import { parseRich, RICH_COLORS, RICH_FONTS, RICH_SIZES, stripRich, type RichNode } from "@/lib/richtext";
+import { splitMentions } from "@/lib/mentions";
 
-function renderNodes(nodes: RichNode[], keyPrefix: string): React.ReactNode[] {
+function renderNodes(nodes: RichNode[], keyPrefix: string, mentions?: string[]): React.ReactNode[] {
   return nodes.map((node, index) => {
     const key = `${keyPrefix}-${index}`;
-    if (node.type === "text") return node.value;
-    const children = renderNodes(node.children, key);
+    if (node.type === "text") {
+      if (mentions === undefined) return node.value;
+      return splitMentions(node.value, mentions).map((segment, segmentIndex) => segment.type === "mention"
+        ? <Link key={`${key}-${segmentIndex}`} href={`/u/${segment.value.slice(1).toLowerCase()}`} className="font-medium text-[#7755A5]">{segment.value}</Link>
+        : segment.value);
+    }
+    const children = renderNodes(node.children, key, mentions);
     const inline = (className = "", style?: React.CSSProperties) => (
       <span key={key} className={className} style={style}>{children}</span>
     );
@@ -55,10 +62,13 @@ function stripPrefix(nodes: RichNode[], prefixLength: number): RichNode[] {
   return [{ ...first, value: first.value.slice(prefixLength) }, ...nodes.slice(1)];
 }
 
-function renderBlock(text: string, rich: string, className: string) {
+function renderBlock(text: string, rich: string, className: string, mentions?: string[]) {
   if (!rich || stripRich(rich) !== text) {
     const ethiopic = /[\u1200-\u137F]/.test(text);
-    return <p lang={ethiopic ? "am" : "en"} className={`user-text break-words whitespace-pre-wrap ${ethiopic ? "user-text-am" : "user-text-en"} ${className}`}>{text}</p>;
+    const content = mentions === undefined ? text : splitMentions(text, mentions).map((segment, index) => segment.type === "mention"
+      ? <Link key={index} href={`/u/${segment.value.slice(1).toLowerCase()}`} className="font-medium text-[#7755A5]">{segment.value}</Link>
+      : segment.value);
+    return <p lang={ethiopic ? "am" : "en"} className={`user-text break-words whitespace-pre-wrap ${ethiopic ? "user-text-am" : "user-text-en"} ${className}`}>{content}</p>;
   }
   const lines = splitNodes(parseRich(rich));
   const paragraphs: React.ReactNode[] = [];
@@ -80,19 +90,19 @@ function renderBlock(text: string, rich: string, className: string) {
       if (listType !== marker) flushList();
       listType = marker;
       const prefixLength = marker === "ul" ? 2 : leadingText.indexOf(". ") + 2;
-      listItems.push(<li key={`li-${index}`}>{renderNodes(stripPrefix(original, prefixLength), `line-${index}`)}</li>);
+      listItems.push(<li key={`li-${index}`}>{renderNodes(stripPrefix(original, prefixLength), `line-${index}`, mentions)}</li>);
       continue;
     }
     flushList();
     const rawLine = original.map((node) => node.type === "text" ? node.value : "").join("");
     if (rawLine === "---") paragraphs.push(<hr key={`hr-${index}`} className="border-soft-lilac" />);
     else if (original.length === 1 && original[0].type === "tag" && original[0].name === "h") {
-      paragraphs.push(<h2 key={`h-${index}`} className="text-xl font-semibold">{renderNodes(original[0].children, `h-${index}`)}</h2>);
+      paragraphs.push(<h2 key={`h-${index}`} className="text-xl font-semibold">{renderNodes(original[0].children, `h-${index}`, mentions)}</h2>);
     } else if (original.length === 1 && original[0].type === "tag" && original[0].name === "quote") {
-      paragraphs.push(<blockquote key={`q-${index}`} className="border-l-4 border-soft-lilac pl-4">{renderNodes(original[0].children, `q-${index}`)}</blockquote>);
+      paragraphs.push(<blockquote key={`q-${index}`} className="border-l-4 border-soft-lilac pl-4">{renderNodes(original[0].children, `q-${index}`, mentions)}</blockquote>);
     } else if (original.length === 1 && original[0].type === "tag" && original[0].name === "center") {
-      paragraphs.push(<p key={`c-${index}`} className="text-center">{renderNodes(original[0].children, `c-${index}`)}</p>);
-    } else if (original.length) paragraphs.push(<p key={`p-${index}`} className="whitespace-pre-wrap">{renderNodes(original, `paragraph-${index}`)}</p>);
+      paragraphs.push(<p key={`c-${index}`} className="text-center">{renderNodes(original[0].children, `c-${index}`, mentions)}</p>);
+    } else if (original.length) paragraphs.push(<p key={`p-${index}`} className="whitespace-pre-wrap">{renderNodes(original, `paragraph-${index}`, mentions)}</p>);
     else paragraphs.push(<p key={`p-${index}`} aria-hidden="true">&nbsp;</p>);
   }
   flushList();
@@ -100,6 +110,6 @@ function renderBlock(text: string, rich: string, className: string) {
   return <div lang={ethiopic ? "am" : "en"} className={`user-text break-words ${ethiopic ? "user-text-am" : "user-text-en"} ${className}`}>{paragraphs}</div>;
 }
 
-export default function RichText({ text, rich, className = "" }: { text: string; rich: string | null | undefined; className?: string }) {
-  return renderBlock(text, typeof rich === "string" ? rich : "", className);
+export default function RichText({ text, rich, className = "", mentions }: { text: string; rich: string | null | undefined; className?: string; mentions?: string[] }) {
+  return renderBlock(text, typeof rich === "string" ? rich : "", className, mentions);
 }

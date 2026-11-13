@@ -807,6 +807,19 @@ const en = {
   "username.saved": "Username saved.",
   "username.change": "You can change it once every 14 days.",
   "username.notFound": "We couldn't find that member.",
+  "mention.button": "Tag a member",
+  "mention.hint": "Type a name to tag a member. Tags only reach members who allow them.",
+  "mention.noResults": "No members found",
+  "mention.rules": "Tagged members are notified only if their settings allow it.",
+  "mention.untag": "Remove my tag",
+  "mention.untagDone": "Your tag was removed.",
+  "mention.whoTitle": "Who can tag me",
+  "mention.everyone": "Everyone",
+  "mention.following": "People I follow",
+  "mention.nobody": "Nobody",
+  "notif.mentionPost": "mentioned you in a post",
+  "notif.mentionComment": "mentioned you in a comment",
+  "notif.setMentions": "Tags and mentions",
 } as const;
 
 export type TranslationKey = keyof typeof en;

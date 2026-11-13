@@ -813,6 +813,19 @@ const am: Record<TranslationKey, string> = {
   "username.saved": "የተጠቃሚ ስም ተቀምጧል።",
   "username.change": "በየ14 ቀኑ አንድ ጊዜ መቀየር ትችያለሽ።",
   "username.notFound": "ያንን አባል ማግኘት አልቻልንም።",
+  "mention.button": "አባል ጥቀሺ",
+  "mention.hint": "አባል ለመጥቀስ ስም ጻፊ። ጥቆማ የሚደርሰው ለሚፈቅዱ አባላት ብቻ ነው።",
+  "mention.noResults": "ምንም አባል አልተገኘም",
+  "mention.rules": "የተጠቀሱ አባላት የሚነገራቸው ቅንብራቸው ከፈቀደ ብቻ ነው።",
+  "mention.untag": "ጥቆማዬን አስወግጂ",
+  "mention.untagDone": "ጥቆማሽ ተወግዷል።",
+  "mention.whoTitle": "ማን ሊጠቅሰኝ ይችላል",
+  "mention.everyone": "ሁሉም",
+  "mention.following": "የምከተላቸው ሰዎች",
+  "mention.nobody": "ማንም",
+  "notif.mentionPost": "በጽሑፍ ውስጥ ጠቅሳሻለች",
+  "notif.mentionComment": "በአስተያየት ውስጥ ጠቅሳሻለች",
+  "notif.setMentions": "ጥቆማዎች",
 };
  
 export default am;

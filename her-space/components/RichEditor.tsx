@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
 import { useLanguage } from "@/components/LanguageProvider";
-import Textarea from "@/components/ui/Textarea";
+import MentionTextarea from "@/components/MentionTextarea";
+import MentionPicker, { type MentionMember } from "@/components/MentionPicker";
 import { domToTags, hasRich, RICH_COLORS, stripRich, tagsToDom } from "@/lib/richtext";
+import { hasMention } from "@/lib/mentions";
 import type { TranslationKey } from "@/lib/i18n/en";
 
 type Props = {
@@ -34,6 +36,10 @@ export default function RichEditor({
   const [mode, setMode] = useState<"rich" | "plain">("rich");
   const [popover, setPopover] = useState<Popover>(null);
   const [activeFormats, setActiveFormats] = useState<Record<string, boolean>>({});
+  const [mentionPickerOpen, setMentionPickerOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionResults, setMentionResults] = useState<MentionMember[]>([]);
+  const mentionRange = useRef<Range | null>(null);
   const plainLength = stripRich(value).length;
   const rawLength = value.length;
   const plainOverLimit = plainLength > maxPlain;
@@ -191,6 +197,46 @@ export default function RichEditor({
     emitEditorValue();
   }
 
+  function toggleMentionPicker() {
+    if (disabled || composing.current) return;
+    if (mentionPickerOpen) {
+      setMentionPickerOpen(false);
+      return;
+    }
+    const selection = document.getSelection();
+    const editor = editorRef.current;
+    if (selection?.rangeCount && editor?.contains(selection.anchorNode)) {
+      mentionRange.current = selection.getRangeAt(0).cloneRange();
+    } else if (editor) {
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(false);
+      mentionRange.current = range;
+    } else {
+      mentionRange.current = null;
+    }
+    setMentionQuery("");
+    setMentionResults([]);
+    setMentionPickerOpen(true);
+    setPopover(null);
+  }
+
+  function insertMention(member: MentionMember) {
+    if (composing.current || disabled) return;
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+    const selection = document.getSelection();
+    if (mentionRange.current && selection) {
+      selection.removeAllRanges();
+      selection.addRange(mentionRange.current);
+    }
+    insertPlainText(`@${member.username} `);
+    mentionRange.current = null;
+    setMentionPickerOpen(false);
+    setMentionResults([]);
+  }
+
   function onPaste(event: ClipboardEvent<HTMLDivElement>) {
     event.preventDefault();
     insertPlainText(event.clipboardData.getData("text/plain"));
@@ -268,6 +314,7 @@ export default function RichEditor({
     <div className="space-y-2">
       {mode === "rich" ? (
         <>
+          <div className="relative">
           <div className="hide-scrollbar flex gap-1 overflow-x-auto pb-1" role="toolbar" aria-label={t("rich.preview")}>
             {toolbarButton("rich.bold", "B", () => runCommand("bold"), activeFormats.bold)}
             {toolbarButton("rich.italic", "I", () => runCommand("italic"), activeFormats.italic)}
@@ -280,6 +327,19 @@ export default function RichEditor({
             {toolbarButton("rich.numbers", "1.", () => runCommand("insertOrderedList"), activeFormats.numbers)}
             {toolbarButton("rich.divider", "―", insertDivider)}
             {toolbarButton("rich.center", "≡", () => runCommand(activeFormats.center ? "justifyLeft" : "justifyCenter"), activeFormats.center)}
+            <button
+              type="button"
+              aria-label={t("mention.button")}
+              aria-expanded={mentionPickerOpen}
+              title={t("mention.button")}
+              disabled={disabled}
+              onMouseDown={(event) => event.preventDefault()}
+              onPointerDown={(event) => event.preventDefault()}
+              onClick={toggleMentionPicker}
+              className={`inline-flex h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-soft-lilac px-2 font-semibold text-deep-plum hover:bg-soft-lilac/40 disabled:opacity-50 ${mentionPickerOpen ? "bg-soft-lilac/60" : "bg-white"}`}
+            >
+              @
+            </button>
             {(["color", "size", "font"] as const).map((kind) => (
               <button
                 key={kind}
@@ -296,6 +356,33 @@ export default function RichEditor({
               </button>
             ))}
             {toolbarButton("rich.clear", "×", clearFormatting)}
+          </div>
+          {mentionPickerOpen && (
+            <div className="absolute left-0 top-full z-30 mt-2 w-full max-w-sm space-y-2 rounded-2xl border border-soft-lilac bg-white p-3 shadow-xl">
+              <input
+                autoFocus
+                aria-label={t("mention.button")}
+                placeholder={t("mention.hint")}
+                className="min-h-11 w-full rounded-xl border border-[#CDBDEB] bg-white px-3 text-deep-plum focus:border-[#8F72BE] focus:outline-none focus:ring-2 focus:ring-[#B49AD8]"
+                value={mentionQuery}
+                onChange={(event) => {
+                  setMentionQuery(event.target.value);
+                  setMentionResults([]);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") setMentionPickerOpen(false);
+                  else if (event.key === "Enter" && mentionResults[0]) {
+                    event.preventDefault();
+                    insertMention(mentionResults[0]);
+                  }
+                }}
+              />
+              <MentionPicker query={mentionQuery} onSelect={insertMention} onResultsChange={setMentionResults} />
+              <button type="button" className="min-h-11 break-words text-sm font-medium text-deep-plum underline" onClick={() => setMentionPickerOpen(false)}>
+                {t("common.cancel")}
+              </button>
+            </div>
+          )}
           </div>
           {popover && (
             <div className="flex flex-wrap gap-2 rounded-xl border border-soft-lilac bg-white p-3" role="group" aria-label={t(`rich.${popover}` as TranslationKey)}>
@@ -358,11 +445,11 @@ export default function RichEditor({
           />
         </>
       ) : (
-        <Textarea
+        <MentionTextarea
           id={id}
           className="min-h-48 text-base"
           value={stripRich(value)}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={onChange}
           placeholder={placeholder}
           disabled={disabled}
           aria-invalid={rawOverLimit || plainOverLimit}
@@ -377,6 +464,7 @@ export default function RichEditor({
         )}
       </div>
       <p className="break-words text-sm text-gray-600">{t("rich.tip")}</p>
+      {mode === "rich" && hasMention(stripRich(value)) && <p className="break-words text-sm leading-6 text-gray-600">{t("mention.rules")}</p>}
     </div>
   );
 }

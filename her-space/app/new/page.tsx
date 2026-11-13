@@ -12,6 +12,7 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
+import MentionTextarea from "@/components/MentionTextarea";
 import SuccessCheck from "@/components/ui/SuccessCheck";
 import { useLanguage } from "@/components/LanguageProvider";
 import type { TranslationKey } from "@/lib/i18n/en";
@@ -800,13 +801,13 @@ export default function NewPostPage() {
               <label className="block space-y-2 text-sm font-medium text-deep-plum">
                 {t("common.body")}
                 {quickPost ? (
-                  <Textarea
+                  <MentionTextarea
                     className="min-h-32 resize-y text-lg"
                     rows={4}
                     maxLength={280}
                     placeholder={t("write.quickPlaceholder")}
                     value={body}
-                    onChange={(event) => setBody(event.target.value)}
+                    onChange={setBody}
                     required
                   />
                 ) : (

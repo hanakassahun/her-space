@@ -22,6 +22,7 @@ type NotificationRow = {
   actor_id: string | null;
   kind: NotificationKind;
   post_id: string | null;
+  comment_id: string | null;
   read_at: string | null;
   created_at: string;
   message: string | null;
@@ -52,7 +53,7 @@ function notificationHref(notification: NotificationRow) {
 }
 
 function NotificationKindIcon({ kind }: { kind: NotificationKind }) {
-  if (kind === "comment") {
+  if (kind === "comment" || kind === "mention") {
     return (
       <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
         <path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2v-6.5A7.5 7.5 0 1 1 20 11.5Z" />
@@ -120,7 +121,7 @@ export default function NotificationsPage() {
 
     const { data, error } = await supabase
       .from("notifications")
-      .select("id, actor_id, kind, post_id, read_at, created_at, message, metric, amount, profiles!notifications_actor_id_fkey(id, display_name, avatar), posts!notifications_post_id_fkey(title, is_quick)")
+      .select("id, actor_id, kind, post_id, comment_id, read_at, created_at, message, metric, amount, profiles!notifications_actor_id_fkey(id, display_name, avatar), posts!notifications_post_id_fkey(title, is_quick)")
       .eq("user_id", userId)
       .in("kind", enabledKinds)
       .order("created_at", { ascending: false })
@@ -231,7 +232,7 @@ export default function NotificationsPage() {
     const groups = new Map<string, NotificationRow[]>();
     const displayRows: { notification: NotificationRow; rows: NotificationRow[] }[] = [];
     for (const notification of notifications.filter((row) => enabledKinds.includes(row.kind))) {
-      const canGroup = ["comment", "follow", "repost", "quote"].includes(notification.kind)
+      const canGroup = ["comment", "follow", "repost", "quote", "mention"].includes(notification.kind)
         || notification.kind === "series";
       const recent = new Date(notification.created_at).getTime() >= cutoff;
       const groupable = canGroup
@@ -242,7 +243,8 @@ export default function NotificationsPage() {
         continue;
       }
       const target = notification.kind === "follow" ? "member"
-        : notification.kind === "series" ? notification.actor_id : notification.post_id;
+        : notification.kind === "series" ? notification.actor_id
+          : notification.kind === "mention" ? `${notification.post_id}:${notification.comment_id ?? "post"}` : notification.post_id;
       const key = `${notification.kind}:${target}`;
       const existing = groups.get(key);
       if (existing) existing.push(notification);
@@ -333,6 +335,15 @@ export default function NotificationsPage() {
                       <span className="break-words text-sm text-gray-700">{rows.length > 1 ? `${t("notif.and")} ${rows.length - 1} ${t("notif.others")}` : t("notif.series")}</span>
                     </span>
                     <span className="block line-clamp-1 break-words text-sm text-gray-600">{post?.title || t("notif.postUnavailable")}</span>
+                  </>
+                ) : notification.kind === "mention" ? (
+                  <>
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="break-words font-medium text-deep-plum">{actorName}</span>
+                      {rows.length > 1 && <span className="break-words text-sm text-gray-700">{t("notif.and")} {rows.length - 1} {t("notif.others")}</span>}
+                      <span className="break-words text-sm text-gray-700">{t(notification.comment_id ? "notif.mentionComment" : "notif.mentionPost")}</span>
+                    </span>
+                    <span className="block line-clamp-1 break-words text-sm text-gray-600">{post?.is_quick ? t("write.quickToggle") : post?.title || t("notif.postUnavailable")}</span>
                   </>
                 ) : (
                   <>
