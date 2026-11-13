@@ -69,11 +69,18 @@ type Post = {
 
 type LikeState = { count: number; liked: boolean };
 type FeedTab = "forYou" | "latest" | "following";
-type RecommendationReason = "follow" | "interest" | "popular" | "recent";
+type RecommendationReason = "follow" | "interest" | "popular" | "recent" | "series" | "new" | "explore";
 type FeedRestoreState = { scrollY: number; pages: number; tab: FeedTab };
 type FollowingFeedRow = { kind: "post" | "repost"; post_id: string; reposter_id: string | null; happened_at: string };
 type FollowingItem = FollowingFeedRow & { key: string };
 type ReposterProfile = { id: string; display_name: string | null; avatar: string | null };
+type RemovedPost = { post: Post; index: number };
+type FeedUndo = {
+  table: "feed_hides" | "feed_less_authors" | "feed_less_topics";
+  value: string;
+  posts: RemovedPost[];
+  pinnedPosts: RemovedPost[];
+};
 
 const feedTabLabels = {
   forYou: "feed.forYou",
@@ -82,11 +89,14 @@ const feedTabLabels = {
 } as const;
 const FEED_TABS = Object.keys(feedTabLabels) as FeedTab[];
 
-const reasonTranslationKeys: Record<RecommendationReason, "feed.whyFollow" | "feed.whyInterest" | "feed.whyPopular" | "feed.whyRecent"> = {
+const reasonTranslationKeys: Record<RecommendationReason, "feed.whyFollow" | "feed.whyInterest" | "feed.whyPopular" | "feed.whyRecent" | "feed.whySeries" | "feed.whyNew" | "feed.whyExplore"> = {
   follow: "feed.whyFollow",
   interest: "feed.whyInterest",
   popular: "feed.whyPopular",
   recent: "feed.whyRecent",
+  series: "feed.whySeries",
+  new: "feed.whyNew",
+  explore: "feed.whyExplore",
 };
 
 const PAGE_SIZE = 20;
@@ -141,11 +151,16 @@ export default function FeedPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [message, setMessage] = useState("");
   const [showSwipeHint, setShowSwipeHint] = useState(false);
+  const [openMenuPostId, setOpenMenuPostId] = useState<string | null>(null);
+  const [feedUndo, setFeedUndo] = useState<FeedUndo | null>(null);
+  const [feedActionBusy, setFeedActionBusy] = useState(false);
   const restoreState = useRef<FeedRestoreState | null>(null);
+  const feedUndoTimeout = useRef<number | null>(null);
   const loadMoreLock = useRef(false);
   const loadMoreSentinel = useRef<HTMLDivElement>(null);
   const likeRequests = useRef(new Set<string>());
   const bookmarkRequests = useRef(new Set<string>());
+  const feedPreferenceRequest = useRef(false);
   const feedTabs = FEED_TABS;
   const changeTab = useCallback((index: number) => {
     const next = feedTabs[index];
@@ -163,6 +178,95 @@ export default function FeedPage() {
     onChange: changeTab,
     enabled: true,
   });
+
+  useEffect(() => () => {
+    if (feedUndoTimeout.current !== null) window.clearTimeout(feedUndoTimeout.current);
+  }, []);
+
+  function restoreRemovedPosts(current: Post[], removed: RemovedPost[]) {
+    const restored = [...current];
+    for (const entry of [...removed].sort((a, b) => a.index - b.index)) {
+      if (!restored.some((post) => post.id === entry.post.id)) {
+        restored.splice(Math.min(entry.index, restored.length), 0, entry.post);
+      }
+    }
+    return restored;
+  }
+
+  async function hideFeedPosts(
+    table: FeedUndo["table"],
+    value: string,
+    matches: (post: Post) => boolean,
+  ) {
+    if (!userId || feedPreferenceRequest.current) return;
+    feedPreferenceRequest.current = true;
+    setFeedActionBusy(true);
+    setOpenMenuPostId(null);
+    setShowSwipeHint(false);
+    const undo: FeedUndo = {
+      table,
+      value,
+      posts: posts.flatMap((post, index) => matches(post) ? [{ post, index }] : []),
+      pinnedPosts: pinnedPosts.flatMap((post, index) => matches(post) ? [{ post, index }] : []),
+    };
+    setPosts((current) => current.filter((post) => !matches(post)));
+    setPinnedPosts((current) => current.filter((post) => !matches(post)));
+
+    try {
+      let error;
+      if (table === "feed_hides") {
+        ({ error } = await supabase.from(table).insert({ post_id: value }));
+      } else if (table === "feed_less_authors") {
+        ({ error } = await supabase.from(table).insert({ author_id: value }));
+      } else {
+        ({ error } = await supabase.from(table).insert({ topic: value }));
+      }
+      if (error && error.code !== "23505") throw error;
+
+      if (feedUndoTimeout.current !== null) window.clearTimeout(feedUndoTimeout.current);
+      setFeedUndo(undo);
+      feedUndoTimeout.current = window.setTimeout(() => setFeedUndo(null), 6000);
+    } catch (error) {
+      setPosts((current) => restoreRemovedPosts(current, undo.posts));
+      setPinnedPosts((current) => restoreRemovedPosts(current, undo.pinnedPosts));
+      const friendlyMessage = friendlyError(error, t);
+      setMessage(friendlyMessage);
+      window.setTimeout(() => setMessage((current) => current === friendlyMessage ? "" : current), 3000);
+    } finally {
+      feedPreferenceRequest.current = false;
+      setFeedActionBusy(false);
+    }
+  }
+
+  async function undoFeedAction() {
+    if (!feedUndo || feedPreferenceRequest.current) return;
+    feedPreferenceRequest.current = true;
+    setFeedActionBusy(true);
+    if (feedUndoTimeout.current !== null) window.clearTimeout(feedUndoTimeout.current);
+
+    try {
+      let error;
+      if (feedUndo.table === "feed_hides") {
+        ({ error } = await supabase.from(feedUndo.table).delete().eq("post_id", feedUndo.value));
+      } else if (feedUndo.table === "feed_less_authors") {
+        ({ error } = await supabase.from(feedUndo.table).delete().eq("author_id", feedUndo.value));
+      } else {
+        ({ error } = await supabase.from(feedUndo.table).delete().eq("topic", feedUndo.value));
+      }
+      if (error) throw error;
+      setPosts((current) => restoreRemovedPosts(current, feedUndo.posts));
+      setPinnedPosts((current) => restoreRemovedPosts(current, feedUndo.pinnedPosts));
+      setFeedUndo(null);
+    } catch (error) {
+      const friendlyMessage = friendlyError(error, t);
+      setMessage(friendlyMessage);
+      window.setTimeout(() => setMessage((current) => current === friendlyMessage ? "" : current), 3000);
+      feedUndoTimeout.current = window.setTimeout(() => setFeedUndo(null), 6000);
+    } finally {
+      feedPreferenceRequest.current = false;
+      setFeedActionBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (!("ontouchstart" in window) && navigator.maxTouchPoints === 0) return;
@@ -623,6 +727,80 @@ export default function FeedPage() {
           className={`post-card space-y-4 ${page === 0 && index < 8 ? "post-entry" : ""}`}
           style={page === 0 && index < 8 ? { animationDelay: `${index * 40}ms` } : undefined}
         >
+          {activeTab === "forYou" && userId && post.author_id !== userId && (
+            <div className="relative flex justify-end">
+              <button
+                type="button"
+                className="inline-flex h-11 min-w-11 items-center justify-center rounded-full text-gray-600 hover:bg-white/80 hover:text-deep-plum focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
+                aria-label={t("feed.moreMenu")}
+                aria-haspopup="menu"
+                aria-expanded={openMenuPostId === post.id}
+                onPointerDown={(event) => event.stopPropagation()}
+                onPointerUp={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setOpenMenuPostId((current) => current === post.id ? null : post.id);
+                }}
+              >
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <circle cx="5" cy="12" r="1.7" />
+                  <circle cx="12" cy="12" r="1.7" />
+                  <circle cx="19" cy="12" r="1.7" />
+                </svg>
+              </button>
+              {openMenuPostId === post.id && (
+                <div className="absolute right-0 top-11 z-20 w-64 max-w-[calc(100vw-3rem)] rounded-2xl border border-soft-lilac bg-white p-2 shadow-xl" role="menu">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="min-h-11 w-full rounded-xl px-3 py-2 text-left text-sm text-deep-plum hover:bg-soft-lilac/40"
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onPointerUp={(event) => event.stopPropagation()}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void hideFeedPosts("feed_hides", post.id, (candidate) => candidate.id === post.id);
+                    }}
+                  >
+                    {t("feed.notInterested")}
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="min-h-11 w-full rounded-xl px-3 py-2 text-left text-sm text-deep-plum hover:bg-soft-lilac/40"
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onPointerUp={(event) => event.stopPropagation()}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void hideFeedPosts("feed_less_authors", post.author_id, (candidate) => candidate.author_id === post.author_id);
+                    }}
+                  >
+                    {t("feed.lessAuthor")}
+                  </button>
+                  {post.topics.slice(0, 3).map((topic, topicIndex) => {
+                    const normalizedTopic = topic.toLowerCase();
+                    return (
+                      <button
+                        key={`${normalizedTopic}-${topicIndex}`}
+                        type="button"
+                        role="menuitem"
+                        className="min-h-11 w-full rounded-xl px-3 py-2 text-left text-sm text-deep-plum hover:bg-soft-lilac/40"
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onPointerUp={(event) => event.stopPropagation()}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void hideFeedPosts("feed_less_topics", normalizedTopic, (candidate) =>
+                            candidate.topics.some((candidateTopic) => candidateTopic.toLowerCase() === normalizedTopic)
+                          );
+                        }}
+                      >
+                        {t("feed.lessTopic")} {topic}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
           {post.cover && <div className="h-[72px] overflow-hidden rounded-xl"><CoverArt cover={post.cover} className="h-full" /></div>}
           <DoubleTapLikeArea
             liked={Boolean(likeStates[post.id]?.liked)}
@@ -818,6 +996,19 @@ export default function FeedPage() {
         )}
         </div>
         {showSwipeHint && <div role="status" className="fixed bottom-24 left-1/2 z-50 max-w-[calc(100vw-2rem)] -translate-x-1/2 break-words rounded-full bg-deep-plum px-4 py-2 text-center text-sm whitespace-normal text-white shadow-lg motion-reduce:transition-none">{t("swipe.hint")}</div>}
+        {feedUndo && (
+          <div className="fixed bottom-24 left-1/2 z-50 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-3 rounded-2xl bg-deep-plum px-4 py-3 text-center text-sm text-white shadow-lg" role="status">
+            <span className="break-words">{t("feed.hiddenToast")}</span>
+            <button
+              type="button"
+              className="inline-flex min-h-11 items-center rounded-full border border-white/60 px-4 font-semibold text-white underline hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              onClick={() => void undoFeedAction()}
+              disabled={feedActionBusy}
+            >
+              {t("feed.undo")}
+            </button>
+          </div>
+        )}
     </PageShell>
   );
 }

@@ -775,6 +775,23 @@ const en = {
   "explore.kindQuestionDesc": "Ask, and help answer",
   "explore.kindKnowledgeDesc": "Things members have learned",
   "explore.seeMoreLike": "See more like this",
+  "feed.moreMenu": "More options for this post",
+  "feed.notInterested": "Not interested in this post",
+  "feed.lessAuthor": "See fewer posts from this member",
+  "feed.lessTopic": "See fewer posts about",
+  "feed.hiddenToast": "Got it. We'll show less like this.",
+  "feed.undo": "Undo",
+  "feed.yourFeed": "Your feed",
+  "feed.yourFeedEmpty": "You haven't hidden anything yet.",
+  "feed.reset": "Reset my feed",
+  "feed.resetConfirm": "Forget everything you've hidden or asked to see less of?",
+  "feed.whySeries": "From a series you follow",
+  "feed.whyNew": "New here",
+  "feed.whyExplore": "Something different for you",
+  "feed.hiddenCount": "posts hidden",
+  "feed.lessAuthors": "Members you see less of",
+  "feed.lessTopics": "Topics you see less of",
+  "feed.remove": "Remove",
 } as const;
 
 export type TranslationKey = keyof typeof en;

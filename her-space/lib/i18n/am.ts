@@ -781,6 +781,23 @@ const am: Record<TranslationKey, string> = {
   "explore.kindQuestionDesc": "ጠይቂ፤ በመመለስም እርዳ",
   "explore.kindKnowledgeDesc": "አባላት የተማሯቸው ነገሮች",
   "explore.seeMoreLike": "እንደዚህ ያሉትን ተጨማሪ ተመልከቺ",
+  "feed.moreMenu": "ስለዚህ ጽሑፍ ተጨማሪ አማራጮች",
+  "feed.notInterested": "ይህ ጽሑፍ አይስበኝም",
+  "feed.lessAuthor": "ከዚህች አባል ጥቂት ጽሑፎችን አሳዪኝ",
+  "feed.lessTopic": "ጥቂት ጽሑፎችን አሳዪኝ ስለ",
+  "feed.hiddenToast": "ገባኝ። እንዲህ ያሉትን ጥቂት እናሳያለን።",
+  "feed.undo": "ተመለስ",
+  "feed.yourFeed": "ምግብሽ",
+  "feed.yourFeedEmpty": "እስካሁን ምንም አልደበቅሽም።",
+  "feed.reset": "ምግቤን እንደገና አስጀምር",
+  "feed.resetConfirm": "የደበቅሽውንና ጥቂት እንዲታይ የጠየቅሽውን ሁሉ ልርሳ?",
+  "feed.whySeries": "ከምትከተያት ተከታታይ",
+  "feed.whyNew": "አዲስ",
+  "feed.whyExplore": "ለአንቺ የተለየ ነገር",
+  "feed.hiddenCount": "የተደበቁ ጽሑፎች",
+  "feed.lessAuthors": "ጥቂት እንዲታዩ የጠየቅሻቸው አባላት",
+  "feed.lessTopics": "ጥቂት እንዲታዩ የጠየቅሻቸው ርዕሶች",
+  "feed.remove": "አስወግጂ",
 };
  
 export default am;

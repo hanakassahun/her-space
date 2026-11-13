@@ -15,6 +15,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/components/AuthProvider";
 import InterestPicker from "@/components/InterestPicker";
 import { maskEmail } from "@/lib/maskEmail";
+import Avatar from "@/components/Avatar";
 
 const RECENT_ACCOUNTS_KEY = "recentAccounts";
 type MoodOverride = "auto" | "morning" | "day" | "evening" | "night";
@@ -41,10 +42,18 @@ type BlockRow = {
   created_at: string;
   profiles: { display_name: string | null } | { display_name: string | null }[] | null;
 };
+type LessAuthorRow = {
+  author_id: string;
+  profiles: { display_name: string | null; avatar: string | null } | { display_name: string | null; avatar: string | null }[] | null;
+};
 
 function getDisplayName(profiles: BlockRow["profiles"]): string {
   const p = Array.isArray(profiles) ? profiles[0] : profiles;
   return p?.display_name ?? "Her Space member";
+}
+
+function getLessAuthorProfile(profiles: LessAuthorRow["profiles"]) {
+  return Array.isArray(profiles) ? profiles[0] : profiles;
 }
 
 export default function SettingsPage() {
@@ -91,6 +100,11 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordSaving, setPasswordSaving] = useState(false);
+  const [hiddenPostCount, setHiddenPostCount] = useState(0);
+  const [lessAuthorRows, setLessAuthorRows] = useState<LessAuthorRow[]>([]);
+  const [lessTopics, setLessTopics] = useState<string[]>([]);
+  const [feedPreferenceMessage, setFeedPreferenceMessage] = useState("");
+  const [feedPreferenceSaving, setFeedPreferenceSaving] = useState(false);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -136,13 +150,18 @@ export default function SettingsPage() {
         return;
       }
 
-      const [blocksResult, interestsResult, privateResult] = await Promise.all([
+      const [blocksResult, interestsResult, privateResult, hiddenPostsResult, lessAuthorsResult, lessTopicsResult] = await Promise.all([
         supabase
           .from("user_blocks")
           .select("blocked_id, kind, created_at, profiles!user_blocks_blocked_id_fkey(display_name)")
           .order("created_at", { ascending: false }),
         supabase.from("member_interests").select("topic").eq("user_id", userId).order("topic"),
         supabase.from("member_private").select("age_group").eq("user_id", userId).maybeSingle(),
+        supabase.from("feed_hides").select("post_id", { count: "exact", head: true }),
+        supabase.from("feed_less_authors")
+          .select("author_id, profiles!feed_less_authors_author_id_fkey(display_name, avatar)")
+          .order("author_id"),
+        supabase.from("feed_less_topics").select("topic").order("topic"),
       ]);
 
       setBlockRows((blocksResult.data ?? []) as BlockRow[]);
@@ -150,8 +169,13 @@ export default function SettingsPage() {
       setSelectedInterests(interests);
       setSavedInterests(interests);
       setAgeGroup(privateResult.data?.age_group === "teen" || privateResult.data?.age_group === "adult" ? privateResult.data.age_group : null);
+      setHiddenPostCount(hiddenPostsResult.count ?? 0);
+      setLessAuthorRows((lessAuthorsResult.data ?? []) as LessAuthorRow[]);
+      setLessTopics(((lessTopicsResult.data ?? []) as { topic: string }[]).map(({ topic }) => topic));
       if (interestsResult.error) setInterestMessage(friendlyError(interestsResult.error, t));
       else if (privateResult.error) setInterestMessage(friendlyError(privateResult.error, t));
+      const feedError = hiddenPostsResult.error ?? lessAuthorsResult.error ?? lessTopicsResult.error;
+      if (feedError) setFeedPreferenceMessage(friendlyError(feedError, t));
       setLoading(false);
     }
     void checkSession();
@@ -209,6 +233,46 @@ export default function SettingsPage() {
       setInterestMessage(t("settings.interestsSaved"));
     }
     setSavingInterests(false);
+  }
+
+  async function removeLessAuthor(authorId: string) {
+    if (feedPreferenceSaving) return;
+    setFeedPreferenceSaving(true);
+    setFeedPreferenceMessage("");
+    const { error } = await supabase.from("feed_less_authors").delete().eq("author_id", authorId);
+    if (error) setFeedPreferenceMessage(friendlyError(error, t));
+    else setLessAuthorRows((current) => current.filter((row) => row.author_id !== authorId));
+    setFeedPreferenceSaving(false);
+  }
+
+  async function removeLessTopic(topic: string) {
+    if (feedPreferenceSaving) return;
+    setFeedPreferenceSaving(true);
+    setFeedPreferenceMessage("");
+    const { error } = await supabase.from("feed_less_topics").delete().eq("topic", topic);
+    if (error) setFeedPreferenceMessage(friendlyError(error, t));
+    else setLessTopics((current) => current.filter((currentTopic) => currentTopic !== topic));
+    setFeedPreferenceSaving(false);
+  }
+
+  async function resetFeedPreferences() {
+    if (feedPreferenceSaving || !window.confirm(t("feed.resetConfirm"))) return;
+    setFeedPreferenceSaving(true);
+    setFeedPreferenceMessage("");
+    const results = await Promise.all([
+      supabase.from("feed_hides").delete(),
+      supabase.from("feed_less_authors").delete(),
+      supabase.from("feed_less_topics").delete(),
+    ]);
+    const failedResult = results.find((result) => result.error);
+    if (failedResult?.error) {
+      setFeedPreferenceMessage(friendlyError(failedResult.error, t));
+    } else {
+      setHiddenPostCount(0);
+      setLessAuthorRows([]);
+      setLessTopics([]);
+    }
+    setFeedPreferenceSaving(false);
   }
 
   async function logOut() {
@@ -410,6 +474,64 @@ export default function SettingsPage() {
           </Button>
         </div>
         {notificationPrefsError && <p className="break-words text-sm text-red-700" role="alert">{notificationPrefsError}</p>}
+      </Card>
+
+      <Card as="section" className="space-y-4">
+        <h2 className="break-words text-xl font-semibold text-deep-plum">{t("feed.yourFeed")}</h2>
+        <p className="text-sm text-gray-700"><span className="font-semibold text-deep-plum">{hiddenPostCount}</span> {t("feed.hiddenCount")}</p>
+        {hiddenPostCount === 0 && lessAuthorRows.length === 0 && lessTopics.length === 0 && !feedPreferenceMessage ? (
+          <p className="text-sm text-gray-600">{t("feed.yourFeedEmpty")}</p>
+        ) : (
+          <>
+            {lessAuthorRows.length > 0 && (
+              <div className="space-y-2 border-t border-soft-lilac/70 pt-4">
+                <h3 className="font-semibold text-deep-plum">{t("feed.lessAuthors")}</h3>
+                <ul className="space-y-2">
+                  {lessAuthorRows.map((row) => {
+                    const profile = getLessAuthorProfile(row.profiles);
+                    const name = profile?.display_name || "Her Space member";
+                    return (
+                      <li key={row.author_id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-soft-lilac bg-white/70 px-3 py-2">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <Avatar name={name} avatar={profile?.avatar ?? null} size={40} />
+                          <span className="min-w-0 break-words font-medium text-deep-plum">{name}</span>
+                        </div>
+                        <Button variant="secondary" type="button" disabled={feedPreferenceSaving} onClick={() => void removeLessAuthor(row.author_id)}>
+                          {t("feed.remove")}
+                        </Button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+            {lessTopics.length > 0 && (
+              <div className="space-y-2 border-t border-soft-lilac/70 pt-4">
+                <h3 className="font-semibold text-deep-plum">{t("feed.lessTopics")}</h3>
+                <ul className="flex flex-wrap gap-2">
+                  {lessTopics.map((topic) => (
+                    <li key={topic} className="inline-flex min-h-11 items-center gap-1 rounded-full bg-soft-lilac pl-3 text-sm text-deep-plum">
+                      <span className="break-words">{topic}</span>
+                      <button
+                        type="button"
+                        className="inline-flex h-11 min-w-11 items-center justify-center rounded-full hover:bg-white/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-periwinkle"
+                        aria-label={`${t("feed.remove")} ${topic}`}
+                        disabled={feedPreferenceSaving}
+                        onClick={() => void removeLessTopic(topic)}
+                      >
+                        <span aria-hidden="true">×</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        )}
+        {feedPreferenceMessage && <p className="break-words text-sm text-red-700" role="alert"><FriendlyErrorMessage message={feedPreferenceMessage} /></p>}
+        <Button variant="secondary" type="button" disabled={feedPreferenceSaving} onClick={() => void resetFeedPreferences()}>
+          {t("feed.reset")}
+        </Button>
       </Card>
 
       <Card as="section" className="space-y-4">
